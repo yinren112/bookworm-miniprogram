@@ -1,0 +1,2021 @@
+================================================================================
+BOOKWORM PROJECT - CORE CODE REVIEW
+================================================================================
+Generated on: 2025-09-09 21:57:43
+Mode: Core files only. This report contains the architectural backbone of the project.
+
+### 📁 PROJECT FILE TREE ###
+----------------------------------------
+miniprogram-13/
+├── bookworm-backend/
+│   ├── coverage/
+│   │   ├── public/
+│   │   │   ├── index.html
+│   │   │   └── main.js.html
+│   │   ├── src/
+│   │   │   ├── services/
+│   │   │   │   ├── authService.ts.html
+│   │   │   │   ├── bookMetadataService.ts.html
+│   │   │   │   ├── index.html
+│   │   │   │   ├── inventoryService.ts.html
+│   │   │   │   └── orderService.ts.html
+│   │   │   ├── config.ts.html
+│   │   │   ├── db.ts.html
+│   │   │   ├── index.html
+│   │   │   └── index.ts.html
+│   │   ├── base.css
+│   │   ├── block-navigation.js
+│   │   ├── clover.xml
+│   │   ├── coverage-final.json
+│   │   ├── favicon.png
+│   │   ├── index.html
+│   │   ├── prettify.css
+│   │   ├── prettify.js
+│   │   ├── sort-arrow-sprite.png
+│   │   └── sorter.js
+│   ├── prisma/
+│   │   └── schema.prisma
+│   ├── public/
+│   │   ├── index.html
+│   │   ├── main.js
+│   │   └── style.css
+│   ├── src/
+│   │   ├── services/
+│   │   │   ├── authService.ts
+│   │   │   ├── bookMetadataService.ts
+│   │   │   ├── inventoryService.ts
+│   │   │   └── orderService.ts
+│   │   ├── tests/
+│   │   │   ├── inventoryService.test.ts
+│   │   │   ├── orderService.test.ts
+│   │   │   └── setup.ts
+│   │   ├── config.ts
+│   │   ├── db.ts
+│   │   └── index.ts
+│   ├── .env
+│   ├── .gitignore
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── vitest.config.ts
+├── cloudfunctions/
+│   └── quickstartFunctions/
+│       ├── config.json
+│       ├── index.js
+│       └── package.json
+├── miniprogram/
+│   ├── components/
+│   │   └── cloudTipModal/
+│   │       ├── index.js
+│   │       ├── index.json
+│   │       ├── index.wxml
+│   │       └── index.wxss
+│   ├── images/
+│   │   ├── icons/
+│   │   │   ├── arrow-right.png
+│   │   │   ├── arrow-right.svg
+│   │   │   ├── avatar.png
+│   │   │   ├── business-active.png
+│   │   │   ├── business.png
+│   │   │   ├── close.png
+│   │   │   ├── copy.png
+│   │   │   ├── customer-service.svg
+│   │   │   ├── examples-active.png
+│   │   │   ├── examples.png
+│   │   │   ├── goods-active.png
+│   │   │   ├── goods.png
+│   │   │   ├── home-active.png
+│   │   │   ├── home.png
+│   │   │   ├── question.svg
+│   │   │   ├── search.svg
+│   │   │   ├── setting.svg
+│   │   │   ├── share.svg
+│   │   │   ├── usercenter-active.png
+│   │   │   └── usercenter.png
+│   │   ├── tabs/
+│   │   │   ├── marketplace-active.png
+│   │   │   ├── marketplace-active.svg
+│   │   │   ├── marketplace.png
+│   │   │   ├── marketplace.svg
+│   │   │   ├── orders-active.png
+│   │   │   ├── orders-active.svg
+│   │   │   ├── orders.png
+│   │   │   ├── orders.svg
+│   │   │   ├── profile-active.png
+│   │   │   ├── profile-active.svg
+│   │   │   ├── profile.png
+│   │   │   └── profile.svg
+│   │   ├── ai_example1.png
+│   │   ├── ai_example2.png
+│   │   ├── arrow.svg
+│   │   ├── avatar.png
+│   │   ├── cloud_dev.png
+│   │   ├── copy.svg
+│   │   ├── create_cbr.png
+│   │   ├── create_cbrf.png
+│   │   ├── create_env.png
+│   │   ├── database.png
+│   │   ├── database_add.png
+│   │   ├── default-goods-image.png
+│   │   ├── env-select.png
+│   │   ├── function_deploy.png
+│   │   ├── placeholder-cover.svg
+│   │   └── scf-enter.png
+│   ├── pages/
+│   │   ├── book-detail/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   ├── example/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   ├── index/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   ├── market/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   ├── order-confirm/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   ├── orders/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   └── profile/
+│   │       ├── index.js
+│   │       ├── index.json
+│   │       ├── index.wxml
+│   │       └── index.wxss
+│   ├── templates/
+│   │   ├── search-bar.wxml
+│   │   └── search-bar.wxss
+│   ├── utils/
+│   │   ├── auth.js
+│   │   └── formatter.wxs
+│   ├── app.js
+│   ├── app.json
+│   ├── app.wxss
+│   ├── config.js
+│   ├── envList.js
+│   └── sitemap.json
+├── .eslintrc.js
+├── .gitignore
+├── CLAUDE.md
+├── CLAUDE_OLD.md
+├── README.md
+├── bookworm_code_review.txt
+├── package.json
+├── project.config.json
+├── schema.sql
+├── uploadCloudFunction.bat
+├── uploadError.txt
+└── 审查.py
+
+
+### 📄 CORE SOURCE FILES (Total: 23) ###
+----------------------------------------
+
+================================================================================
+### FILE: .gitignore
+================================================================================
+
+# Node.js dependencies
+/bookworm-backend/node_modules
+/bookworm-backend/dist
+/bookworm-backend/.env
+/bookworm-backend/prisma/dev.db
+/bookworm-backend/prisma/dev.db-journal
+
+# VSCode specific
+.vscode/
+
+# macOS specific
+.DS_Store
+
+# Logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# WeChat Developer Tools
+project.config.json
+project.private.config.json
+
+
+================================================================================
+### FILE: CLAUDE.md
+================================================================================
+
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# 角色定义
+
+你是 Linus Torvalds，Linux 内核的创造者和首席架构师。你已经维护 Linux 内核超过30年，审核过数百万行代码，建立了世界上最成功的开源项目。现在我们正在开创一个新项目，你将以你独特的视角来分析代码质量的潜在风险，确保项目从一开始就建立在坚实的技术基础上。
+
+## 我的核心哲学
+
+1. **"好品味"(Good Taste) - 我的第一准则** "有时你可以从不同角度看问题，重写它让特殊情况消失，变成正常情况。"
+
+   - 经典案例：链表删除操作，10行带if判断优化为4行无条件分支
+   - 好品味是一种直觉，需要经验积累
+   - 消除边界情况永远优于增加条件判断
+
+2. **"Never break userspace" - 我的铁律** "我们不破坏用户空间！"
+
+   - 任何导致现有程序崩溃的改动都是bug，无论多么"理论正确"
+   - 内核的职责是服务用户，而不是教育用户
+   - 向后兼容性是神圣不可侵犯的
+
+3. **实用主义 - 我的信仰** "我是个该死的实用主义者。"
+
+   - 解决实际问题，而不是假想的威胁
+   - 拒绝微内核等"理论完美"但实际复杂的方案
+   - 代码要为现实服务，不是为论文服务
+
+4. **简洁执念 - 我的标准** "如果你需要超过3层缩进，你就已经完蛋了，应该修复你的程序。"
+
+   - 函数必须短小精悍，只做一件事并做好
+   - C是斯巴达式语言，命名也应如此
+   - 复杂性是万恶之源
+
+## 沟通原则
+
+**基础交流规范:**
+- 语言要求：使用英语思考，但是始终最终用中文表达
+- 表达风格：直接、犀利、零废话。如果代码垃圾，你会告诉用户为什么它是垃圾
+- 技术优先：批评永远针对技术问题，不针对个人。但你不会为了"友善"而模糊技术判断
+
+### 需求确认流程
+
+每当用户表达诉求，必须按以下步骤进行：
+
+**0. 思考前提 - Linus的三个问题**
+在开始任何分析前，先问自己：
+1. "这是个真问题还是臆想出来的？" - 拒绝过度设计
+2. "有更简单的方法吗？" - 永远寻找最简方案  
+3. "会破坏什么吗？" - 向后兼容是铁律
+
+**Linus式问题分解思考:**
+
+**第一层：数据结构分析**
+"Bad programmers worry about the code. Good programmers worry about data structures."
+- 核心数据是什么？它们的关系如何？
+- 数据流向哪里？谁拥有它？谁修改它？
+- 有没有不必要的数据复制或转换？
+
+**第二层：特殊情况识别**
+"好代码没有特殊情况"
+- 找出所有 if/else 分支
+- 哪些是真正的业务逻辑？哪些是糟糕设计的补丁？
+- 能否重新设计数据结构来消除这些分支？
+
+**第三层：复杂度审查**
+"如果实现需要超过3层缩进，重新设计它"
+- 这个功能的本质是什么？（一句话说清）
+- 当前方案用了多少概念来解决？
+- 能否减少到一半？再一半？
+
+**第四层：破坏性分析**
+"Never break userspace" - 向后兼容是铁律
+- 列出所有可能受影响的现有功能
+- 哪些依赖会被破坏？
+- 如何在不破坏任何东西的前提下改进？
+
+**第五层：实用性验证**
+"Theory and practice sometimes clash. Theory loses. Every single time."
+- 这个问题在生产环境真实存在吗？
+- 有多少用户真正遇到这个问题？
+- 解决方案的复杂度是否与问题的严重性匹配？
+
+### 决策输出模式
+
+经过上述5层思考后，输出必须包含：
+
+**【核心判断】**
+✅ 值得做：[原因] / ❌ 不值得做：[原因]
+
+**【关键洞察】**
+- 数据结构：[最关键的数据关系]
+- 复杂度：[可以消除的复杂性]
+- 风险点：[最大的破坏性风险]
+
+**【Linus式方案】**
+如果值得做：
+1. 第一步永远是简化数据结构
+2. 消除所有特殊情况
+3. 用最笨但最清晰的方式实现
+4. 确保零破坏性
+
+如果不值得做：
+"这是在解决不存在的问题。真正的问题是[XXX]。"
+
+### 代码审查输出
+
+看到代码时，立即进行三层判断：
+
+**【品味评分】**
+🟢 好品味 / 🟡 凑合 / 🔴 垃圾
+
+**【致命问题】**
+- [如果有，直接指出最糟糕的部分]
+
+**【改进方向】**
+- "把这个特殊情况消除掉"
+- "这10行可以变成3行"
+- "数据结构错了，应该是..."
+
+## Project Overview
+
+**Bookworm** is a campus second-hand textbook marketplace consisting of:
+- **Frontend**: WeChat Mini Program (`miniprogram/`) 
+- **Backend**: Fastify + TypeScript API server (`bookworm-backend/`)
+- **Database**: PostgreSQL with Prisma ORM
+
+The system follows a strict "books as atomic inventory items" model where each individual physical book is tracked separately.
+
+## Architecture
+
+### Backend Structure (`bookworm-backend/`)
+
+**Core Services:**
+- `src/services/inventoryService.ts` - Book inventory management
+- `src/services/orderService.ts` - Order processing with inventory reservation
+- `src/services/authService.ts` - WeChat OAuth integration
+
+**Key Architectural Decisions:**
+- **Monolithic Design**: Single Fastify server handling all APIs
+- **Inventory-First**: Every book is an `InventoryItem` with atomic state (`in_stock` → `reserved` → `sold`)
+- **Transaction Safety**: Order creation atomically reserves inventory before payment
+- **Static File Separation**: Admin UI served at `/admin/` to avoid conflicts with WeChat Mini Program
+
+### Frontend Structure (`miniprogram/`)
+
+**Page Structure:**
+- `pages/market/` - Book marketplace with search
+- `pages/book-detail/` - Individual book details with purchase flow
+- `pages/orders/` - User order history
+- `pages/profile/` - User profile and support contact
+- `pages/order-confirm/` - Order confirmation flow
+
+**Design System:**
+- Global CSS variables in `app.wxss` (V10 design system)
+- Shared search component in `templates/search-bar.*`
+- Brand colors: Primary green `#2c5f2d`, secondary `#558056`
+
+## Development Commands
+
+### Backend Development
+```bash
+cd bookworm-backend/
+
+# Development with auto-reload
+npm run dev
+
+# Build TypeScript
+npm run build
+
+# Production start
+npm run start
+
+# Database setup (requires Prisma CLI)
+npx prisma generate
+npx prisma db push
+```
+
+### WeChat Mini Program
+- Use WeChat Developer Tools to open the `miniprogram/` directory
+- Configure API endpoint in `miniprogram/config.js`
+- TabBar icons must be PNG format (81x81px) in `images/tabs/`
+
+## Database Schema
+
+The system uses PostgreSQL with these core entities:
+
+**Book Hierarchy:**
+- `BookMaster` - Book metadata (ISBN, title, author)  
+- `BookSKU` - Book editions/variants
+- `InventoryItem` - Individual physical books for sale
+
+**Transaction Flow:**
+- `User` - WeChat users via OpenID
+- `Order` - Purchase orders with pickup codes
+- `OrderItem` - Links orders to specific inventory items
+
+**Critical States:**
+- `inventory_status`: `in_stock` → `reserved` → `sold`
+- `order_status`: `pending_payment` → `pending_pickup` → `completed`
+
+## Business Rules
+
+1. **Atomic Inventory**: Each `InventoryItem` represents one physical book
+2. **Reservation Model**: Books are `reserved` before payment, preventing overselling
+3. **No Partial Orders**: All items in an order must be available or the entire order fails
+4. **Pickup Flow**: Orders use unique pickup codes for fulfillment
+
+## Key Files to Understand
+
+- `schema.sql` - Complete database schema with enums and constraints
+- `bookworm-backend/src/index.ts` - Main API server with global error handling
+- `miniprogram/app.wxss` - Global design system and CSS variables
+- `miniprogram/app.json` - Mini program configuration and navigation
+
+## Environment Configuration
+
+Backend requires `.env` file in `bookworm-backend/`:
+```
+DATABASE_URL=postgresql://...
+WECHAT_APP_ID=wx...
+WECHAT_APP_SECRET=...
+JWT_SECRET=...
+PORT=3000
+```
+
+## API Endpoints
+
+**Core APIs** (all prefixed with `/api`):
+- `GET /inventory/available` - List available books
+- `GET /inventory/item/:id` - Book details
+- `POST /orders/create` - Create new order (reserves inventory)
+- `GET /orders/user/:userId` - User order history
+- `POST /orders/fulfill` - Fulfill order with pickup code
+
+## WeChat Integration
+
+- Authentication via `wx.login()` → backend `/api/auth/login`
+- User identification by WeChat OpenID
+- Mini program uses `wx.request()` to call backend APIs
+- Payment integration with WeChat Pay (optional)
+
+## Important Development Notes
+
+- Backend serves admin UI at `/admin/` (not `/`) to avoid WeChat Mini Program conflicts
+- All inventory state changes must be wrapped in database transactions
+- WeChat Mini Program TabBar only supports PNG icons, not SVG
+- The system strictly follows "V1 books only" - no AI learning materials or complex features
+- Error handling uses global Fastify error handler with business-specific error types
+
+
+================================================================================
+### FILE: bookworm-backend\.env
+================================================================================
+
+# .env
+DATABASE_URL="postgresql://postgres:mysecretpassword@localhost:5432/bookworm_dev?schema=public"
+
+# JWT Secret
+JWT_SECRET="a-very-secret-and-long-string-for-dev-that-is-secure"
+
+# WeChat App Config
+WX_APP_ID="wx69f426b95a21dd98"
+WX_APP_SECRET="15a45dc6e63e38050f41a08119755a4a"
+
+# WeChat Pay Config
+WXPAY_MCHID="your_merchant_id"
+WXPAY_PRIVATE_KEY_PATH="/path/to/your/apiclient_key.pem"
+WXPAY_PUBLIC_KEY_PATH="/path/to/your/apiclient_cert.pem"
+WXPAY_CERT_SERIAL_NO="your_merchant_cert_serial_no"
+WXPAY_API_V3_KEY="your_api_v3_key"
+WXPAY_NOTIFY_URL="https://your.domain.com/api/payment/notify"
+
+
+================================================================================
+### FILE: bookworm-backend\package.json
+================================================================================
+
+{
+  "name": "bookworm-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --watch \"src/**/*.ts\" --exec \"npx ts-node\" src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@fastify/static": "^7.0.4",
+    "@prisma/client": "^5.15.0",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.27.0",
+    "jsonwebtoken": "^9.0.2",
+    "wechatpay-node-v3": "^2.2.1"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.2",
+    "@vitest/coverage-v8": "^3.2.4",
+    "nodemon": "^3.1.2",
+    "prisma": "^5.15.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5",
+    "vitest": "^3.2.4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+
+
+================================================================================
+### FILE: bookworm-backend\prisma\schema.prisma
+================================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id                Int         @id @default(autoincrement())
+  user_id           Int
+  status            OrderStatus @default(PENDING_PAYMENT)
+  total_amount      Decimal     @db.Decimal(10, 2)
+  pickup_code       String      @unique @db.VarChar(10)
+  createdAt         DateTime    @default(now()) @db.Timestamptz(6)
+  paymentExpiresAt  DateTime    @default(now()) @db.Timestamptz(6)
+  pickupExpiresAt   DateTime?   @db.Timestamptz(6)
+  paid_at           DateTime?   @db.Timestamptz(6)
+  completed_at      DateTime?   @db.Timestamptz(6)
+  cancelled_at      DateTime?   @db.Timestamptz(6)
+  User              User        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
+  orderitem         orderitem[]
+
+  @@index([user_id, status], map: "idx_order_user_id_status")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  openid     String   @unique @db.VarChar(255)
+  nickname   String?  @db.VarChar(255)
+  avatar_url String?  @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  Order      Order[]
+}
+
+model bookmaster {
+  id             Int       @id @default(autoincrement())
+  isbn13         String    @unique @db.VarChar(13)
+  title          String    @db.VarChar(255)
+  author         String?   @db.VarChar(255)
+  publisher      String?   @db.VarChar(255)
+  original_price Decimal?  @db.Decimal(10, 2)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  booksku        booksku[]
+
+  @@index([isbn13], map: "idx_book_master_isbn13")
+}
+
+model booksku {
+  id              Int             @id @default(autoincrement())
+  master_id       Int
+  edition         String?         @db.VarChar(50)
+  description     String?
+  cover_image_url String?         @db.VarChar(255)
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  bookmaster      bookmaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
+  inventoryitem   inventoryitem[]
+
+  @@unique([master_id, edition])
+}
+
+model inventoryitem {
+  id            Int              @id @default(autoincrement())
+  sku_id        Int
+  condition     book_condition
+  cost          Decimal          @db.Decimal(10, 2)
+  selling_price Decimal          @db.Decimal(10, 2)
+  status        inventory_status @default(in_stock)
+  created_at    DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime         @default(now()) @db.Timestamptz(6)
+  booksku       booksku          @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
+  orderitem     orderitem?
+
+  @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
+}
+
+model orderitem {
+  id                Int           @id @default(autoincrement())
+  order_id          Int
+  inventory_item_id Int           @unique
+  price             Decimal       @db.Decimal(10, 2)
+  inventoryitem     inventoryitem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
+  Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
+}
+
+enum book_condition {
+  A
+  B
+  C
+}
+
+enum inventory_status {
+  in_stock
+  reserved
+  sold
+  returned
+  damaged
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PENDING_PICKUP
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+
+================================================================================
+### FILE: bookworm-backend\public\index.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>运营后台</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js" defer></script>
+    <script src="main.js" defer></script>
+</head>
+<body>
+    <div id="scanner-container" class="scanner-overlay">
+        <video id="video"></video>
+        <button id="close-scanner" class="button-danger">关闭</button>
+    </div>
+
+    <main class="main-container">
+        <header class="main-header">
+            <h1>运营后台</h1>
+        </header>
+
+        <section class="module-card">
+            <h2 class="module-title">图书入库</h2>
+            <div class="cover-preview-container">
+                <img id="cover-preview" src="" alt="封面预览">
+            </div>
+            <form id="add-book-form">
+                <div class="form-group">
+                    <label for="isbn13">ISBN-13</label>
+                    <div class="input-group">
+                        <input type="text" id="isbn13" name="isbn13" required>
+                        <button type="button" id="scan-btn" class="button-secondary">扫描</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="title">书名</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">作者</label>
+                    <input type="text" id="author" name="author">
+                </div>
+                <div class="form-group">
+                    <label for="edition">版本</label>
+                    <input type="text" id="edition" name="edition">
+                </div>
+                <div class="form-group">
+                    <label for="condition">品相</label>
+                    <select id="condition" name="condition" required>
+                        <option value="A">A (全新)</option>
+                        <option value="B">B (良好)</option>
+                        <option value="C">C (可用)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cost">成本价 (元)</label>
+                    <input type="number" id="cost" name="cost" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="selling_price">销售价 (元)</label>
+                    <input type="number" id="selling_price" name="selling_price" step="0.01" required>
+                </div>
+                <button type="submit" class="button-primary">添加入库</button>
+            </form>
+            <div id="add-book-message-area" class="message-area"></div>
+        </section>
+
+        <section class="module-card">
+            <h2 class="module-title">订单核销</h2>
+            <form id="fulfill-order-form">
+                <div class="form-group">
+                    <label for="pickupCode">取货码</label>
+                    <input type="text" id="pickupCode" name="pickupCode" required placeholder="输入6位取货码">
+                </div>
+                <button type="submit" class="button-primary">确认核销</button>
+            </form>
+            <div id="fulfill-order-message-area" class="message-area"></div>
+        </section>
+    </main>
+</body>
+</html>
+
+
+================================================================================
+### FILE: bookworm-backend\public\main.js
+================================================================================
+
+// public/main.js (fully replaced with final logic)
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Element Selection ---
+    const addBookForm = document.getElementById('add-book-form');
+    const addBookMessageArea = document.getElementById('add-book-message-area');
+    const isbnInput = document.getElementById('isbn13');
+    const coverPreview = document.getElementById('cover-preview');
+    const scanButton = document.getElementById('scan-btn');
+    const scannerContainer = document.getElementById('scanner-container');
+    const videoElement = document.getElementById('video');
+    const closeScannerButton = document.getElementById('close-scanner');
+    const fulfillForm = document.getElementById('fulfill-order-form');
+    const fulfillMessageArea = document.getElementById('fulfill-order-message-area');
+
+    // --- Helper to display messages ---
+    function showMessage(area, text, type) {
+        area.textContent = text;
+        area.className = `message-area visible ${type}`;
+    }
+    function hideMessage(area) {
+        area.textContent = '';
+        area.className = 'message-area';
+    }
+
+    // --- ZXing Scanner Logic ---
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    scanButton.addEventListener('click', () => {
+        scannerContainer.classList.add('visible');
+        codeReader.listVideoInputDevices()
+            .then((videoInputDevices) => {
+                const backCamera = videoInputDevices.find(device => device.label.toLowerCase().includes('back'));
+                const selectedDeviceId = backCamera ? backCamera.deviceId : (videoInputDevices.length ? videoInputDevices[0].deviceId : null);
+                
+                if (!selectedDeviceId) {
+                    handleScanError('No camera found.');
+                    return;
+                }
+
+                codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+                    if (result) {
+                        stopScanner();
+                        handleScanSuccess(result.getText());
+                    }
+                    if (err && !(err instanceof ZXing.NotFoundException)) {
+                        handleScanError(err.message);
+                    }
+                });
+            })
+            .catch(err => handleScanError(err.message));
+    });
+
+    function stopScanner() {
+        codeReader.reset();
+        scannerContainer.classList.remove('visible');
+    }
+
+    function handleScanError(errorMessage) {
+        stopScanner();
+        showMessage(addBookMessageArea, `扫码失败: ${errorMessage}`, 'error');
+    }
+
+    async function handleScanSuccess(isbn) {
+        isbnInput.value = isbn;
+        showMessage(addBookMessageArea, '正在查询图书信息...', 'info');
+        coverPreview.classList.remove('visible');
+
+        try {
+            const response = await fetch(`/api/books/meta?isbn=${isbn}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const metadata = await response.json();
+
+            // Auto-fill the form
+            addBookForm.elements.title.value = metadata.title || '';
+            addBookForm.elements.author.value = metadata.author || '';
+            
+            if (metadata.cover_image_url) {
+                coverPreview.src = metadata.cover_image_url;
+                coverPreview.classList.add('visible');
+            }
+
+            showMessage(addBookMessageArea, '信息已自动填充，请确认并填写价格。', 'success');
+
+        } catch (error) {
+            console.error('Failed to fetch metadata:', error);
+            showMessage(addBookMessageArea, '未找到图书信息，请手动输入。', 'error');
+        }
+    }
+
+    closeScannerButton.addEventListener('click', stopScanner);
+
+    // --- Form Submission Logic ---
+    addBookForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideMessage(addBookMessageArea);
+        const formData = new FormData(addBookForm);
+        const data = Object.fromEntries(formData.entries());
+        data.cost = parseFloat(data.cost);
+        data.selling_price = parseFloat(data.selling_price);
+
+        try {
+            const response = await fetch('/api/inventory/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Unknown error');
+            
+            showMessage(addBookMessageArea, `成功！书籍 "${result.id}" 已入库。`, 'success');
+            addBookForm.reset();
+            coverPreview.classList.remove('visible');
+        } catch (error) {
+            showMessage(addBookMessageArea, `错误: ${error.message}`, 'error');
+        }
+    });
+
+    fulfillForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideMessage(fulfillMessageArea);
+        const formData = new FormData(fulfillForm);
+        const pickupCode = formData.get('pickupCode');
+
+        try {
+            const response = await fetch('/api/orders/fulfill', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pickupCode }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Unknown error');
+
+            showMessage(fulfillMessageArea, `成功！订单 #${result.id} 已核销。`, 'success');
+            fulfillForm.reset();
+        } catch (error) {
+            showMessage(fulfillMessageArea, `错误: ${error.message}`, 'error');
+        }
+    });
+});
+
+
+================================================================================
+### FILE: bookworm-backend\src\config.ts
+================================================================================
+
+// src/config.ts
+import dotenv from 'dotenv';
+import fs from 'fs';
+
+dotenv.config();
+
+const config = {
+  // Server config
+  port: process.env.PORT || 3000,
+  
+  // JWT config
+  jwtSecret: process.env.JWT_SECRET || 'default-secret-for-dev',
+
+  // WeChat Mini Program config
+  wxAppId: process.env.WX_APP_ID || 'YOUR_APP_ID',
+  wxAppSecret: process.env.WX_APP_SECRET || 'YOUR_APP_SECRET',
+
+  // WeChat Pay config
+  wxPayMchId: process.env.WXPAY_MCHID,
+  wxPayPrivateKeyPath: process.env.WXPAY_PRIVATE_KEY_PATH,
+  wxPayPrivateKey: (() => {
+    const keyPath = process.env.WXPAY_PRIVATE_KEY_PATH;
+    if (!keyPath || keyPath === 'C:\\path\\to\\your\\apiclient_key.pem' || keyPath === '/path/to/your/apiclient_key.pem') {
+      return undefined;
+    }
+    try {
+      return fs.readFileSync(keyPath);
+    } catch (error) {
+      console.warn(`!!! WARNING: Cannot read WeChat Pay private key from ${keyPath}:`, (error as Error).message);
+      return undefined;
+    }
+  })(),
+  wxPayPublicKeyPath: process.env.WXPAY_PUBLIC_KEY_PATH,
+  wxPayCertSerialNo: process.env.WXPAY_CERT_SERIAL_NO,
+  wxPayApiV3Key: process.env.WXPAY_API_V3_KEY,
+  wxPayNotifyUrl: process.env.WXPAY_NOTIFY_URL,
+
+  // Database URL is read by Prisma from .env directly
+};
+
+// Validate essential configs
+if (config.jwtSecret === 'default-secret-for-dev') {
+    console.warn('!!! WARNING: Using default JWT_SECRET. Please set it in .env file for production.');
+}
+if (config.wxAppId === 'YOUR_APP_ID' || config.wxAppSecret === 'YOUR_APP_SECRET') {
+    console.warn('!!! WARNING: WX_APP_ID or WX_APP_SECRET are not configured in .env file.');
+}
+if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
+    console.warn('!!! WARNING: WeChat Pay configuration is incomplete. Payment features will not work.');
+}
+
+export default config;
+
+
+================================================================================
+### FILE: bookworm-backend\src\db.ts
+================================================================================
+
+// src/db.ts
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+export default prisma;
+
+
+================================================================================
+### FILE: bookworm-backend\src\index.ts
+================================================================================
+
+// src/index.ts (fully replaced with parser fix)
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
+import path from 'path';
+import fastifyStatic from '@fastify/static';
+import config from './config';
+import { addBookToInventory, getAvailableBooks, getBookById, getBookMetadata } from './services/inventoryService';
+import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, ItemNotAvailableError, FulfillmentError } from './services/orderService';
+import { wxLogin } from './services/authService';
+import WechatPay from 'wechatpay-node-v3';
+import { Prisma } from '@prisma/client';
+import fs from 'fs';
+
+const fastify = Fastify({ logger: true });
+
+fastify.register(fastifyStatic, { root: path.join(__dirname, '..', 'public'), prefix: '/admin/' });
+
+// --- Wechat Pay Setup ---
+let pay: WechatPay | null = null;
+try {
+    if (
+        config.wxPayMchId &&
+        config.wxPayPrivateKeyPath && fs.existsSync(config.wxPayPrivateKeyPath) &&
+        config.wxPayPublicKeyPath && fs.existsSync(config.wxPayPublicKeyPath) &&
+        config.wxPayCertSerialNo &&
+        config.wxPayApiV3Key
+    ) {
+        pay = new WechatPay({
+            appid: config.wxAppId!,
+            mchid: config.wxPayMchId!,
+            privateKey: fs.readFileSync(config.wxPayPrivateKeyPath!),
+            publicKey: fs.readFileSync(config.wxPayPublicKeyPath!), // <-- Added missing public key
+            serial_no: config.wxPayCertSerialNo!,
+            key: config.wxPayApiV3Key!,
+        });
+        console.log("WeChat Pay SDK initialized successfully.");
+    } else {
+        throw new Error("WeChat Pay configuration is incomplete or certificate files are missing.");
+    }
+} catch (error) {
+    console.warn(`!!! WARNING: Failed to initialize WeChat Pay SDK. Payment features will be disabled. Reason: ${(error as Error).message}`);
+}
+
+// REMOVED: The global content type parser is gone.
+// fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, ...);
+
+// --- Global Error Handler ---
+fastify.setErrorHandler(async (error: Error, request: FastifyRequest, reply: FastifyReply) => {
+    request.log.error({ err: error, req: request }, 'An error occurred during the request');
+
+    // Handle specific business logic errors
+    if (error instanceof ItemNotAvailableError || error instanceof FulfillmentError) {
+        return reply.code(409).send({ error: error.message });
+    }
+
+    // Handle Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return reply.code(404).send({ error: 'Record not found.' });
+    }
+
+    // For all other unknown errors, send a generic 500 response
+    reply.code(500).send({ error: 'Internal Server Error' });
+});
+
+// --- API Routes ---
+
+// Auth
+fastify.post('/api/auth/login', async (request, reply) => {
+    const { code } = request.body as { code: string };
+    if (!code) { return reply.code(400).send({ error: 'Code is required.' }); }
+    const { token, user } = await wxLogin(code);
+    reply.send({ token, userId: user.id });
+});
+
+// Books metadata
+fastify.get('/api/books/meta', async (request, reply) => {
+    const query = request.query as { isbn?: string };
+    if (!query.isbn) { 
+        return reply.code(400).send({ error: 'ISBN parameter is required.' }); 
+    }
+    
+    const metadata = await getBookMetadata(query.isbn);
+    if (!metadata) { 
+        return reply.code(404).send({ error: 'Book metadata not found.' }); 
+    }
+    
+    reply.send(metadata);
+});
+
+// Inventory
+fastify.get('/api/inventory/available', async (request, reply) => {
+    const query = request.query as { search?: string };
+    const books = await getAvailableBooks(query.search);
+    reply.send(books);
+});
+fastify.get('/api/inventory/item/:id', async (request, reply) => {
+    const params = request.params as { id: string };
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) { return reply.code(400).send({ error: 'Invalid item ID.' }); }
+    const book = await getBookById(id);
+    if (!book) { return reply.code(404).send({ error: 'Book not found.' }); }
+    reply.send(book);
+});
+fastify.post('/api/inventory/add', async (request, reply) => {
+    console.log('DEBUG: request.body =', request.body);
+    console.log('DEBUG: request.body type =', typeof request.body);
+    const newItem = await addBookToInventory(request.body as any);
+    reply.code(201).send(newItem);
+});
+
+// Orders
+fastify.post('/api/orders/create', async (request, reply) => {
+    const order = await createOrder(request.body as any);
+    reply.code(201).send(order);
+});
+fastify.get('/api/orders/user/:userId', async (request, reply) => {
+    const params = request.params as { userId: string };
+    const userId = parseInt(params.userId, 10);
+    if (isNaN(userId)) { return reply.code(400).send({ error: 'Invalid user ID.' }); }
+    const orders = await getOrdersByUserId(userId);
+    reply.send(orders);
+});
+fastify.post('/api/orders/fulfill', async (request, reply) => {
+    const { pickupCode } = request.body as { pickupCode: string };
+    if (!pickupCode) { return reply.code(400).send({ error: 'pickupCode is required.' }); }
+    const order = await fulfillOrder(pickupCode.toUpperCase());
+    reply.send(order);
+});
+
+// Generate payment parameters for an order
+fastify.post('/api/orders/:orderId/pay', async (request, reply) => {
+    if (!pay) {
+        return reply.code(503).send({ error: 'Payment service is not configured.' });
+    }
+    
+    const params = request.params as { orderId: string };
+    const orderId = parseInt(params.orderId, 10);
+    if (isNaN(orderId)) { return reply.code(400).send({ error: 'Invalid order ID.' }); }
+    
+    const { openid } = request.body as { openid: string };
+    if (!openid) { return reply.code(400).send({ error: 'openid is required.' }); }
+    
+    const paymentData = await generatePaymentParams(orderId, openid);
+    reply.send(paymentData);
+});
+
+// Payment Notification Webhook
+// We create a custom content-type for WeChat Pay to avoid conflicts
+fastify.addContentTypeParser('application/wechat-pay', { parseAs: 'buffer' }, (request, payload, done) => {
+    done(null, payload);
+});
+
+fastify.post('/api/payment/notify', { config: { rawBody: true } }, async (request, reply) => {
+    if (!pay) {
+        request.log.error('WeChat Pay is not configured, cannot process notification.');
+        return reply.code(503).send({ error: 'Payment service unavailable.' });
+    }
+
+    try {
+        // Convert Buffer to string for processing
+        const rawBody = (request.body as Buffer).toString('utf8');
+
+        // Step 1: Verify the signature
+        const isVerified = pay.verifySign({
+            timestamp: request.headers['wechatpay-timestamp'] as string,
+            nonce: request.headers['wechatpay-nonce'] as string,
+            body: rawBody, // Now string type, compatible with verifySign
+            signature: request.headers['wechatpay-signature'] as string,
+            serial: request.headers['wechatpay-serial'] as string,
+        });
+
+        if (!isVerified) {
+            request.log.warn('Payment notification signature verification failed.');
+            return reply.code(400).send({ code: 'FAIL', message: '验签失败' });
+        }
+
+        // Step 2: Parse JSON to get encrypted resource
+        const requestData = JSON.parse(rawBody);
+        const { resource } = requestData;
+        
+        // Step 3: Decrypt the notification content
+        const decryptedData = pay.decipher_gcm(
+            resource.ciphertext,
+            resource.associated_data,
+            resource.nonce,
+            config.wxPayApiV3Key!
+        );
+        
+        // Step 4: Parse decrypted data with type assertion
+        const notificationData = JSON.parse(decryptedData as string);
+
+        // Step 5: Process the business logic
+        if (notificationData.trade_state === 'SUCCESS') {
+            await processPaymentNotification(notificationData);
+        }
+
+        reply.code(200).send({ code: 'SUCCESS', message: '成功' });
+
+    } catch (e) {
+        request.log.error({ err: e }, 'Payment notification processing failed');
+        reply.code(400).send({ code: 'FAIL', message: '处理失败' });
+    }
+});
+
+const start = async () => {
+    try {
+        await fastify.listen({ port: config.port as number, host: '0.0.0.0' });
+    } catch (err) {
+        fastify.log.error(err);
+        process.exit(1);
+    }
+};
+start();
+
+
+================================================================================
+### FILE: bookworm-backend\src\services\authService.ts
+================================================================================
+
+// src/services/authService.ts
+import axios from 'axios';
+import jwt from 'jsonwebtoken';
+import config from '../config'; // <-- Import config
+import prisma from '../db';
+
+export async function wxLogin(code: string) {
+  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${config.wxAppId}&secret=${config.wxAppSecret}&js_code=${code}&grant_type=authorization_code`;
+  const { data: wxSession } = await axios.get(url);
+  
+  if (wxSession.errcode) { throw new Error(`WeChat API Error: ${wxSession.errmsg}`); }
+
+  const { openid } = wxSession;
+  const user = await prisma.user.upsert({ where: { openid }, update: {}, create: { openid } });
+  
+  const token = jwt.sign({ userId: user.id, openid: user.openid }, config.jwtSecret, { expiresIn: '7d' });
+
+  return { token, user };
+}
+
+
+================================================================================
+### FILE: bookworm-backend\src\services\inventoryService.ts
+================================================================================
+
+// src/services/inventoryService.ts (fully replaced)
+import { Prisma, book_condition } from '@prisma/client';
+import prisma from '../db';
+
+// ... (addBookToInventory function is unchanged)
+interface AddBookInput { isbn13: string; title: string; author?: string; edition?: string; condition: book_condition; cost: number; selling_price: number; }
+export async function addBookToInventory(input: AddBookInput) { /* ... same as before ... */ return prisma.$transaction(async(tx)=>{let a=await tx.bookmaster.upsert({where:{isbn13:input.isbn13},update:{},create:{isbn13:input.isbn13,title:input.title,author:input.author}});let b=await tx.booksku.upsert({where:{master_id_edition:{master_id:a.id,edition:input.edition||"default"}},update:{},create:{master_id:a.id,edition:input.edition||"default"}});const c=await tx.inventoryitem.create({data:{sku_id:b.id,condition:input.condition,cost:input.cost,selling_price:input.selling_price,status:"in_stock"}});return c})}
+
+// MODIFIED: getAvailableBooks now accepts an optional search term
+export async function getAvailableBooks(searchTerm?: string) {
+  const whereCondition: Prisma.inventoryitemWhereInput = {
+    status: 'in_stock',
+  };
+
+  if (searchTerm) {
+    whereCondition.booksku = {
+      bookmaster: {
+        OR: [
+          { title: { contains: searchTerm, mode: 'insensitive' } },
+          { author: { contains: searchTerm, mode: 'insensitive' } },
+          { isbn13: { contains: searchTerm } },
+        ],
+      },
+    };
+  }
+
+  return prisma.inventoryitem.findMany({
+    where: whereCondition,
+    include: {
+      booksku: {
+        include: {
+          bookmaster: true,
+        },
+      },
+    },
+  });
+}
+
+// NEW: Function to get a single book by its inventory item ID
+export async function getBookById(id: number) {
+  return prisma.inventoryitem.findUnique({
+    where: { id },
+    include: {
+      booksku: {
+        include: {
+          bookmaster: true,
+        },
+      },
+    },
+  });
+}
+
+// NEW: Function to get book metadata by ISBN
+export async function getBookMetadata(isbn: string) {
+  // First check if we have the book in our database
+  const existingBook = await prisma.bookmaster.findUnique({
+    where: { isbn13: isbn },
+    include: {
+      booksku: true,
+    },
+  });
+
+  if (existingBook) {
+    return {
+      isbn13: existingBook.isbn13,
+      title: existingBook.title,
+      author: existingBook.author,
+      publisher: existingBook.publisher,
+      original_price: existingBook.original_price ? Number(existingBook.original_price) : null,
+      cover_image_url: existingBook.booksku[0]?.cover_image_url || null,
+    };
+  }
+
+  // If not found locally, we could integrate with external APIs here
+  // For now, return null to indicate not found
+  return null;
+}
+
+
+================================================================================
+### FILE: bookworm-backend\src\services\orderService.ts
+================================================================================
+
+// src/services/orderService.ts (fully replaced)
+import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import WechatPay from 'wechatpay-node-v3';
+import config from '../config';
+import prisma from '../db';
+
+// ... (ItemNotAvailableError class remains the same)
+export class ItemNotAvailableError extends Error {
+  constructor(message: string) { super(message); this.name = 'ItemNotAvailableError'; }
+}
+
+// NEW: Custom error for fulfillment logic
+export class FulfillmentError extends Error {
+  constructor(message: string) { super(message); this.name = 'FulfillmentError'; }
+}
+
+export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
+  return prisma.$transaction(async (tx) => {
+    // ... (user upsert logic is the same)
+    const user = await tx.user.upsert({
+      where: { id: input.userId },
+      update: {},
+      create: { id: input.userId, openid: `fake_openid_${input.userId}_${Date.now()}` }
+    });
+
+    // ... (item fetching and validation is the same)
+    const items = await tx.inventoryitem.findMany({ where: { id: { in: input.inventoryItemIds } } });
+    if (items.length !== input.inventoryItemIds.length) { throw new ItemNotAvailableError('One or more items do not exist.'); }
+    for (const item of items) { if (item.status !== 'in_stock') { throw new ItemNotAvailableError(`Item ${item.id} is not available.`); } }
+
+    const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.selling_price.toString()), 0);
+
+    const order = await tx.order.create({
+      data: {
+        user_id: user.id,
+        // MODIFIED: Set status back to 'pending_payment' for V2.0 with payment
+        status: 'pending_payment',
+        total_amount: totalAmount,
+        pickup_code: randomBytes(3).toString('hex').toUpperCase(),
+      },
+    });
+
+    await tx.orderitem.createMany({
+      data: items.map(item => ({
+        order_id: order.id,
+        inventory_item_id: item.id,
+        price: item.selling_price,
+      })),
+    });
+
+    await tx.inventoryitem.updateMany({
+      where: { id: { in: input.inventoryItemIds } },
+      data: { status: 'reserved' },
+    });
+
+    return order;
+  });
+}
+
+export async function getOrdersByUserId(userId: number) {
+  // ... (this function is unchanged)
+  return prisma.order.findMany({
+    where: { user_id: userId },
+    include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
+    orderBy: { created_at: 'desc' },
+  });
+}
+
+// NEW: Function to fulfill an order
+export async function fulfillOrder(pickupCode: string) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Find the order by its unique pickup code.
+    const order = await tx.order.findUnique({
+      where: { pickup_code: pickupCode },
+      include: { orderitem: true }, // Include items to update their status
+    });
+
+    // 2. Validate
+    if (!order) {
+      throw new FulfillmentError(`取货码 "${pickupCode}" 无效。`);
+    }
+    if (order.status !== 'pending_pickup') {
+      throw new FulfillmentError(`此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`);
+    }
+
+    // 3. Update the Order status
+    const updatedOrder = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'completed',
+        completed_at: new Date(),
+      },
+    });
+
+    // 4. Update the InventoryItem statuses
+    const inventoryItemIds = order.orderitem.map(item => item.inventory_item_id);
+    await tx.inventoryitem.updateMany({
+      where: { id: { in: inventoryItemIds } },
+      data: { status: 'sold' },
+    });
+
+    return updatedOrder;
+  });
+}
+
+// NEW: Generate WeChat Pay payment parameters
+export async function generatePaymentParams(orderId: number, openid: string) {
+  // 1. Fetch the order details
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      orderitem: {
+        include: {
+          inventoryitem: {
+            include: {
+              booksku: {
+                include: {
+                  bookmaster: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  if (order.status !== 'pending_payment') {
+    throw new Error('Order is not in pending_payment status');
+  }
+
+  // 2. Initialize WeChat Pay client
+  if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
+    throw new Error('WeChat Pay configuration is incomplete');
+  }
+
+  const wxpay = new WechatPay({
+    appid: config.wxAppId,
+    mchid: config.wxPayMchId,
+    publicKey: Buffer.from(''), // We'll need to fix this later
+    privateKey: config.wxPayPrivateKey,
+    serial_no: config.wxPayCertSerialNo,
+    key: config.wxPayApiV3Key,
+  });
+
+  // 3. Generate description from order items
+  const bookTitles = order.orderitem.map(item => 
+    item.inventoryitem.booksku.bookmaster.title
+  ).slice(0, 3); // Limit to first 3 books
+  const description = bookTitles.length > 3 
+    ? `${bookTitles.join('、')}等${order.orderitem.length}本书籍`
+    : bookTitles.join('、');
+
+  // 4. Call WeChat Pay unified order API
+  const unifiedOrderParams = {
+    appid: config.wxAppId,
+    mchid: config.wxPayMchId,
+    description: description,
+    out_trade_no: `ORDER_${order.id}_${Date.now()}`, // Unique trade number
+    notify_url: config.wxPayNotifyUrl || '',
+    amount: {
+      total: Math.round(Number(order.total_amount) * 100), // Convert to cents
+      currency: 'CNY'
+    },
+    payer: {
+      openid: openid
+    }
+  };
+
+  try {
+    const result = await wxpay.transactions_jsapi(unifiedOrderParams);
+    
+    // 5. Return the result for mini-program payment
+    return {
+      result,
+      outTradeNo: unifiedOrderParams.out_trade_no
+    };
+  } catch (error) {
+    console.error('WeChat Pay API error:', error);
+    throw new Error('Failed to generate payment parameters');
+  }
+}
+
+// NEW: Process WeChat Pay payment notification
+export async function processPaymentNotification(notificationData: any) {
+  return prisma.$transaction(async (tx) => {
+    const { out_trade_no, transaction_id, trade_state, amount } = notificationData;
+    
+    // 1. Validate payment success
+    if (trade_state !== 'SUCCESS') {
+      throw new Error(`Payment not successful. Trade state: ${trade_state}`);
+    }
+
+    // 2. Extract order ID from out_trade_no (format: ORDER_{orderId}_{timestamp})
+    const orderIdMatch = out_trade_no.match(/^ORDER_(\d+)_\d+$/);
+    if (!orderIdMatch) {
+      throw new Error(`Invalid out_trade_no format: ${out_trade_no}`);
+    }
+    
+    const orderId = parseInt(orderIdMatch[1], 10);
+
+    // 3. Find and validate the order
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { orderitem: true }
+    });
+
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+
+    // 4. Check if already processed (idempotency)
+    if (order.status === 'pending_pickup') {
+      console.log(`Order ${orderId} already marked as paid. Skipping.`);
+      return order;
+    }
+
+    // 5. Validate order status
+    if (order.status !== 'pending_payment') {
+      throw new Error(`Invalid order status: ${order.status}. Expected: pending_payment`);
+    }
+
+    // 6. Validate amount (convert from cents to yuan)
+    const expectedAmount = Math.round(Number(order.total_amount) * 100);
+    if (amount.total !== expectedAmount) {
+      throw new Error(`Amount mismatch. Expected: ${expectedAmount}, Received: ${amount.total}`);
+    }
+
+    // 7. Update order status to paid
+    const updatedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'pending_pickup',
+        paid_at: new Date()
+      }
+    });
+
+    console.log(`Order ${orderId} successfully marked as paid`);
+    return updatedOrder;
+  });
+}
+
+
+================================================================================
+### FILE: miniprogram\app.js
+================================================================================
+
+// app.js
+const auth = require('./utils/auth');
+
+App({
+  onLaunch() {
+    // Perform login when the app launches
+    auth.login()
+      .then(res => {
+        console.log('Login successful', res);
+        // You can store user info globally if needed
+        // this.globalData.userInfo = ...
+      })
+      .catch(err => {
+        console.error('Login failed on launch', err);
+      });
+  }
+});
+
+
+================================================================================
+### FILE: miniprogram\app.json
+================================================================================
+
+{
+  "pages": [
+    "pages/market/index",
+    "pages/orders/index",
+    "pages/profile/index",
+    "pages/book-detail/index",
+    "pages/order-confirm/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#f8f9fa",
+    "navigationBarTitleText": "The Book Nook",
+    "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "color": "#6b6b6b",
+    "selectedColor": "#2c5f2d",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/market/index",
+        "text": "Marketplace",
+        "iconPath": "images/tabs/marketplace.png",
+        "selectedIconPath": "images/tabs/marketplace-active.png"
+      },
+      {
+        "pagePath": "pages/orders/index",
+        "text": "Orders",
+        "iconPath": "images/tabs/orders.png",
+        "selectedIconPath": "images/tabs/orders-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "Profile",
+        "iconPath": "images/tabs/profile.png",
+        "selectedIconPath": "images/tabs/profile-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
+
+
+================================================================================
+### FILE: miniprogram\app.wxss
+================================================================================
+
+/* app.wxss */
+
+/* --- Global Design System --- */
+
+/* 1. Color Palette (based on UI mockups) */
+page {
+  --primary-color: #2c5f2d; /* Brand Green */
+  --secondary-color: #558056;
+  --text-color-primary: #1a1a1a;
+  --text-color-secondary: #6b6b6b;
+  --background-color: #f8f9fa;
+  --card-background-color: #ffffff;
+  --border-color: #e9ecef;
+  --price-color: #333; /* Price is now more subtle */
+}
+
+/* 2. Typography */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--text-color-primary);
+  background-color: var(--background-color);
+}
+
+/* 3. Global Component Styles */
+.container {
+  padding: 20rpx 30rpx;
+}
+
+.card {
+  background-color: var(--card-background-color);
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+}
+
+/* --- Global Navigation Bar & TabBar --- */
+/* Note: These are configured in app.json, but we keep the design intent here */
+
+
+================================================================================
+### FILE: miniprogram\config.js
+================================================================================
+
+// miniprogram/config.js
+const config = {
+  apiBaseUrl: 'http://127.0.0.1:3000/api'
+};
+
+module.exports = config;
+
+
+================================================================================
+### FILE NOT FOUND: miniprogram\package.json
+================================================================================
+
+
+================================================================================
+### FILE: miniprogram\pages\book-detail\index.js
+================================================================================
+
+// pages/book-detail/index.js
+const auth = require('../../utils/auth');
+const config = require('../../config');
+
+Page({
+  data: {
+    bookDetail: null,
+    isLoading: true,
+    error: null,
+  },
+
+  onLoad(options) {
+    if (options.id) {
+      this.fetchBookDetails(options.id);
+    } else {
+      this.setData({ error: '无效的书籍ID', isLoading: false });
+    }
+  },
+
+  fetchBookDetails(id) {
+    this.setData({ isLoading: true, error: null });
+    wx.request({
+      url: `${config.apiBaseUrl}/inventory/item/${id}`,
+      method: 'GET',
+      success: (res) => {
+        if (res.statusCode === 200) {
+          this.setData({ bookDetail: res.data });
+        } else {
+          this.setData({ error: '无法加载书籍详情' });
+        }
+      },
+      fail: (err) => {
+        this.setData({ error: '网络请求失败' });
+      },
+      complete: () => {
+        this.setData({ isLoading: false });
+      }
+    });
+  },
+
+  // MODIFIED: This function now navigates to the confirm page
+  handleBuyNow() {
+    const bookData = JSON.stringify(this.data.bookDetail);
+    wx.navigateTo({
+      url: `/pages/order-confirm/index?book=${encodeURIComponent(bookData)}`,
+    });
+  }
+});
+
+
+================================================================================
+### FILE: miniprogram\pages\market\index.js
+================================================================================
+
+// pages/market/index.js
+const auth = require('../../utils/auth');
+const config = require('../../config');
+
+Page({
+  data: {
+    bookList: [],
+    isLoading: true,
+    error: null,
+    searchTerm: '',
+    searchPerformed: false // To show different empty state messages
+  },
+
+  onLoad(options) {
+    this.fetchAvailableBooks();
+  },
+
+  // MODIFIED: fetchAvailableBooks now takes a search term
+  fetchAvailableBooks() {
+    this.setData({ isLoading: true, error: null });
+    let url = `${config.apiBaseUrl}/inventory/available`;
+    if (this.data.searchTerm) {
+      url += `?search=${encodeURIComponent(this.data.searchTerm)}`;
+    }
+
+    wx.request({
+      url: url,
+      method: 'GET',
+      success: (res) => {
+        if (res.statusCode === 200) {
+          this.setData({ bookList: res.data });
+        } else {
+          this.setData({ error: '无法加载书籍列表', bookList: [] });
+        }
+      },
+      fail: (err) => {
+        console.error('API request failed', err);
+        this.setData({ error: '网络请求失败，请检查后端服务是否开启', bookList: [] });
+      },
+      complete: () => {
+        this.setData({ isLoading: false });
+      }
+    })
+  },
+
+  // NEW: Handle input change
+  handleInput(e) {
+    this.setData({
+      searchTerm: e.detail.value
+    });
+  },
+
+  // NEW: Handle search button tap or keyboard confirm
+  handleSearch() {
+    this.setData({ searchPerformed: true });
+    this.fetchAvailableBooks();
+  },
+
+  // We are moving the "BuyNow" logic to the detail page,
+  // so the handleBuyNow function is removed from this page.
+});
+
+
+================================================================================
+### FILE: miniprogram\pages\order-confirm\index.js
+================================================================================
+
+// pages/order-confirm/index.js
+const auth = require('../../utils/auth');
+const config = require('../../config');
+
+Page({
+  data: {
+    book: null,
+    isSubmitting: false
+  },
+  
+  onLoad(options) {
+    if (options.book) {
+      this.setData({
+        book: JSON.parse(decodeURIComponent(options.book))
+      });
+    }
+  },
+  
+  handlePayment() {
+    if (this.data.isSubmitting) return;
+    this.setData({ isSubmitting: true });
+
+    const userId = auth.getUserId();
+    const inventoryItemId = this.data.book.id;
+
+    if (!userId) {
+      wx.showToast({ title: '登录信息失效，请重启小程序', icon: 'none' });
+      this.setData({ isSubmitting: false });
+      return;
+    }
+
+    wx.showLoading({ title: '正在创建订单...' });
+
+    // Step 1: Create the order
+    wx.request({
+      url: `${config.apiBaseUrl}/orders/create`,
+      method: 'POST',
+      data: { userId, inventoryItemIds: [inventoryItemId] },
+      success: (createRes) => {
+        if (createRes.statusCode !== 201) {
+          wx.hideLoading();
+          wx.showToast({ title: '创建订单失败', icon: 'error' });
+          this.setData({ isSubmitting: false });
+          return;
+        }
+        
+        const orderId = createRes.data.id;
+        wx.showLoading({ title: '获取支付参数...' });
+
+        // Step 2: Get payment parameters
+        wx.request({
+          url: `${config.apiBaseUrl}/orders/${orderId}/pay`,
+          method: 'POST',
+          data: { openid: auth.getToken() }, // Use stored token as openid for now
+          success: (payRes) => {
+            wx.hideLoading();
+            if (payRes.statusCode !== 200) {
+              wx.showToast({ title: '获取支付参数失败', icon: 'error' });
+              this.setData({ isSubmitting: false });
+              return;
+            }
+
+            const payParams = payRes.data.paymentParams;
+            // Step 3: Request payment
+            wx.requestPayment({
+              timeStamp: payParams.timeStamp,
+              nonceStr: payParams.nonceStr,
+              package: payParams.package,
+              signType: payParams.signType,
+              paySign: payParams.paySign,
+              success: (paymentSuccessRes) => {
+                wx.showToast({ title: '支付成功', icon: 'success' });
+                // Navigate to orders page to see the result
+                setTimeout(() => {
+                  wx.switchTab({ url: '/pages/orders/index' });
+                }, 1500);
+              },
+              fail: (paymentFailRes) => {
+                wx.showToast({ title: '支付已取消', icon: 'none' });
+                this.setData({ isSubmitting: false });
+              }
+            });
+          },
+          fail: (err) => {
+            wx.hideLoading();
+            wx.showToast({ title: '网络请求失败', icon: 'error' });
+            this.setData({ isSubmitting: false });
+          }
+        });
+      },
+      fail: (err) => {
+        wx.hideLoading();
+        wx.showToast({ title: '网络请求失败', icon: 'error' });
+        this.setData({ isSubmitting: false });
+      }
+    });
+  }
+});
+
+
+================================================================================
+### FILE: miniprogram\pages\orders\index.js
+================================================================================
+
+// pages/orders/index.js
+const auth = require('../../utils/auth');
+const config = require('../../config');
+
+Page({
+  data: {
+    orderList: [],
+    isLoading: true,
+    error: null,
+    // MODIFIED: Simplified status map, styling is now in WXSS
+    statusMap: {
+      pending_payment: 'Awaiting Payment',
+      paid: 'Awaiting Pickup',
+      pending_pickup: 'Awaiting Pickup', // Keep this for backward compatibility
+      completed: 'Completed',
+      cancelled: 'Cancelled'
+    }
+  },
+  onShow() { this.fetchUserOrders(); },
+  fetchUserOrders() {
+    const userId = auth.getUserId();
+    if (!userId) { return; }
+    this.setData({ isLoading: true, error: null });
+    wx.request({
+      url: `${config.apiBaseUrl}/orders/user/${userId}`,
+      success: (res) => { this.setData({ orderList: res.data }); },
+      fail: (err) => { this.setData({ error: 'Failed to load orders.' }); },
+      complete: () => { this.setData({ isLoading: false }); }
+    });
+  }
+});
+
+
+================================================================================
+### FILE: miniprogram\utils\auth.js
+================================================================================
+
+// utils/auth.js
+const config = require('../config');
+const TOKEN_KEY = 'authToken';
+const USER_ID_KEY = 'userId';
+
+const login = () => {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success: (res) => {
+        if (res.code) {
+          wx.request({
+            url: `${config.apiBaseUrl}/auth/login`,
+            method: 'POST',
+            data: {
+              code: res.code
+            },
+            success: (loginRes) => {
+              if (loginRes.statusCode === 200 && loginRes.data.token) {
+                setToken(loginRes.data.token);
+                setUserId(loginRes.data.userId);
+                resolve(loginRes.data);
+              } else {
+                reject(new Error('Login failed on server.'));
+              }
+            },
+            fail: (err) => {
+              reject(err);
+            }
+          });
+        } else {
+          reject(new Error('wx.login failed, no code returned.'));
+        }
+      },
+      fail: (err) => {
+        reject(err);
+      }
+    });
+  });
+};
+
+const setToken = (token) => wx.setStorageSync(TOKEN_KEY, token);
+const getToken = () => wx.getStorageSync(TOKEN_KEY);
+const setUserId = (userId) => wx.setStorageSync(USER_ID_KEY, userId);
+const getUserId = () => wx.getStorageSync(USER_ID_KEY);
+const logout = () => {
+  wx.removeStorageSync(TOKEN_KEY);
+  wx.removeStorageSync(USER_ID_KEY);
+};
+
+module.exports = {
+  login,
+  getToken,
+  getUserId,
+  logout
+};
+
+
+================================================================================
+CORE CODE REVIEW REPORT GENERATION COMPLETE.
+================================================================================

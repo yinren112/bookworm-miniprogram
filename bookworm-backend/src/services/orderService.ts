@@ -34,10 +34,10 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
     const order = await tx.order.create({
       data: {
         user_id: user.id,
-        // MODIFIED: Set status back to 'pending_payment' for V2.0 with payment
-        status: 'pending_payment',
+        status: 'PENDING_PAYMENT',
         total_amount: totalAmount,
         pickup_code: randomBytes(3).toString('hex').toUpperCase(),
+        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
       },
     });
 
@@ -161,7 +161,7 @@ export async function generatePaymentParams(orderId: number, openid: string) {
     appid: config.wxAppId,
     mchid: config.wxPayMchId,
     description: description,
-    out_trade_no: `ORDER_${order.id}_${Date.now()}`, // Unique trade number
+    out_trade_no: `BOOKWORM_${order.id}`, // Simple and unique
     notify_url: config.wxPayNotifyUrl || '',
     amount: {
       total: Math.round(Number(order.total_amount) * 100), // Convert to cents
@@ -196,13 +196,11 @@ export async function processPaymentNotification(notificationData: any) {
       throw new Error(`Payment not successful. Trade state: ${trade_state}`);
     }
 
-    // 2. Extract order ID from out_trade_no (format: ORDER_{orderId}_{timestamp})
-    const orderIdMatch = out_trade_no.match(/^ORDER_(\d+)_\d+$/);
-    if (!orderIdMatch) {
+    // 2. Extract order ID from out_trade_no (format: BOOKWORM_{orderId})
+    if (!out_trade_no.startsWith('BOOKWORM_')) {
       throw new Error(`Invalid out_trade_no format: ${out_trade_no}`);
     }
-    
-    const orderId = parseInt(orderIdMatch[1], 10);
+    const orderId = parseInt(out_trade_no.split('_')[1], 10);
 
     // 3. Find and validate the order
     const order = await tx.order.findUnique({

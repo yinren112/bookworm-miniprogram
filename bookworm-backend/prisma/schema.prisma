@@ -8,17 +8,19 @@ datasource db {
 }
 
 model Order {
-  id           Int          @id @default(autoincrement())
-  user_id      Int
-  status       order_status @default(pending_payment)
-  total_amount Decimal      @db.Decimal(10, 2)
-  pickup_code  String       @unique @db.VarChar(10)
-  created_at   DateTime     @default(now()) @db.Timestamptz(6)
-  paid_at      DateTime?    @db.Timestamptz(6)
-  completed_at DateTime?    @db.Timestamptz(6)
-  cancelled_at DateTime?    @db.Timestamptz(6)
-  User         User         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
-  orderitem    orderitem[]
+  id                Int         @id @default(autoincrement())
+  user_id           Int
+  status            OrderStatus @default(PENDING_PAYMENT)
+  total_amount      Decimal     @db.Decimal(10, 2)
+  pickup_code       String      @unique @db.VarChar(10)
+  createdAt         DateTime    @default(now()) @db.Timestamptz(6)
+  paymentExpiresAt  DateTime    @db.Timestamptz(6)
+  pickupExpiresAt   DateTime?   @db.Timestamptz(6)
+  paid_at           DateTime?   @db.Timestamptz(6)
+  completed_at      DateTime?   @db.Timestamptz(6)
+  cancelled_at      DateTime?   @db.Timestamptz(6)
+  User              User        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
+  orderitem         orderitem[]
 
   @@index([user_id, status], map: "idx_order_user_id_status")
 }
@@ -98,9 +100,10 @@ enum inventory_status {
   damaged
 }
 
-enum order_status {
-  pending_payment
-  pending_pickup
-  completed
-  cancelled
+enum OrderStatus {
+  PENDING_PAYMENT
+  PENDING_PICKUP
+  COMPLETED
+  CANCELLED
+  RETURNED
 }

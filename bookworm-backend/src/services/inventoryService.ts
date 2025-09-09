@@ -2,9 +2,61 @@
 import { Prisma, book_condition } from '@prisma/client';
 import prisma from '../db';
 
-// ... (addBookToInventory function is unchanged)
-interface AddBookInput { isbn13: string; title: string; author?: string; edition?: string; condition: book_condition; cost: number; selling_price: number; }
-export async function addBookToInventory(input: AddBookInput) { /* ... same as before ... */ return prisma.$transaction(async(tx)=>{let a=await tx.bookmaster.upsert({where:{isbn13:input.isbn13},update:{},create:{isbn13:input.isbn13,title:input.title,author:input.author}});let b=await tx.booksku.upsert({where:{master_id_edition:{master_id:a.id,edition:input.edition||"default"}},update:{},create:{master_id:a.id,edition:input.edition||"default"}});const c=await tx.inventoryitem.create({data:{sku_id:b.id,condition:input.condition,cost:input.cost,selling_price:input.selling_price,status:"in_stock"}});return c})}
+interface AddBookInput {
+  isbn13: string;
+  title: string;
+  author?: string;
+  edition?: string;
+  condition: book_condition;
+  cost: number;
+  selling_price: number;
+}
+
+export async function addBookToInventory(input: AddBookInput) {
+  return prisma.$transaction(async (tx) => {
+    // Step 1: Find or create the master book record (based on ISBN).
+    // This represents the abstract concept of the book.
+    const bookMaster = await tx.bookmaster.upsert({
+      where: { isbn13: input.isbn13 },
+      update: {}, // No updates needed if it exists
+      create: {
+        isbn13: input.isbn13,
+        title: input.title,
+        author: input.author,
+      },
+    });
+
+    // Step 2: Find or create the specific SKU (e.g., '2nd Edition').
+    // This represents a specific version of the master book.
+    const bookSku = await tx.booksku.upsert({
+      where: {
+        master_id_edition: {
+          master_id: bookMaster.id,
+          edition: input.edition || "default",
+        },
+      },
+      update: {}, // No updates needed if it exists
+      create: {
+        master_id: bookMaster.id,
+        edition: input.edition || "default",
+      },
+    });
+
+    // Step 3: Create the actual inventory item.
+    // This represents the physical copy we have in stock.
+    const inventoryItem = await tx.inventoryitem.create({
+      data: {
+        sku_id: bookSku.id,
+        condition: input.condition,
+        cost: input.cost,
+        selling_price: input.selling_price,
+        status: "in_stock",
+      },
+    });
+
+    return inventoryItem;
+  });
+}
 
 // MODIFIED: getAvailableBooks now accepts an optional search term
 export async function getAvailableBooks(searchTerm?: string) {
