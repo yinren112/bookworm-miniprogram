@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>运营后台</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js" defer></script>
+    <script src="main.js" defer></script>
+</head>
+<body>
+    <div id="scanner-container" class="scanner-overlay">
+        <video id="video"></video>
+        <button id="close-scanner" class="button-danger">关闭</button>
+    </div>
+
+    <main class="main-container">
+        <header class="main-header">
+            <h1>运营后台</h1>
+        </header>
+
+        <section class="module-card">
+            <h2 class="module-title">图书入库</h2>
+            <div class="cover-preview-container">
+                <img id="cover-preview" src="" alt="封面预览">
+            </div>
+            <form id="add-book-form">
+                <div class="form-group">
+                    <label for="isbn13">ISBN-13</label>
+                    <div class="input-group">
+                        <input type="text" id="isbn13" name="isbn13" required>
+                        <button type="button" id="scan-btn" class="button-secondary">扫描</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="title">书名</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">作者</label>
+                    <input type="text" id="author" name="author">
+                </div>
+                <div class="form-group">
+                    <label for="edition">版本</label>
+                    <input type="text" id="edition" name="edition">
+                </div>
+                <div class="form-group">
+                    <label for="condition">品相</label>
+                    <select id="condition" name="condition" required>
+                        <option value="A">A (全新)</option>
+                        <option value="B">B (良好)</option>
+                        <option value="C">C (可用)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cost">成本价 (元)</label>
+                    <input type="number" id="cost" name="cost" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="selling_price">销售价 (元)</label>
+                    <input type="number" id="selling_price" name="selling_price" step="0.01" required>
+                </div>
+                <button type="submit" class="button-primary">添加入库</button>
+            </form>
+            <div id="add-book-message-area" class="message-area"></div>
+        </section>
+
+        <section class="module-card">
+            <h2 class="module-title">订单核销</h2>
+            <form id="fulfill-order-form">
+                <div class="form-group">
+                    <label for="pickupCode">取货码</label>
+                    <input type="text" id="pickupCode" name="pickupCode" required placeholder="输入6位取货码">
+                </div>
+                <button type="submit" class="button-primary">确认核销</button>
+            </form>
+            <div id="fulfill-order-message-area" class="message-area"></div>
+        </section>
+    </main>
+</body>
+</html>

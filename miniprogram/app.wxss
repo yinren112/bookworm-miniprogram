@@ -1,0 +1,40 @@
+/* app.wxss */
+
+/* --- Global Design System --- */
+
+/* 1. Color Palette (based on UI mockups) */
+page {
+  --primary-color: #2c5f2d; /* Brand Green */
+  --secondary-color: #558056;
+  --text-color-primary: #1a1a1a;
+  --text-color-secondary: #6b6b6b;
+  --background-color: #f8f9fa;
+  --card-background-color: #ffffff;
+  --border-color: #e9ecef;
+  --price-color: #333; /* Price is now more subtle */
+}
+
+/* 2. Typography */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--text-color-primary);
+  background-color: var(--background-color);
+}
+
+/* 3. Global Component Styles */
+.container {
+  padding: 20rpx 30rpx;
+}
+
+.card {
+  background-color: var(--card-background-color);
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+}
+
+/* --- Global Navigation Bar & TabBar --- */
+/* Note: These are configured in app.json, but we keep the design intent here */

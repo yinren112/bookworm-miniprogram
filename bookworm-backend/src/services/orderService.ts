@@ -1,0 +1,246 @@
+// src/services/orderService.ts (fully replaced)
+import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import WechatPay from 'wechatpay-node-v3';
+import config from '../config';
+import prisma from '../db';
+
+// ... (ItemNotAvailableError class remains the same)
+export class ItemNotAvailableError extends Error {
+  constructor(message: string) { super(message); this.name = 'ItemNotAvailableError'; }
+}
+
+// NEW: Custom error for fulfillment logic
+export class FulfillmentError extends Error {
+  constructor(message: string) { super(message); this.name = 'FulfillmentError'; }
+}
+
+export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
+  return prisma.$transaction(async (tx) => {
+    // ... (user upsert logic is the same)
+    const user = await tx.user.upsert({
+      where: { id: input.userId },
+      update: {},
+      create: { id: input.userId, openid: `fake_openid_${input.userId}_${Date.now()}` }
+    });
+
+    // ... (item fetching and validation is the same)
+    const items = await tx.inventoryitem.findMany({ where: { id: { in: input.inventoryItemIds } } });
+    if (items.length !== input.inventoryItemIds.length) { throw new ItemNotAvailableError('One or more items do not exist.'); }
+    for (const item of items) { if (item.status !== 'in_stock') { throw new ItemNotAvailableError(`Item ${item.id} is not available.`); } }
+
+    const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.selling_price.toString()), 0);
+
+    const order = await tx.order.create({
+      data: {
+        user_id: user.id,
+        // MODIFIED: Set status back to 'pending_payment' for V2.0 with payment
+        status: 'pending_payment',
+        total_amount: totalAmount,
+        pickup_code: randomBytes(3).toString('hex').toUpperCase(),
+      },
+    });
+
+    await tx.orderitem.createMany({
+      data: items.map(item => ({
+        order_id: order.id,
+        inventory_item_id: item.id,
+        price: item.selling_price,
+      })),
+    });
+
+    await tx.inventoryitem.updateMany({
+      where: { id: { in: input.inventoryItemIds } },
+      data: { status: 'reserved' },
+    });
+
+    return order;
+  });
+}
+
+export async function getOrdersByUserId(userId: number) {
+  // ... (this function is unchanged)
+  return prisma.order.findMany({
+    where: { user_id: userId },
+    include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
+    orderBy: { created_at: 'desc' },
+  });
+}
+
+// NEW: Function to fulfill an order
+export async function fulfillOrder(pickupCode: string) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Find the order by its unique pickup code.
+    const order = await tx.order.findUnique({
+      where: { pickup_code: pickupCode },
+      include: { orderitem: true }, // Include items to update their status
+    });
+
+    // 2. Validate
+    if (!order) {
+      throw new FulfillmentError(`取货码 "${pickupCode}" 无效。`);
+    }
+    if (order.status !== 'pending_pickup') {
+      throw new FulfillmentError(`此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`);
+    }
+
+    // 3. Update the Order status
+    const updatedOrder = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'completed',
+        completed_at: new Date(),
+      },
+    });
+
+    // 4. Update the InventoryItem statuses
+    const inventoryItemIds = order.orderitem.map(item => item.inventory_item_id);
+    await tx.inventoryitem.updateMany({
+      where: { id: { in: inventoryItemIds } },
+      data: { status: 'sold' },
+    });
+
+    return updatedOrder;
+  });
+}
+
+// NEW: Generate WeChat Pay payment parameters
+export async function generatePaymentParams(orderId: number, openid: string) {
+  // 1. Fetch the order details
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      orderitem: {
+        include: {
+          inventoryitem: {
+            include: {
+              booksku: {
+                include: {
+                  bookmaster: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  if (order.status !== 'pending_payment') {
+    throw new Error('Order is not in pending_payment status');
+  }
+
+  // 2. Initialize WeChat Pay client
+  if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
+    throw new Error('WeChat Pay configuration is incomplete');
+  }
+
+  const wxpay = new WechatPay({
+    appid: config.wxAppId,
+    mchid: config.wxPayMchId,
+    publicKey: Buffer.from(''), // We'll need to fix this later
+    privateKey: config.wxPayPrivateKey,
+    serial_no: config.wxPayCertSerialNo,
+    key: config.wxPayApiV3Key,
+  });
+
+  // 3. Generate description from order items
+  const bookTitles = order.orderitem.map(item => 
+    item.inventoryitem.booksku.bookmaster.title
+  ).slice(0, 3); // Limit to first 3 books
+  const description = bookTitles.length > 3 
+    ? `${bookTitles.join('、')}等${order.orderitem.length}本书籍`
+    : bookTitles.join('、');
+
+  // 4. Call WeChat Pay unified order API
+  const unifiedOrderParams = {
+    appid: config.wxAppId,
+    mchid: config.wxPayMchId,
+    description: description,
+    out_trade_no: `ORDER_${order.id}_${Date.now()}`, // Unique trade number
+    notify_url: config.wxPayNotifyUrl || '',
+    amount: {
+      total: Math.round(Number(order.total_amount) * 100), // Convert to cents
+      currency: 'CNY'
+    },
+    payer: {
+      openid: openid
+    }
+  };
+
+  try {
+    const result = await wxpay.transactions_jsapi(unifiedOrderParams);
+    
+    // 5. Return the result for mini-program payment
+    return {
+      result,
+      outTradeNo: unifiedOrderParams.out_trade_no
+    };
+  } catch (error) {
+    console.error('WeChat Pay API error:', error);
+    throw new Error('Failed to generate payment parameters');
+  }
+}
+
+// NEW: Process WeChat Pay payment notification
+export async function processPaymentNotification(notificationData: any) {
+  return prisma.$transaction(async (tx) => {
+    const { out_trade_no, transaction_id, trade_state, amount } = notificationData;
+    
+    // 1. Validate payment success
+    if (trade_state !== 'SUCCESS') {
+      throw new Error(`Payment not successful. Trade state: ${trade_state}`);
+    }
+
+    // 2. Extract order ID from out_trade_no (format: ORDER_{orderId}_{timestamp})
+    const orderIdMatch = out_trade_no.match(/^ORDER_(\d+)_\d+$/);
+    if (!orderIdMatch) {
+      throw new Error(`Invalid out_trade_no format: ${out_trade_no}`);
+    }
+    
+    const orderId = parseInt(orderIdMatch[1], 10);
+
+    // 3. Find and validate the order
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { orderitem: true }
+    });
+
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+
+    // 4. Check if already processed (idempotency)
+    if (order.status === 'pending_pickup') {
+      console.log(`Order ${orderId} already marked as paid. Skipping.`);
+      return order;
+    }
+
+    // 5. Validate order status
+    if (order.status !== 'pending_payment') {
+      throw new Error(`Invalid order status: ${order.status}. Expected: pending_payment`);
+    }
+
+    // 6. Validate amount (convert from cents to yuan)
+    const expectedAmount = Math.round(Number(order.total_amount) * 100);
+    if (amount.total !== expectedAmount) {
+      throw new Error(`Amount mismatch. Expected: ${expectedAmount}, Received: ${amount.total}`);
+    }
+
+    // 7. Update order status to paid
+    const updatedOrder = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'pending_pickup',
+        paid_at: new Date()
+      }
+    });
+
+    console.log(`Order ${orderId} successfully marked as paid`);
+    return updatedOrder;
+  });
+}

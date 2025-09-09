@@ -1,0 +1,43 @@
+{
+  "pages": [
+    "pages/market/index",
+    "pages/orders/index",
+    "pages/profile/index",
+    "pages/book-detail/index",
+    "pages/order-confirm/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#f8f9fa",
+    "navigationBarTitleText": "The Book Nook",
+    "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "color": "#6b6b6b",
+    "selectedColor": "#2c5f2d",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/market/index",
+        "text": "Marketplace",
+        "iconPath": "images/tabs/marketplace.png",
+        "selectedIconPath": "images/tabs/marketplace-active.png"
+      },
+      {
+        "pagePath": "pages/orders/index",
+        "text": "Orders",
+        "iconPath": "images/tabs/orders.png",
+        "selectedIconPath": "images/tabs/orders-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "Profile",
+        "iconPath": "images/tabs/profile.png",
+        "selectedIconPath": "images/tabs/profile-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

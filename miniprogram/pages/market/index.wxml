@@ -1,0 +1,31 @@
+<!-- pages/market/index.wxml -->
+<import src="../../templates/search-bar.wxml" />
+
+<view class="container">
+  <view class="header-title">The Book Nook</view>
+  
+  <template is="searchBar" data="{{placeholder: 'Search for title, author, or ISBN', searchTerm: searchTerm}}" />
+
+  <view wx:if="{{isLoading}}" class="loading-indicator">Loading...</view>
+  <view wx:if="{{error}}" class="error-message">{{error}}</view>
+  <view wx:if="{{!isLoading && !error && bookList.length === 0}}" class="empty-state">
+    <text>{{searchPerformed ? 'No matching books found' : 'No books available right now'}}</text>
+  </view>
+
+  <view class="book-grid" wx:if="{{bookList.length > 0}}">
+    <navigator wx:for="{{bookList}}" wx:key="id" class="book-card-navigator" url="/pages/book-detail/index?id={{item.id}}">
+      <view class="book-card card">
+        <image class="book-cover" src="{{item.booksku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFill" />
+        <view class="book-info">
+          <text class="book-title">{{item.booksku.bookmaster.title}}</text>
+          <text class="book-author">{{item.booksku.bookmaster.author}}</text>
+          <view class="book-meta">
+            <text>Edition: {{item.booksku.edition}}</text>
+            <text>Condition: {{item.condition}}</text>
+          </view>
+          <text class="book-price">¥{{item.selling_price}}</text>
+        </view>
+      </view>
+    </navigator>
+  </view>
+</view>

@@ -1,0 +1,34 @@
+// utils/formatter.wxs
+var formatTime = function(isoString) {
+  if (!isoString) return '';
+  var date = getDate(isoString.replace('T', ' ').replace('Z', ''));
+  var year = date.getFullYear();
+  var month = date.getMonth() + 1;
+  var day = date.getDate();
+  var hour = date.getHours();
+  var minute = date.getMinutes();
+
+  return year + '-' + month + '-' + day + ' ' + (hour < 10 ? '0' + hour : hour) + ':' + (minute < 10 ? '0' + minute : minute);
+}
+
+// Append to utils/formatter.wxs
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+var formatOrderTime = function(isoString) {
+  if (!isoString) return '';
+  var date = getDate(isoString.replace('T', ' ').replace('Z', ''));
+  var month = months[date.getMonth()];
+  var day = date.getDate();
+  var year = date.getFullYear();
+  var hours = date.getHours();
+  var minutes = date.getMinutes();
+  var ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  minutes = minutes < 10 ? '0' + minutes : minutes;
+  return month + ' ' + day + ', ' + year + ' ' + hours + ':' + minutes + ' ' + ampm;
+}
+
+module.exports = {
+  formatTime: formatTime,
+  formatOrderTime: formatOrderTime // Export the new function
+};

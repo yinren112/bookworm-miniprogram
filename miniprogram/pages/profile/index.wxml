@@ -1,0 +1,26 @@
+<!-- pages/profile/index.wxml -->
+<view class="container profile-container">
+  <view class="header">
+    <view class="avatar-wrapper">
+      <open-data type="userAvatarUrl"></open-data>
+    </view>
+    <text class="username">Username</text>
+    <text class="nickname">{{userInfo.nickName}}</text>
+  </view>
+
+  <view class="menu-card card">
+    <view class="menu-item" bindtap="copyWechatId">
+      <text class="menu-text">Contact Support</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+    <button class="menu-item share-button" open-type="share">
+      <text class="menu-text">Share with Friends</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </button>
+  </view>
+
+  <view class="support-info">
+    <text>Support WeChat: {{serviceInfo.wechatId}} (Tap to Copy)</text>
+    <text>Service Hours: {{serviceInfo.time}}</text>
+  </view>
+</view>

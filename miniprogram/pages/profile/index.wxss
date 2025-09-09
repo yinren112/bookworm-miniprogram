@@ -1,0 +1,80 @@
+/* pages/profile/index.wxss */
+.profile-container {
+  text-align: center;
+}
+
+.header {
+  padding: 40rpx 0;
+}
+
+.avatar-wrapper {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  border: 4rpx solid var(--primary-color);
+  margin: 0 auto 20rpx;
+  overflow: hidden;
+}
+
+.username {
+  display: block;
+  font-size: 36rpx;
+  font-weight: bold;
+  color: var(--text-color-primary);
+}
+
+.nickname {
+  display: block;
+  font-size: 28rpx;
+  color: var(--text-color-secondary);
+}
+
+.menu-card {
+  padding: 10rpx 30rpx; /* Reduced vertical padding */
+  text-align: left;
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-text {
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.menu-arrow {
+  width: 24rpx;
+  height: 24rpx;
+}
+
+.share-button {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0;
+  margin: 0;
+  line-height: 1.5;
+  font-size: inherit;
+  width: 100%;
+}
+.share-button::after {
+  border: none;
+}
+
+.support-info {
+  margin-top: 40rpx;
+  font-size: 24rpx;
+  color: var(--text-color-secondary);
+  line-height: 1.6;
+}
+.support-info text {
+  display: block;
+}

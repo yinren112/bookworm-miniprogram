@@ -1,0 +1,40 @@
+<!--pages/order-confirm/index.wxml-->
+<view class="container" wx:if="{{book}}">
+  <view class="card">
+    <view class="card-title">商品信息</view>
+    <view class="book-item">
+      <view class="book-info">
+        <text class="book-title">{{book.booksku.bookmaster.title}}</text>
+        <text class="book-author">作者: {{book.booksku.bookmaster.author || '未知'}}</text>
+        <text class="book-condition">品相: {{book.condition}}</text>
+      </view>
+      <text class="book-price">¥{{book.selling_price}}</text>
+    </view>
+  </view>
+  
+  <view class="card">
+    <view class="card-title">订单详情</view>
+    <view class="summary-item">
+      <text>商品总额</text>
+      <text>¥{{book.selling_price}}</text>
+    </view>
+    <view class="summary-item">
+      <text>运费</text>
+      <text>¥0.00</text>
+    </view>
+  </view>
+  
+  <view class="footer-bar">
+    <view class="total-section">
+      <text>合计: </text>
+      <text class="total-price">¥{{book.selling_price}}</text>
+    </view>
+    <button class="pay-button" bindtap="handlePayment" disabled="{{isSubmitting}}">
+      {{isSubmitting ? '处理中...' : '去支付'}}
+    </button>
+  </view>
+</view>
+
+<view class="container" wx:else>
+  <view class="error-message">商品信息加载失败</view>
+</view>

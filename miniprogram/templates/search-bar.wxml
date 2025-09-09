@@ -1,0 +1,7 @@
+<!-- templates/search-bar.wxml -->
+<template name="searchBar">
+  <view class="search-bar-wrapper">
+    <image class="search-icon" src="/images/icons/search.svg" />
+    <input class="search-input" placeholder="{{placeholder}}" value="{{searchTerm}}" bindinput="handleInput" bindconfirm="handleSearch" />
+  </view>
+</template>

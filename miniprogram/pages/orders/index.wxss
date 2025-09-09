@@ -1,0 +1,28 @@
+/* pages/orders/index.wxss */
+@import "../../templates/search-bar.wxss";
+
+.header-title { font-size: 48rpx; font-weight: bold; margin-bottom: 20rpx; }
+
+.empty-state, .loading-indicator, .error-message { text-align: center; color: var(--text-color-secondary); padding: 80rpx 0; }
+
+.order-card { padding: 0; }
+.card-header, .card-body, .card-footer { padding: 30rpx; }
+.card-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
+.order-info text { display: block; }
+.order-id { font-size: 32rpx; font-weight: bold; }
+.order-status { font-size: 28rpx; font-weight: 500; margin: 8rpx 0; }
+.status-paid, .status-pending_pickup { color: #ffa500; /* Orange */ }
+.status-completed { color: var(--primary-color); }
+.status-cancelled { color: var(--text-color-secondary); }
+.order-date { font-size: 24rpx; color: var(--text-color-secondary); }
+.order-total-header { text-align: right; }
+.total-label { font-size: 24rpx; color: var(--text-color-secondary); }
+.total-value { font-size: 32rpx; font-weight: bold; }
+
+.card-body { border-bottom: 1px solid var(--border-color); }
+.book-title { font-size: 28rpx; color: var(--text-color-secondary); }
+
+.card-footer { display: flex; justify-content: space-between; align-items: center; }
+.pickup-label { font-size: 28rpx; color: var(--text-color-secondary); }
+.pickup-code { font-size: 32rpx; font-weight: bold; }
+.total-footer { display: none; /* Hidden on mobile, shown on wider screens if needed */ }

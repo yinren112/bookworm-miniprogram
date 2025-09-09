@@ -1,0 +1,46 @@
+<!-- pages/orders/index.wxml -->
+<wxs src="../../utils/formatter.wxs" module="tools" />
+
+<view class="container">
+  <view class="header-title">My Orders</view>
+  
+  <!-- Search Bar (Style will be shared with Market page) -->
+  <view class="search-bar-wrapper">
+    <image class="search-icon" src="/images/icons/search.svg" />
+    <input class="search-input" placeholder="Search for title, author, or ISBN" />
+  </view>
+
+  <view wx:if="{{isLoading}}" class="loading-indicator">Loading orders...</view>
+  <view wx:if="{{error}}" class="error-message">{{error}}</view>
+  <view wx:if="{{!isLoading && !error && orderList.length === 0}}" class="empty-state">
+    <text>You have no orders yet.</text>
+  </view>
+
+  <view class="order-list" wx:if="{{orderList.length > 0}}">
+    <view class="order-card card" wx:for="{{orderList}}" wx:key="id">
+      <view class="card-header">
+        <view class="order-info">
+          <text class="order-id">Order #{{item.pickup_code}}</text>
+          <text class="order-status status-{{item.status}}">{{statusMap[item.status]}}</text>
+          <text class="order-date">{{tools.formatOrderTime(item.created_at)}}</text>
+        </view>
+        <view class="order-total-header">
+          <text class="total-label">Total:</text>
+          <text class="total-value">¥{{item.total_amount}}</text>
+        </view>
+      </view>
+      
+      <view class="card-body">
+        <view class="book-item" wx:for="{{item.orderitem}}" wx:for-item="orderItem" wx:key="id">
+          <text class="book-title">Item: {{orderItem.inventoryitem.booksku.bookmaster.title}}</text>
+        </view>
+      </view>
+
+      <view class="card-footer">
+        <text class="pickup-label">Pickup Code:</text>
+        <text class="pickup-code">{{item.pickup_code}}</text>
+        <view class="total-footer">Total: ¥{{item.total_amount}}</view>
+      </view>
+    </view>
+  </view>
+</view>

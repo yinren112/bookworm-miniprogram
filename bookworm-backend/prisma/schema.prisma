@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id           Int          @id @default(autoincrement())
+  user_id      Int
+  status       order_status @default(pending_payment)
+  total_amount Decimal      @db.Decimal(10, 2)
+  pickup_code  String       @unique @db.VarChar(10)
+  created_at   DateTime     @default(now()) @db.Timestamptz(6)
+  paid_at      DateTime?    @db.Timestamptz(6)
+  completed_at DateTime?    @db.Timestamptz(6)
+  cancelled_at DateTime?    @db.Timestamptz(6)
+  User         User         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
+  orderitem    orderitem[]
+
+  @@index([user_id, status], map: "idx_order_user_id_status")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  openid     String   @unique @db.VarChar(255)
+  nickname   String?  @db.VarChar(255)
+  avatar_url String?  @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  Order      Order[]
+}
+
+model bookmaster {
+  id             Int       @id @default(autoincrement())
+  isbn13         String    @unique @db.VarChar(13)
+  title          String    @db.VarChar(255)
+  author         String?   @db.VarChar(255)
+  publisher      String?   @db.VarChar(255)
+  original_price Decimal?  @db.Decimal(10, 2)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  booksku        booksku[]
+
+  @@index([isbn13], map: "idx_book_master_isbn13")
+}
+
+model booksku {
+  id              Int             @id @default(autoincrement())
+  master_id       Int
+  edition         String?         @db.VarChar(50)
+  description     String?
+  cover_image_url String?         @db.VarChar(255)
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  bookmaster      bookmaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
+  inventoryitem   inventoryitem[]
+
+  @@unique([master_id, edition])
+}
+
+model inventoryitem {
+  id            Int              @id @default(autoincrement())
+  sku_id        Int
+  condition     book_condition
+  cost          Decimal          @db.Decimal(10, 2)
+  selling_price Decimal          @db.Decimal(10, 2)
+  status        inventory_status @default(in_stock)
+  created_at    DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime         @default(now()) @db.Timestamptz(6)
+  booksku       booksku          @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
+  orderitem     orderitem?
+
+  @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
+}
+
+model orderitem {
+  id                Int           @id @default(autoincrement())
+  order_id          Int
+  inventory_item_id Int           @unique
+  price             Decimal       @db.Decimal(10, 2)
+  inventoryitem     inventoryitem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
+  Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
+}
+
+enum book_condition {
+  A
+  B
+  C
+}
+
+enum inventory_status {
+  in_stock
+  reserved
+  sold
+  returned
+  damaged
+}
+
+enum order_status {
+  pending_payment
+  pending_pickup
+  completed
+  cancelled
+}
