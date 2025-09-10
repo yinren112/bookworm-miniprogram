@@ -38,11 +38,10 @@ Page({
     });
   },
 
-  // MODIFIED: This function now navigates to the confirm page
   handleBuyNow() {
-    const bookData = JSON.stringify(this.data.bookDetail);
+    const inventoryItemId = this.data.bookDetail.id;
     wx.navigateTo({
-      url: `/pages/order-confirm/index?book=${encodeURIComponent(bookData)}`,
+      url: `/pages/order-confirm/index?id=${inventoryItemId}`,
     });
   }
 });

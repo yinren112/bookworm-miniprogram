@@ -5,19 +5,41 @@ const config = require('../../config');
 Page({
   data: {
     book: null,
+    isLoading: true,
+    error: null,
     isSubmitting: false
   },
   
   onLoad(options) {
-    if (options.book) {
-      this.setData({
-        book: JSON.parse(decodeURIComponent(options.book))
-      });
+    if (options.id) {
+      this.fetchBookDetails(options.id);
+    } else {
+      this.setData({ isLoading: false, error: '无效的商品ID' });
     }
+  },
+
+  fetchBookDetails(id) {
+    this.setData({ isLoading: true, error: null });
+    wx.request({
+      url: `${config.apiBaseUrl}/inventory/item/${id}`,
+      success: (res) => {
+        if (res.statusCode === 200 && res.data.status === 'in_stock') {
+          this.setData({ book: res.data });
+        } else {
+          this.setData({ error: res.data.error || '该书籍已售出或不可用' });
+        }
+      },
+      fail: (err) => {
+        this.setData({ error: '网络请求失败，无法获取书籍信息' });
+      },
+      complete: () => {
+        this.setData({ isLoading: false });
+      }
+    });
   },
   
   handlePayment() {
-    if (this.data.isSubmitting) return;
+    if (this.data.isSubmitting || !this.data.book) return;
     this.setData({ isSubmitting: true });
 
     const userId = auth.getUserId();
@@ -39,7 +61,7 @@ Page({
       success: (createRes) => {
         if (createRes.statusCode !== 201) {
           wx.hideLoading();
-          wx.showToast({ title: '创建订单失败', icon: 'error' });
+          wx.showToast({ title: createRes.data.error || '创建订单失败', icon: 'error' });
           this.setData({ isSubmitting: false });
           return;
         }
@@ -51,26 +73,21 @@ Page({
         wx.request({
           url: `${config.apiBaseUrl}/orders/${orderId}/pay`,
           method: 'POST',
-          data: { openid: auth.getToken() }, // Use stored token as openid for now
+          data: { openid: auth.getToken() },
           success: (payRes) => {
             wx.hideLoading();
             if (payRes.statusCode !== 200) {
-              wx.showToast({ title: '获取支付参数失败', icon: 'error' });
+              wx.showToast({ title: payRes.data.error || '获取支付参数失败', icon: 'error' });
               this.setData({ isSubmitting: false });
               return;
             }
 
-            const payParams = payRes.data.paymentParams;
+            const payParams = payRes.data.result;
             // Step 3: Request payment
             wx.requestPayment({
-              timeStamp: payParams.timeStamp,
-              nonceStr: payParams.nonceStr,
-              package: payParams.package,
-              signType: payParams.signType,
-              paySign: payParams.paySign,
+              ...payParams,
               success: (paymentSuccessRes) => {
                 wx.showToast({ title: '支付成功', icon: 'success' });
-                // Navigate to orders page to see the result
                 setTimeout(() => {
                   wx.switchTab({ url: '/pages/orders/index' });
                 }, 1500);
