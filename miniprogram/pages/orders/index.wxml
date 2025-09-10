@@ -21,7 +21,7 @@
       <view class="card-header">
         <view class="order-info">
           <text class="order-id">Order #{{item.pickup_code}}</text>
-          <text class="order-status status-{{item.status}}">{{statusMap[item.status]}}</text>
+          <text class="order-status status-{{item.status}}">{{statusMap[item.status] || '未知状态'}}</text>
           <text class="order-date">{{tools.formatOrderTime(item.created_at)}}</text>
         </view>
         <view class="order-total-header">

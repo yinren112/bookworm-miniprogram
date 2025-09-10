@@ -1,20 +1,14 @@
 // pages/orders/index.js
 const auth = require('../../utils/auth');
 const config = require('../../config');
+const { ORDER_STATUS } = require('../../utils/constants');
 
 Page({
   data: {
     orderList: [],
     isLoading: true,
     error: null,
-    // MODIFIED: Simplified status map, styling is now in WXSS
-    statusMap: {
-      pending_payment: 'Awaiting Payment',
-      paid: 'Awaiting Pickup',
-      pending_pickup: 'Awaiting Pickup', // Keep this for backward compatibility
-      completed: 'Completed',
-      cancelled: 'Cancelled'
-    }
+    statusMap: ORDER_STATUS,
   },
   onShow() { this.fetchUserOrders(); },
   fetchUserOrders() {
