@@ -1,6 +1,7 @@
 // src/services/inventoryService.ts (fully replaced)
 import { Prisma, book_condition } from '@prisma/client';
 import prisma from '../db';
+import { getBookMetadata } from './bookMetadataService';
 
 interface AddBookInput {
   isbn13: string;
@@ -14,15 +15,30 @@ interface AddBookInput {
 
 export async function addBookToInventory(input: AddBookInput) {
   return prisma.$transaction(async (tx) => {
+    
+    // NEW: Attempt to fetch external metadata
+    const metadata = await getBookMetadata(input.isbn13);
+    
     // Step 1: Find or create the master book record (based on ISBN).
-    // This represents the abstract concept of the book.
+    // Use metadata if available, otherwise use input data (manual entry)
     const bookMaster = await tx.bookmaster.upsert({
       where: { isbn13: input.isbn13 },
-      update: {}, // No updates needed if it exists
+      update: {
+        // If metadata is available, update title/author/publisher
+        ...(metadata && {
+          title: metadata.title,
+          author: metadata.author,
+          publisher: metadata.publisher,
+          original_price: metadata.original_price,
+        }),
+      }, 
       create: {
         isbn13: input.isbn13,
-        title: input.title,
-        author: input.author,
+        // Use metadata or fall back to input
+        title: metadata?.title || input.title, 
+        author: metadata?.author || input.author,
+        publisher: metadata?.publisher,
+        original_price: metadata?.original_price,
       },
     });
 
@@ -35,10 +51,16 @@ export async function addBookToInventory(input: AddBookInput) {
           edition: input.edition || "default",
         },
       },
-      update: {}, // No updates needed if it exists
+      update: {
+        // If metadata is available, update cover image URL
+        ...(metadata && {
+          cover_image_url: metadata.cover_image_url,
+        }),
+      },
       create: {
         master_id: bookMaster.id,
         edition: input.edition || "default",
+        cover_image_url: metadata?.cover_image_url, // Use metadata cover image
       },
     });
 
@@ -102,28 +124,3 @@ export async function getBookById(id: number) {
   });
 }
 
-// NEW: Function to get book metadata by ISBN
-export async function getBookMetadata(isbn: string) {
-  // First check if we have the book in our database
-  const existingBook = await prisma.bookmaster.findUnique({
-    where: { isbn13: isbn },
-    include: {
-      booksku: true,
-    },
-  });
-
-  if (existingBook) {
-    return {
-      isbn13: existingBook.isbn13,
-      title: existingBook.title,
-      author: existingBook.author,
-      publisher: existingBook.publisher,
-      original_price: existingBook.original_price ? Number(existingBook.original_price) : null,
-      cover_image_url: existingBook.booksku[0]?.cover_image_url || null,
-    };
-  }
-
-  // If not found locally, we could integrate with external APIs here
-  // For now, return null to indicate not found
-  return null;
-}

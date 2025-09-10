@@ -3,7 +3,8 @@ import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import path from 'path';
 import fastifyStatic from '@fastify/static';
 import config from './config';
-import { addBookToInventory, getAvailableBooks, getBookById, getBookMetadata } from './services/inventoryService';
+import { addBookToInventory, getAvailableBooks, getBookById } from './services/inventoryService';
+import { getBookMetadata } from './services/bookMetadataService';
 import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, getPendingPickupOrders, cancelExpiredOrders, ItemNotAvailableError, FulfillmentError } from './services/orderService';
 import { wxLogin } from './services/authService';
 import WechatPay from 'wechatpay-node-v3';
@@ -62,6 +63,11 @@ fastify.setErrorHandler(async (error: Error, request: FastifyRequest, reply: Fas
 });
 
 // --- API Routes ---
+
+// Health Check Endpoint
+fastify.get('/api/health', async (request, reply) => {
+  reply.send({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Auth
 fastify.post('/api/auth/login', async (request, reply) => {

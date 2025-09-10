@@ -17,6 +17,14 @@
       <text class="menu-text">分享给好友</text>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </button>
+    <view class="menu-item" bindtap="showTerms">
+      <text class="menu-text">用户服务协议</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+    <view class="menu-item" bindtap="showTerms">
+      <text class="menu-text">隐私政策</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
   </view>
 
   <view class="support-info">

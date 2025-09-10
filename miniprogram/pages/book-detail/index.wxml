@@ -1,9 +1,18 @@
 <!-- pages/book-detail/index.wxml -->
 <view class="container">
-  <view wx:if="{{isLoading}}" class="loading-indicator">加载中...</view>
-  <view wx:if="{{error}}" class="error-message">{{error}}</view>
+  <!-- Skeleton -->
+  <view wx:if="{{isLoading}}" class="skeleton-container">
+    <view class="skeleton-image-large"></view>
+    <view class="skeleton-text title"></view>
+    <view class="skeleton-text"></view>
+    <view class="skeleton-text short"></view>
+    <view class="skeleton-divider"></view>
+    <view class="skeleton-text"></view>
+    <view class="skeleton-text"></view>
+  </view>
 
-  <view wx:if="{{bookDetail}}" class="detail-container">
+  <!-- Real Content -->
+  <view wx:if="{{!isLoading && bookDetail}}" class="detail-container animated">
     <image class="cover-image" src="{{bookDetail.booksku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFit" />
 
     <view class="info-section">
@@ -30,6 +39,11 @@
         </view>
       </view>
     </view>
+  </view>
+
+  <!-- Error State -->
+  <view wx:if="{{!isLoading && error}}" class="error-container">
+    <text>{{error}}</text>
   </view>
 
   <view class="footer-bar" wx:if="{{bookDetail}}">

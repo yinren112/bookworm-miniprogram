@@ -1,65 +1,88 @@
-// src/services/bookMetadataService.ts
+// bookworm-backend/src/services/bookMetadataService.ts
 import axios from 'axios';
+import prisma from '../db';
+import config from '../config'; // 导入config
 
-const OPEN_LIBRARY_URL = 'https://openlibrary.org';
+// 探数 API 配置
+const TANSHU_BASE_URL = 'https://api.tanshuapi.com/api/isbn/v2/index';
 
-// Type definitions for the Open Library API responses
-interface AuthorDetails {
-  name: string;
-}
-interface BookInfo {
+interface TanshuBookData {
   title: string;
-  authors: { key: string }[];
-  publishers: string[];
-  publish_date: string;
-  covers: number[];
+  img: string;
+  author: string;
+  isbn: string;
+  publisher: string;
+  pubdate: string;
+  price: string;
+  summary: string;
+  // ... other fields from Tanshu API
 }
 
-// Fetches the name of a single author from their key
-async function fetchAuthorName(authorKey: string): Promise<string> {
-  try {
-    const { data } = await axios.get<AuthorDetails>(`${OPEN_LIBRARY_URL}${authorKey}.json`);
-    return data.name;
-  } catch (error) {
-    console.error(`Failed to fetch author ${authorKey}`, error);
-    return 'Unknown Author'; // Return a fallback value
+interface TanshuApiResponse {
+  code: number;
+  msg: string;
+  data: TanshuBookData;
+}
+
+interface BookMetadata {
+  isbn13: string;
+  title: string;
+  author: string;
+  publisher: string;
+  summary: string;
+  original_price: number;
+  cover_image_url: string;
+}
+
+/**
+ * Fetches book metadata from Tanshu API using ISBN.
+ * @param isbn The ISBN-13 of the book.
+ * @returns Parsed metadata or null if not found or on error.
+ */
+export async function getBookMetadata(isbn: string): Promise<BookMetadata | null> {
+  if (!config.tanshuApiKey) {
+    console.warn('!!! WARNING: TANSHU_API_KEY is not configured in .env. Book metadata feature is disabled.');
+    return null;
   }
-}
 
-export async function fetchMetadataByISBN(isbn: string) {
+  const url = `${TANSHU_BASE_URL}?key=${config.tanshuApiKey}&isbn=${isbn}`;
+  
   try {
-    // Step 1: Fetch the main book information by ISBN
-    const bookResponse = await axios.get<BookInfo>(`${OPEN_LIBRARY_URL}/isbn/${isbn}.json`);
-    const bookData = bookResponse.data;
+    const response = await axios.get<TanshuApiResponse>(url, {
+      validateStatus: () => true, // 接受所有状态码，自己处理
+    });
 
-    // Step 2: Concurrently fetch all author names
-    let authorNames: string[] = [];
-    if (bookData.authors && bookData.authors.length > 0) {
-      const authorPromises = bookData.authors.map(author => fetchAuthorName(author.key));
-      authorNames = await Promise.all(authorPromises);
+    if (response.status !== 200 || response.data.code !== 1) {
+      console.error(`Tanshu API Error for ISBN ${isbn}: Status ${response.status}, code: ${response.data.code}, msg: ${response.data.msg}`);
+      return null;
     }
-    
-    // Step 3: Construct the cover image URL (if available)
-    // https://covers.openlibrary.org/b/id/COVER_ID-L.jpg
-    const coverImageUrl = bookData.covers && bookData.covers.length > 0
-      ? `https://covers.openlibrary.org/b/id/${bookData.covers[0]}-L.jpg`
-      : null;
 
-    // Step 4: Adapt the data to our internal model and return it
+    const data = response.data.data;
+
+    let priceValue = 0;
+    if (data.price) {
+        try {
+            const priceMatch = data.price.match(/(\d+\.?\d*)/);
+            if (priceMatch) {
+                priceValue = parseFloat(priceMatch[1]);
+            }
+        } catch (e) {
+            console.warn(`Could not parse price for ${data.title}: ${data.price}`);
+        }
+    }
+
     return {
-      title: bookData.title,
-      author: authorNames.join(', '),
-      publisher: bookData.publishers ? bookData.publishers.join(', ') : '',
-      // Note: Open Library does not provide reliable price data. We leave it out.
-      original_price: null,
-      cover_image_url: coverImageUrl,
+      isbn13: data.isbn,
+      title: data.title || '未知书名',
+      author: data.author || '未知作者',
+      publisher: data.publisher || '未知出版社',
+      summary: data.summary || '暂无简介',
+      original_price: priceValue,
+      cover_image_url: data.img || '',
     };
 
-  } catch (error: any) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return null; // Book not found, this is an expected outcome
-    }
-    console.error(`Failed to fetch metadata for ISBN ${isbn} from Open Library`, error);
-    throw new Error(`Failed to fetch metadata for ISBN ${isbn}`);
+  } catch (error) {
+    console.error(`Network error calling Tanshu API for ISBN ${isbn}:`, (error as Error).message);
+    return null;
   }
 }

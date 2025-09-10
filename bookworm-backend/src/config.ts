@@ -35,6 +35,9 @@ const config = {
   wxPayApiV3Key: process.env.WXPAY_API_V3_KEY,
   wxPayNotifyUrl: process.env.WXPAY_NOTIFY_URL,
 
+  // Tanshu API config
+  tanshuApiKey: process.env.TANSHU_API_KEY,
+
   // Database URL is read by Prisma from .env directly
 };
 
@@ -47,6 +50,9 @@ if (config.wxAppId === 'YOUR_APP_ID' || config.wxAppSecret === 'YOUR_APP_SECRET'
 }
 if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
     console.warn('!!! WARNING: WeChat Pay configuration is incomplete. Payment features will not work.');
+}
+if (!config.tanshuApiKey) { 
+    console.warn('!!! WARNING: TANSHU_API_KEY is not configured.'); 
 }
 
 export default config;
