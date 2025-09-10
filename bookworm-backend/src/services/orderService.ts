@@ -63,7 +63,7 @@ export async function getOrdersByUserId(userId: number) {
   return prisma.order.findMany({
     where: { user_id: userId },
     include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
-    orderBy: { created_at: 'desc' },
+    orderBy: { createdAt: 'desc' },
   });
 }
 
@@ -80,7 +80,7 @@ export async function fulfillOrder(pickupCode: string) {
     if (!order) {
       throw new FulfillmentError(`取货码 "${pickupCode}" 无效。`);
     }
-    if (order.status !== 'pending_pickup') {
+    if (order.status !== 'PENDING_PICKUP') {
       throw new FulfillmentError(`此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`);
     }
 
@@ -88,7 +88,7 @@ export async function fulfillOrder(pickupCode: string) {
     const updatedOrder = await tx.order.update({
       where: { id: order.id },
       data: {
-        status: 'completed',
+        status: 'COMPLETED',
         completed_at: new Date(),
       },
     });
@@ -105,7 +105,7 @@ export async function fulfillOrder(pickupCode: string) {
 }
 
 // NEW: Generate WeChat Pay payment parameters
-export async function generatePaymentParams(orderId: number, openid: string) {
+export async function generatePaymentParams(pay: WechatPay, orderId: number, openid: string) {
   // 1. Fetch the order details
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -130,23 +130,10 @@ export async function generatePaymentParams(orderId: number, openid: string) {
     throw new Error('Order not found');
   }
 
-  if (order.status !== 'pending_payment') {
-    throw new Error('Order is not in pending_payment status');
+  if (order.status !== 'PENDING_PAYMENT') {
+    throw new Error('Order is not in PENDING_PAYMENT status');
   }
 
-  // 2. Initialize WeChat Pay client
-  if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
-    throw new Error('WeChat Pay configuration is incomplete');
-  }
-
-  const wxpay = new WechatPay({
-    appid: config.wxAppId,
-    mchid: config.wxPayMchId,
-    publicKey: Buffer.from(''), // We'll need to fix this later
-    privateKey: config.wxPayPrivateKey,
-    serial_no: config.wxPayCertSerialNo,
-    key: config.wxPayApiV3Key,
-  });
 
   // 3. Generate description from order items
   const bookTitles = order.orderitem.map(item => 
@@ -173,7 +160,7 @@ export async function generatePaymentParams(orderId: number, openid: string) {
   };
 
   try {
-    const result = await wxpay.transactions_jsapi(unifiedOrderParams);
+    const result = await pay.transactions_jsapi(unifiedOrderParams);
     
     // 5. Return the result for mini-program payment
     return {
@@ -213,14 +200,14 @@ export async function processPaymentNotification(notificationData: any) {
     }
 
     // 4. Check if already processed (idempotency)
-    if (order.status === 'pending_pickup') {
+    if (order.status === 'PENDING_PICKUP') {
       console.log(`Order ${orderId} already marked as paid. Skipping.`);
       return order;
     }
 
     // 5. Validate order status
-    if (order.status !== 'pending_payment') {
-      throw new Error(`Invalid order status: ${order.status}. Expected: pending_payment`);
+    if (order.status !== 'PENDING_PAYMENT') {
+      throw new Error(`Invalid order status: ${order.status}. Expected: PENDING_PAYMENT`);
     }
 
     // 6. Validate amount (convert from cents to yuan)
@@ -233,12 +220,106 @@ export async function processPaymentNotification(notificationData: any) {
     const updatedOrder = await tx.order.update({
       where: { id: orderId },
       data: {
-        status: 'pending_pickup',
+        status: 'PENDING_PICKUP',
         paid_at: new Date()
       }
     });
 
     console.log(`Order ${orderId} successfully marked as paid`);
     return updatedOrder;
+  });
+}
+
+export async function getPendingPickupOrders() {
+  return prisma.order.findMany({
+    where: {
+      status: 'PENDING_PICKUP',
+    },
+    include: {
+      orderitem: {
+        include: {
+          inventoryitem: {
+            include: {
+              booksku: {
+                include: {
+                  bookmaster: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      paid_at: 'asc', // 按支付时间升序，先付钱的先备货
+    },
+  });
+}
+
+export async function cancelExpiredOrders() {
+  return prisma.$transaction(async (tx) => {
+    // 1. Find all orders that are pending payment and have expired.
+    const expiredOrders = await tx.order.findMany({
+      where: {
+        status: 'PENDING_PAYMENT',
+        paymentExpiresAt: {
+          lt: new Date(), // Less than the current time
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (expiredOrders.length === 0) {
+      return { cancelledCount: 0 }; // Nothing to do
+    }
+
+    const expiredOrderIds = expiredOrders.map(o => o.id);
+    console.log(`Found ${expiredOrderIds.length} expired orders to cancel:`, expiredOrderIds);
+
+    // 2. Find all inventory items linked to these expired orders.
+    const itemsToRelease = await tx.orderitem.findMany({
+      where: {
+        order_id: {
+          in: expiredOrderIds,
+        },
+      },
+      select: {
+        inventory_item_id: true,
+      },
+    });
+
+    const inventoryItemIdsToRelease = itemsToRelease.map(i => i.inventory_item_id);
+
+    // 3. Update the orders' status to CANCELLED.
+    await tx.order.updateMany({
+      where: {
+        id: {
+          in: expiredOrderIds,
+        },
+      },
+      data: {
+        status: 'CANCELLED',
+        cancelled_at: new Date(),
+      },
+    });
+
+    // 4. Update the inventory items' status back to in_stock.
+    if (inventoryItemIdsToRelease.length > 0) {
+      await tx.inventoryitem.updateMany({
+        where: {
+          id: {
+            in: inventoryItemIdsToRelease,
+          },
+        },
+        data: {
+          status: 'in_stock',
+        },
+      });
+    }
+    
+    console.log(`Cancelled ${expiredOrderIds.length} orders and released ${inventoryItemIdsToRelease.length} items back to stock.`);
+    return { cancelledCount: expiredOrderIds.length };
   });
 }

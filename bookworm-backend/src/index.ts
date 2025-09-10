@@ -4,7 +4,7 @@ import path from 'path';
 import fastifyStatic from '@fastify/static';
 import config from './config';
 import { addBookToInventory, getAvailableBooks, getBookById, getBookMetadata } from './services/inventoryService';
-import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, ItemNotAvailableError, FulfillmentError } from './services/orderService';
+import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, getPendingPickupOrders, cancelExpiredOrders, ItemNotAvailableError, FulfillmentError } from './services/orderService';
 import { wxLogin } from './services/authService';
 import WechatPay from 'wechatpay-node-v3';
 import { Prisma } from '@prisma/client';
@@ -125,6 +125,10 @@ fastify.post('/api/orders/fulfill', async (request, reply) => {
     const order = await fulfillOrder(pickupCode.toUpperCase());
     reply.send(order);
 });
+fastify.get('/api/orders/pending-pickup', async (request, reply) => {
+    const orders = await getPendingPickupOrders();
+    reply.send(orders);
+});
 
 // Generate payment parameters for an order
 fastify.post('/api/orders/:orderId/pay', async (request, reply) => {
@@ -139,7 +143,7 @@ fastify.post('/api/orders/:orderId/pay', async (request, reply) => {
     const { openid } = request.body as { openid: string };
     if (!openid) { return reply.code(400).send({ error: 'openid is required.' }); }
     
-    const paymentData = await generatePaymentParams(orderId, openid);
+    const paymentData = await generatePaymentParams(pay, orderId, openid);
     reply.send(paymentData);
 });
 
@@ -204,6 +208,22 @@ fastify.post('/api/payment/notify', { config: { rawBody: true } }, async (reques
 const start = async () => {
     try {
         await fastify.listen({ port: config.port as number, host: '0.0.0.0' });
+        
+        // Start the background job to cancel expired orders
+        const cleanupInterval = 60 * 1000; // Run every 60 seconds
+        setInterval(async () => {
+            try {
+                fastify.log.info('Running background job: cancelExpiredOrders...');
+                const { cancelledCount } = await cancelExpiredOrders();
+                if (cancelledCount > 0) {
+                    fastify.log.info(`Background job finished: Cancelled ${cancelledCount} expired orders.`);
+                } else {
+                    fastify.log.info('Background job finished: No expired orders found.');
+                }
+            } catch (error) {
+                fastify.log.error(error, 'Error running cancelExpiredOrders background job');
+            }
+        }, cleanupInterval);
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);

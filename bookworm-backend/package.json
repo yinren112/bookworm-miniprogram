@@ -7,7 +7,9 @@
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"npx ts-node\" src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "seed": "npx ts-node prisma/seed.ts",
+    "postinstall": "cp node_modules/@zxing/library/umd/index.min.js public/zxing.min.js"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",
@@ -22,6 +24,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.2",
     "@vitest/coverage-v8": "^3.2.4",
+    "@zxing/library": "^0.21.3",
     "nodemon": "^3.1.2",
     "prisma": "^5.15.0",
     "ts-node": "^10.9.2",

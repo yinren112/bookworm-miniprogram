@@ -18,7 +18,7 @@ Page({
     wx.request({
       url: `${config.apiBaseUrl}/orders/user/${userId}`,
       success: (res) => { this.setData({ orderList: res.data }); },
-      fail: (err) => { this.setData({ error: 'Failed to load orders.' }); },
+      fail: (err) => { this.setData({ error: '加载订单失败。' }); },
       complete: () => { this.setData({ isLoading: false }); }
     });
   }

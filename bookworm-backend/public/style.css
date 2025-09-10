@@ -322,3 +322,40 @@ button:focus {
   0% { transform: translateY(-50%) rotate(0deg); }
   100% { transform: translateY(-50%) rotate(360deg); }
 }
+
+/* Pending Orders Dashboard Styles */
+.order-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  background-color: #fdfdfd;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.order-item-list {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-color-secondary);
+}
+
+.order-item-list li {
+  margin-bottom: 5px;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-color-secondary);
+  padding: 20px;
+}

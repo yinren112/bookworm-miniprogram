@@ -21,7 +21,7 @@ describe('Order Service', () => {
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         order: {
-          create: vi.fn().mockResolvedValue({ id: 1, status: 'pending_payment' as order_status, total_amount: 100 }),
+          create: vi.fn().mockResolvedValue({ id: 1, status: 'PENDING_PAYMENT' as order_status, total_amount: 100 }),
         },
         orderitem: {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -39,7 +39,8 @@ describe('Order Service', () => {
       });
       expect(mockTransaction.order.create).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({
-          status: 'pending_payment'
+          status: 'PENDING_PAYMENT',
+          paymentExpiresAt: expect.any(Date)
         })
       }));
     });
@@ -69,7 +70,7 @@ describe('Order Service', () => {
     it('should complete an order and mark items as sold', async () => {
       const orderToFulfill = { 
         id: 1, 
-        status: 'pending_pickup' as order_status, 
+        status: 'PENDING_PICKUP' as order_status, 
         orderitem: [{ inventory_item_id: 101 }] 
       };
       
@@ -77,7 +78,7 @@ describe('Order Service', () => {
       const mockTransaction = {
         order: {
           findUnique: vi.fn().mockResolvedValue(orderToFulfill),
-          update: vi.fn().mockResolvedValue({ id: 1, status: 'completed' as order_status }),
+          update: vi.fn().mockResolvedValue({ id: 1, status: 'COMPLETED' as order_status }),
         },
         inventoryitem: {
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -90,7 +91,7 @@ describe('Order Service', () => {
 
       expect(mockTransaction.order.update).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({
-          status: 'completed'
+          status: 'COMPLETED'
         })
       }));
       expect(mockTransaction.inventoryitem.updateMany).toHaveBeenCalledWith({
@@ -100,7 +101,7 @@ describe('Order Service', () => {
     });
 
     it('should throw FulfillmentError if order is not in a fulfillable state', async () => {
-      const completedOrder = { id: 1, status: 'completed' as order_status, orderitem: [] };
+      const completedOrder = { id: 1, status: 'COMPLETED' as order_status, orderitem: [] };
       
       // Mock the transaction
       const mockTransaction = {
@@ -117,14 +118,14 @@ describe('Order Service', () => {
 
   describe('processPaymentNotification', () => {
     it('should update order status to paid on successful notification', async () => {
-      const notification = { out_trade_no: 'ORDER_1_123456', amount: { total: 10000 }, trade_state: 'SUCCESS' };
-      const pendingOrder = { id: 1, status: 'pending_payment' as order_status, total_amount: 100.00 };
+      const notification = { out_trade_no: 'BOOKWORM_1', amount: { total: 10000 }, trade_state: 'SUCCESS' };
+      const pendingOrder = { id: 1, status: 'PENDING_PAYMENT' as order_status, total_amount: 100.00 };
 
       // Mock the transaction
       const mockTransaction = {
         order: {
           findUnique: vi.fn().mockResolvedValue(pendingOrder),
-          update: vi.fn().mockResolvedValue({ ...pendingOrder, status: 'pending_pickup', paid_at: new Date() }),
+          update: vi.fn().mockResolvedValue({ ...pendingOrder, status: 'PENDING_PICKUP', paid_at: new Date() }),
         },
       };
 
@@ -134,13 +135,13 @@ describe('Order Service', () => {
 
       expect(mockTransaction.order.update).toHaveBeenCalledWith({
         where: { id: 1 },
-        data: { status: 'pending_pickup', paid_at: expect.any(Date) },
+        data: { status: 'PENDING_PICKUP', paid_at: expect.any(Date) },
       });
     });
 
     it('should not update order if status is not pending_payment (idempotency)', async () => {
-      const notification = { out_trade_no: 'ORDER_1_123456', amount: { total: 10000 }, trade_state: 'SUCCESS' };
-      const paidOrder = { id: 1, status: 'pending_pickup' as order_status, total_amount: 100.00 };
+      const notification = { out_trade_no: 'BOOKWORM_1', amount: { total: 10000 }, trade_state: 'SUCCESS' };
+      const paidOrder = { id: 1, status: 'PENDING_PICKUP' as order_status, total_amount: 100.00 };
 
       // Mock the transaction
       const mockTransaction = {

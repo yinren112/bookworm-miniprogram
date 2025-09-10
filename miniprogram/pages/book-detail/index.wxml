@@ -1,6 +1,6 @@
 <!-- pages/book-detail/index.wxml -->
 <view class="container">
-  <view wx:if="{{isLoading}}" class="loading-indicator">Loading...</view>
+  <view wx:if="{{isLoading}}" class="loading-indicator">加载中...</view>
   <view wx:if="{{error}}" class="error-message">{{error}}</view>
 
   <view wx:if="{{bookDetail}}" class="detail-container">
@@ -17,11 +17,11 @@
 
       <view class="specs-card card">
         <view class="spec-item">
-          <text class="spec-label">Edition</text>
-          <text class="spec-value">{{bookDetail.booksku.edition || 'N/A'}}</text>
+          <text class="spec-label">版本</text>
+          <text class="spec-value">{{bookDetail.booksku.edition || '暂无'}}</text>
         </view>
         <view class="spec-item">
-          <text class="spec-label">Condition</text>
+          <text class="spec-label">品相</text>
           <text class="spec-value">{{bookDetail.condition}}</text>
         </view>
         <view class="spec-item">

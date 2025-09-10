@@ -9,7 +9,7 @@
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#f8f9fa",
-    "navigationBarTitleText": "The Book Nook",
+    "navigationBarTitleText": "二手书市场",
     "navigationBarTextStyle": "black"
   },
   "tabBar": {
@@ -20,19 +20,19 @@
     "list": [
       {
         "pagePath": "pages/market/index",
-        "text": "Marketplace",
+        "text": "市场",
         "iconPath": "images/tabs/marketplace.png",
         "selectedIconPath": "images/tabs/marketplace-active.png"
       },
       {
         "pagePath": "pages/orders/index",
-        "text": "Orders",
+        "text": "订单",
         "iconPath": "images/tabs/orders.png",
         "selectedIconPath": "images/tabs/orders-active.png"
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "Profile",
+        "text": "我的",
         "iconPath": "images/tabs/profile.png",
         "selectedIconPath": "images/tabs/profile-active.png"
       }

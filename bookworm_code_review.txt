@@ -1,7 +1,7 @@
 ================================================================================
 BOOKWORM PROJECT - CORE CODE REVIEW
 ================================================================================
-Generated on: 2025-09-09 21:57:43
+Generated on: 2025-09-10 17:40:55
 Mode: Core files only. This report contains the architectural backbone of the project.
 
 ### 📁 PROJECT FILE TREE ###
@@ -34,7 +34,8 @@ miniprogram-13/
 │   │   ├── sort-arrow-sprite.png
 │   │   └── sorter.js
 │   ├── prisma/
-│   │   └── schema.prisma
+│   │   ├── schema.prisma
+│   │   └── seed.ts
 │   ├── public/
 │   │   ├── index.html
 │   │   ├── main.js
@@ -48,6 +49,7 @@ miniprogram-13/
 │   │   ├── tests/
 │   │   │   ├── inventoryService.test.ts
 │   │   │   ├── orderService.test.ts
+│   │   │   ├── paymentService.test.ts
 │   │   │   └── setup.ts
 │   │   ├── config.ts
 │   │   ├── db.ts
@@ -57,18 +59,8 @@ miniprogram-13/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vitest.config.ts
-├── cloudfunctions/
-│   └── quickstartFunctions/
-│       ├── config.json
-│       ├── index.js
-│       └── package.json
 ├── miniprogram/
 │   ├── components/
-│   │   └── cloudTipModal/
-│   │       ├── index.js
-│   │       ├── index.json
-│   │       ├── index.wxml
-│   │       └── index.wxss
 │   ├── images/
 │   │   ├── icons/
 │   │   │   ├── arrow-right.png
@@ -104,34 +96,13 @@ miniprogram-13/
 │   │   │   ├── profile-active.svg
 │   │   │   ├── profile.png
 │   │   │   └── profile.svg
-│   │   ├── ai_example1.png
-│   │   ├── ai_example2.png
 │   │   ├── arrow.svg
 │   │   ├── avatar.png
-│   │   ├── cloud_dev.png
 │   │   ├── copy.svg
-│   │   ├── create_cbr.png
-│   │   ├── create_cbrf.png
-│   │   ├── create_env.png
-│   │   ├── database.png
-│   │   ├── database_add.png
 │   │   ├── default-goods-image.png
-│   │   ├── env-select.png
-│   │   ├── function_deploy.png
-│   │   ├── placeholder-cover.svg
-│   │   └── scf-enter.png
+│   │   └── placeholder-cover.svg
 │   ├── pages/
 │   │   ├── book-detail/
-│   │   │   ├── index.js
-│   │   │   ├── index.json
-│   │   │   ├── index.wxml
-│   │   │   └── index.wxss
-│   │   ├── example/
-│   │   │   ├── index.js
-│   │   │   ├── index.json
-│   │   │   ├── index.wxml
-│   │   │   └── index.wxss
-│   │   ├── index/
 │   │   │   ├── index.js
 │   │   │   ├── index.json
 │   │   │   ├── index.wxml
@@ -161,24 +132,20 @@ miniprogram-13/
 │   │   └── search-bar.wxss
 │   ├── utils/
 │   │   ├── auth.js
+│   │   ├── constants.js
 │   │   └── formatter.wxs
 │   ├── app.js
 │   ├── app.json
 │   ├── app.wxss
 │   ├── config.js
-│   ├── envList.js
 │   └── sitemap.json
 ├── .eslintrc.js
 ├── .gitignore
 ├── CLAUDE.md
-├── CLAUDE_OLD.md
 ├── README.md
 ├── bookworm_code_review.txt
 ├── package.json
 ├── project.config.json
-├── schema.sql
-├── uploadCloudFunction.bat
-├── uploadError.txt
 └── 审查.py
 
 
@@ -537,7 +504,8 @@ WXPAY_NOTIFY_URL="https://your.domain.com/api/payment/notify"
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"npx ts-node\" src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "seed": "npx ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",
@@ -584,7 +552,7 @@ model Order {
   total_amount      Decimal     @db.Decimal(10, 2)
   pickup_code       String      @unique @db.VarChar(10)
   createdAt         DateTime    @default(now()) @db.Timestamptz(6)
-  paymentExpiresAt  DateTime    @default(now()) @db.Timestamptz(6)
+  paymentExpiresAt  DateTime    @db.Timestamptz(6)
   pickupExpiresAt   DateTime?   @db.Timestamptz(6)
   paid_at           DateTime?   @db.Timestamptz(6)
   completed_at      DateTime?   @db.Timestamptz(6)
@@ -761,6 +729,14 @@ enum OrderStatus {
             </form>
             <div id="fulfill-order-message-area" class="message-area"></div>
         </section>
+
+        <section class="module-card">
+            <h2 class="module-title">待取货订单看板</h2>
+            <div id="pending-orders-container">
+                <!-- Orders will be dynamically inserted here -->
+            </div>
+            <div id="pending-orders-message-area" class="message-area"></div>
+        </section>
     </main>
 </body>
 </html>
@@ -770,145 +746,215 @@ enum OrderStatus {
 ### FILE: bookworm-backend\public\main.js
 ================================================================================
 
-// public/main.js (fully replaced with final logic)
+// public/main.js (Refactored for clarity and maintainability)
+
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Element Selection ---
-    const addBookForm = document.getElementById('add-book-form');
-    const addBookMessageArea = document.getElementById('add-book-message-area');
-    const isbnInput = document.getElementById('isbn13');
-    const coverPreview = document.getElementById('cover-preview');
-    const scanButton = document.getElementById('scan-btn');
-    const scannerContainer = document.getElementById('scanner-container');
-    const videoElement = document.getElementById('video');
-    const closeScannerButton = document.getElementById('close-scanner');
-    const fulfillForm = document.getElementById('fulfill-order-form');
-    const fulfillMessageArea = document.getElementById('fulfill-order-message-area');
 
-    // --- Helper to display messages ---
-    function showMessage(area, text, type) {
-        area.textContent = text;
-        area.className = `message-area visible ${type}`;
+  /**
+   * A reusable utility to show messages in a designated area.
+   * @param {HTMLElement} area The message container element.
+   * @param {string} text The message to display.
+   * @param {'success' | 'error' | 'info'} type The type of the message for styling.
+   */
+  function showMessage(area, text, type) {
+    area.textContent = text;
+    area.className = `message-area visible ${type}`;
+  }
+
+  /**
+   * Manages the book addition module.
+   */
+  const BookAdder = {
+    form: document.getElementById('add-book-form'),
+    messageArea: document.getElementById('add-book-message-area'),
+    isbnInput: document.getElementById('isbn13'),
+    coverPreview: document.getElementById('cover-preview'),
+
+    init() {
+      this.form.addEventListener('submit', this.handleSubmit.bind(this));
+    },
+
+    async handleSubmit(e) {
+      e.preventDefault();
+      showMessage(this.messageArea, '正在提交...', 'info');
+
+      const formData = new FormData(this.form);
+      const data = {
+        ...Object.fromEntries(formData.entries()),
+        cost: parseFloat(formData.get('cost')),
+        selling_price: parseFloat(formData.get('selling_price')),
+      };
+
+      try {
+        const response = await fetch('/api/inventory/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '未知错误');
+
+        showMessage(this.messageArea, `成功！书籍ID "${result.id}" 已入库。`, 'success');
+        this.form.reset();
+        this.coverPreview.classList.remove('visible');
+      } catch (error) {
+        showMessage(this.messageArea, `错误: ${error.message}`, 'error');
+      }
     }
-    function hideMessage(area) {
-        area.textContent = '';
-        area.className = 'message-area';
+  };
+
+  /**
+   * Manages the order fulfillment module.
+   */
+  const OrderFulfiller = {
+    form: document.getElementById('fulfill-order-form'),
+    messageArea: document.getElementById('fulfill-order-message-area'),
+
+    init() {
+      this.form.addEventListener('submit', this.handleSubmit.bind(this));
+    },
+
+    async handleSubmit(e) {
+      e.preventDefault();
+      showMessage(this.messageArea, '正在核销...', 'info');
+      const pickupCode = new FormData(this.form).get('pickupCode');
+
+      try {
+        const response = await fetch('/api/orders/fulfill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pickupCode }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '未知错误');
+
+        showMessage(this.messageArea, `成功！订单 #${result.id} 已核销。`, 'success');
+        this.form.reset();
+      } catch (error) {
+        showMessage(this.messageArea, `错误: ${error.message}`, 'error');
+      }
     }
+  };
 
-    // --- ZXing Scanner Logic ---
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    scanButton.addEventListener('click', () => {
-        scannerContainer.classList.add('visible');
-        codeReader.listVideoInputDevices()
-            .then((videoInputDevices) => {
-                const backCamera = videoInputDevices.find(device => device.label.toLowerCase().includes('back'));
-                const selectedDeviceId = backCamera ? backCamera.deviceId : (videoInputDevices.length ? videoInputDevices[0].deviceId : null);
-                
-                if (!selectedDeviceId) {
-                    handleScanError('No camera found.');
-                    return;
-                }
+  /**
+   * Manages the pending orders dashboard.
+   */
+  const PendingOrdersDashboard = {
+    container: document.getElementById('pending-orders-container'),
+    messageArea: document.getElementById('pending-orders-message-area'),
+    
+    init() {
+      this.fetchOrders(); // Fetch immediately on load
+      setInterval(this.fetchOrders.bind(this), 10000); // And then every 10 seconds
+    },
 
-                codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
-                    if (result) {
-                        stopScanner();
-                        handleScanSuccess(result.getText());
-                    }
-                    if (err && !(err instanceof ZXing.NotFoundException)) {
-                        handleScanError(err.message);
-                    }
-                });
-            })
-            .catch(err => handleScanError(err.message));
-    });
+    async fetchOrders() {
+      try {
+        const response = await fetch('/api/orders/pending-pickup');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const orders = await response.json();
+        
+        this.render(orders);
+      } catch (error) {
+        showMessage(this.messageArea, `无法加载订单: ${error.message}`, 'error');
+      }
+    },
 
-    function stopScanner() {
-        codeReader.reset();
-        scannerContainer.classList.remove('visible');
+    render(orders) {
+      if (orders.length === 0) {
+        this.container.innerHTML = '<p class="empty-state">当前没有待取货的订单。</p>';
+        return;
+      }
+
+      this.container.innerHTML = orders.map(order => `
+        <div class="order-card">
+          <div class="order-header">
+            <strong>取货码: ${order.pickup_code}</strong>
+            <span>¥${order.total_amount}</span>
+          </div>
+          <ul class="order-item-list">
+            ${order.orderitem.map(item => `
+              <li>${item.inventoryitem.booksku.bookmaster.title} (品相: ${item.inventoryitem.condition})</li>
+            `).join('')}
+          </ul>
+        </div>
+      `).join('');
     }
+  };
 
-    function handleScanError(errorMessage) {
-        stopScanner();
-        showMessage(addBookMessageArea, `扫码失败: ${errorMessage}`, 'error');
-    }
+  /**
+   * Manages the ISBN scanner functionality.
+   */
+  const Scanner = {
+    reader: new ZXing.BrowserMultiFormatReader(),
+    container: document.getElementById('scanner-container'),
+    videoElement: document.getElementById('video'),
+    scanButton: document.getElementById('scan-btn'),
+    closeButton: document.getElementById('close-scanner'),
 
-    async function handleScanSuccess(isbn) {
-        isbnInput.value = isbn;
-        showMessage(addBookMessageArea, '正在查询图书信息...', 'info');
-        coverPreview.classList.remove('visible');
+    init() {
+      this.scanButton.addEventListener('click', this.start.bind(this));
+      this.closeButton.addEventListener('click', this.stop.bind(this));
+    },
 
-        try {
-            const response = await fetch(`/api/books/meta?isbn=${isbn}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+    start() {
+      this.container.classList.add('visible');
+      this.reader.listVideoInputDevices()
+        .then(devices => {
+          const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+          if (!backCamera) throw new Error('No camera found.');
+          
+          this.reader.decodeFromVideoDevice(backCamera.deviceId, this.videoElement, (result, err) => {
+            if (result) {
+              this.stop();
+              this.handleScanSuccess(result.getText());
             }
-            const metadata = await response.json();
-
-            // Auto-fill the form
-            addBookForm.elements.title.value = metadata.title || '';
-            addBookForm.elements.author.value = metadata.author || '';
-            
-            if (metadata.cover_image_url) {
-                coverPreview.src = metadata.cover_image_url;
-                coverPreview.classList.add('visible');
+            if (err && !(err instanceof ZXing.NotFoundException)) {
+              console.error(err);
+              showMessage(BookAdder.messageArea, `扫码失败: ${err.message}`, 'error');
+              this.stop();
             }
+          });
+        })
+        .catch(err => {
+          showMessage(BookAdder.messageArea, `摄像头错误: ${err.message}`, 'error');
+          this.stop();
+        });
+    },
 
-            showMessage(addBookMessageArea, '信息已自动填充，请确认并填写价格。', 'success');
+    stop() {
+      this.reader.reset();
+      this.container.classList.remove('visible');
+    },
 
-        } catch (error) {
-            console.error('Failed to fetch metadata:', error);
-            showMessage(addBookMessageArea, '未找到图书信息，请手动输入。', 'error');
+    async handleScanSuccess(isbn) {
+      BookAdder.isbnInput.value = isbn;
+      showMessage(BookAdder.messageArea, '正在查询图书信息...', 'info');
+      BookAdder.coverPreview.classList.remove('visible');
+
+      try {
+        const response = await fetch(`/api/books/meta?isbn=${isbn}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const meta = await response.json();
+        
+        BookAdder.form.elements.title.value = meta.title || '';
+        BookAdder.form.elements.author.value = meta.author || '';
+        if (meta.cover_image_url) {
+          BookAdder.coverPreview.src = meta.cover_image_url;
+          BookAdder.coverPreview.classList.add('visible');
         }
+        showMessage(BookAdder.messageArea, '信息已自动填充。', 'success');
+      } catch (error) {
+        showMessage(BookAdder.messageArea, '未找到图书信息，请手动输入。', 'error');
+      }
     }
+  };
 
-    closeScannerButton.addEventListener('click', stopScanner);
-
-    // --- Form Submission Logic ---
-    addBookForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        hideMessage(addBookMessageArea);
-        const formData = new FormData(addBookForm);
-        const data = Object.fromEntries(formData.entries());
-        data.cost = parseFloat(data.cost);
-        data.selling_price = parseFloat(data.selling_price);
-
-        try {
-            const response = await fetch('/api/inventory/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Unknown error');
-            
-            showMessage(addBookMessageArea, `成功！书籍 "${result.id}" 已入库。`, 'success');
-            addBookForm.reset();
-            coverPreview.classList.remove('visible');
-        } catch (error) {
-            showMessage(addBookMessageArea, `错误: ${error.message}`, 'error');
-        }
-    });
-
-    fulfillForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        hideMessage(fulfillMessageArea);
-        const formData = new FormData(fulfillForm);
-        const pickupCode = formData.get('pickupCode');
-
-        try {
-            const response = await fetch('/api/orders/fulfill', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pickupCode }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Unknown error');
-
-            showMessage(fulfillMessageArea, `成功！订单 #${result.id} 已核销。`, 'success');
-            fulfillForm.reset();
-        } catch (error) {
-            showMessage(fulfillMessageArea, `错误: ${error.message}`, 'error');
-        }
-    });
+  // Initialize all modules
+  BookAdder.init();
+  OrderFulfiller.init();
+  PendingOrdersDashboard.init();
+  Scanner.init();
 });
 
 
@@ -990,7 +1036,7 @@ import path from 'path';
 import fastifyStatic from '@fastify/static';
 import config from './config';
 import { addBookToInventory, getAvailableBooks, getBookById, getBookMetadata } from './services/inventoryService';
-import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, ItemNotAvailableError, FulfillmentError } from './services/orderService';
+import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, getPendingPickupOrders, ItemNotAvailableError, FulfillmentError } from './services/orderService';
 import { wxLogin } from './services/authService';
 import WechatPay from 'wechatpay-node-v3';
 import { Prisma } from '@prisma/client';
@@ -1110,6 +1156,10 @@ fastify.post('/api/orders/fulfill', async (request, reply) => {
     if (!pickupCode) { return reply.code(400).send({ error: 'pickupCode is required.' }); }
     const order = await fulfillOrder(pickupCode.toUpperCase());
     reply.send(order);
+});
+fastify.get('/api/orders/pending-pickup', async (request, reply) => {
+    const orders = await getPendingPickupOrders();
+    reply.send(orders);
 });
 
 // Generate payment parameters for an order
@@ -1231,9 +1281,61 @@ export async function wxLogin(code: string) {
 import { Prisma, book_condition } from '@prisma/client';
 import prisma from '../db';
 
-// ... (addBookToInventory function is unchanged)
-interface AddBookInput { isbn13: string; title: string; author?: string; edition?: string; condition: book_condition; cost: number; selling_price: number; }
-export async function addBookToInventory(input: AddBookInput) { /* ... same as before ... */ return prisma.$transaction(async(tx)=>{let a=await tx.bookmaster.upsert({where:{isbn13:input.isbn13},update:{},create:{isbn13:input.isbn13,title:input.title,author:input.author}});let b=await tx.booksku.upsert({where:{master_id_edition:{master_id:a.id,edition:input.edition||"default"}},update:{},create:{master_id:a.id,edition:input.edition||"default"}});const c=await tx.inventoryitem.create({data:{sku_id:b.id,condition:input.condition,cost:input.cost,selling_price:input.selling_price,status:"in_stock"}});return c})}
+interface AddBookInput {
+  isbn13: string;
+  title: string;
+  author?: string;
+  edition?: string;
+  condition: book_condition;
+  cost: number;
+  selling_price: number;
+}
+
+export async function addBookToInventory(input: AddBookInput) {
+  return prisma.$transaction(async (tx) => {
+    // Step 1: Find or create the master book record (based on ISBN).
+    // This represents the abstract concept of the book.
+    const bookMaster = await tx.bookmaster.upsert({
+      where: { isbn13: input.isbn13 },
+      update: {}, // No updates needed if it exists
+      create: {
+        isbn13: input.isbn13,
+        title: input.title,
+        author: input.author,
+      },
+    });
+
+    // Step 2: Find or create the specific SKU (e.g., '2nd Edition').
+    // This represents a specific version of the master book.
+    const bookSku = await tx.booksku.upsert({
+      where: {
+        master_id_edition: {
+          master_id: bookMaster.id,
+          edition: input.edition || "default",
+        },
+      },
+      update: {}, // No updates needed if it exists
+      create: {
+        master_id: bookMaster.id,
+        edition: input.edition || "default",
+      },
+    });
+
+    // Step 3: Create the actual inventory item.
+    // This represents the physical copy we have in stock.
+    const inventoryItem = await tx.inventoryitem.create({
+      data: {
+        sku_id: bookSku.id,
+        condition: input.condition,
+        cost: input.cost,
+        selling_price: input.selling_price,
+        status: "in_stock",
+      },
+    });
+
+    return inventoryItem;
+  });
+}
 
 // MODIFIED: getAvailableBooks now accepts an optional search term
 export async function getAvailableBooks(searchTerm?: string) {
@@ -1346,10 +1448,10 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
     const order = await tx.order.create({
       data: {
         user_id: user.id,
-        // MODIFIED: Set status back to 'pending_payment' for V2.0 with payment
-        status: 'pending_payment',
+        status: 'PENDING_PAYMENT',
         total_amount: totalAmount,
         pickup_code: randomBytes(3).toString('hex').toUpperCase(),
+        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
       },
     });
 
@@ -1375,7 +1477,7 @@ export async function getOrdersByUserId(userId: number) {
   return prisma.order.findMany({
     where: { user_id: userId },
     include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
-    orderBy: { created_at: 'desc' },
+    orderBy: { createdAt: 'desc' },
   });
 }
 
@@ -1392,7 +1494,7 @@ export async function fulfillOrder(pickupCode: string) {
     if (!order) {
       throw new FulfillmentError(`取货码 "${pickupCode}" 无效。`);
     }
-    if (order.status !== 'pending_pickup') {
+    if (order.status !== 'PENDING_PICKUP') {
       throw new FulfillmentError(`此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`);
     }
 
@@ -1400,7 +1502,7 @@ export async function fulfillOrder(pickupCode: string) {
     const updatedOrder = await tx.order.update({
       where: { id: order.id },
       data: {
-        status: 'completed',
+        status: 'COMPLETED',
         completed_at: new Date(),
       },
     });
@@ -1442,8 +1544,8 @@ export async function generatePaymentParams(orderId: number, openid: string) {
     throw new Error('Order not found');
   }
 
-  if (order.status !== 'pending_payment') {
-    throw new Error('Order is not in pending_payment status');
+  if (order.status !== 'PENDING_PAYMENT') {
+    throw new Error('Order is not in PENDING_PAYMENT status');
   }
 
   // 2. Initialize WeChat Pay client
@@ -1473,7 +1575,7 @@ export async function generatePaymentParams(orderId: number, openid: string) {
     appid: config.wxAppId,
     mchid: config.wxPayMchId,
     description: description,
-    out_trade_no: `ORDER_${order.id}_${Date.now()}`, // Unique trade number
+    out_trade_no: `BOOKWORM_${order.id}`, // Simple and unique
     notify_url: config.wxPayNotifyUrl || '',
     amount: {
       total: Math.round(Number(order.total_amount) * 100), // Convert to cents
@@ -1508,13 +1610,11 @@ export async function processPaymentNotification(notificationData: any) {
       throw new Error(`Payment not successful. Trade state: ${trade_state}`);
     }
 
-    // 2. Extract order ID from out_trade_no (format: ORDER_{orderId}_{timestamp})
-    const orderIdMatch = out_trade_no.match(/^ORDER_(\d+)_\d+$/);
-    if (!orderIdMatch) {
+    // 2. Extract order ID from out_trade_no (format: BOOKWORM_{orderId})
+    if (!out_trade_no.startsWith('BOOKWORM_')) {
       throw new Error(`Invalid out_trade_no format: ${out_trade_no}`);
     }
-    
-    const orderId = parseInt(orderIdMatch[1], 10);
+    const orderId = parseInt(out_trade_no.split('_')[1], 10);
 
     // 3. Find and validate the order
     const order = await tx.order.findUnique({
@@ -1527,14 +1627,14 @@ export async function processPaymentNotification(notificationData: any) {
     }
 
     // 4. Check if already processed (idempotency)
-    if (order.status === 'pending_pickup') {
+    if (order.status === 'PENDING_PICKUP') {
       console.log(`Order ${orderId} already marked as paid. Skipping.`);
       return order;
     }
 
     // 5. Validate order status
-    if (order.status !== 'pending_payment') {
-      throw new Error(`Invalid order status: ${order.status}. Expected: pending_payment`);
+    if (order.status !== 'PENDING_PAYMENT') {
+      throw new Error(`Invalid order status: ${order.status}. Expected: PENDING_PAYMENT`);
     }
 
     // 6. Validate amount (convert from cents to yuan)
@@ -1547,13 +1647,39 @@ export async function processPaymentNotification(notificationData: any) {
     const updatedOrder = await tx.order.update({
       where: { id: orderId },
       data: {
-        status: 'pending_pickup',
+        status: 'PENDING_PICKUP',
         paid_at: new Date()
       }
     });
 
     console.log(`Order ${orderId} successfully marked as paid`);
     return updatedOrder;
+  });
+}
+
+export async function getPendingPickupOrders() {
+  return prisma.order.findMany({
+    where: {
+      status: 'PENDING_PICKUP',
+    },
+    include: {
+      orderitem: {
+        include: {
+          inventoryitem: {
+            include: {
+              booksku: {
+                include: {
+                  bookmaster: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      paid_at: 'asc', // 按支付时间升序，先付钱的先备货
+    },
   });
 }
 
@@ -1596,7 +1722,7 @@ App({
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#f8f9fa",
-    "navigationBarTitleText": "The Book Nook",
+    "navigationBarTitleText": "二手书市场",
     "navigationBarTextStyle": "black"
   },
   "tabBar": {
@@ -1607,19 +1733,19 @@ App({
     "list": [
       {
         "pagePath": "pages/market/index",
-        "text": "Marketplace",
+        "text": "市场",
         "iconPath": "images/tabs/marketplace.png",
         "selectedIconPath": "images/tabs/marketplace-active.png"
       },
       {
         "pagePath": "pages/orders/index",
-        "text": "Orders",
+        "text": "订单",
         "iconPath": "images/tabs/orders.png",
         "selectedIconPath": "images/tabs/orders-active.png"
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "Profile",
+        "text": "我的",
         "iconPath": "images/tabs/profile.png",
         "selectedIconPath": "images/tabs/profile-active.png"
       }
@@ -1737,11 +1863,10 @@ Page({
     });
   },
 
-  // MODIFIED: This function now navigates to the confirm page
   handleBuyNow() {
-    const bookData = JSON.stringify(this.data.bookDetail);
+    const inventoryItemId = this.data.bookDetail.id;
     wx.navigateTo({
-      url: `/pages/order-confirm/index?book=${encodeURIComponent(bookData)}`,
+      url: `/pages/order-confirm/index?id=${inventoryItemId}`,
     });
   }
 });
@@ -1825,19 +1950,41 @@ const config = require('../../config');
 Page({
   data: {
     book: null,
+    isLoading: true,
+    error: null,
     isSubmitting: false
   },
   
   onLoad(options) {
-    if (options.book) {
-      this.setData({
-        book: JSON.parse(decodeURIComponent(options.book))
-      });
+    if (options.id) {
+      this.fetchBookDetails(options.id);
+    } else {
+      this.setData({ isLoading: false, error: '无效的商品ID' });
     }
+  },
+
+  fetchBookDetails(id) {
+    this.setData({ isLoading: true, error: null });
+    wx.request({
+      url: `${config.apiBaseUrl}/inventory/item/${id}`,
+      success: (res) => {
+        if (res.statusCode === 200 && res.data.status === 'in_stock') {
+          this.setData({ book: res.data });
+        } else {
+          this.setData({ error: res.data.error || '该书籍已售出或不可用' });
+        }
+      },
+      fail: (err) => {
+        this.setData({ error: '网络请求失败，无法获取书籍信息' });
+      },
+      complete: () => {
+        this.setData({ isLoading: false });
+      }
+    });
   },
   
   handlePayment() {
-    if (this.data.isSubmitting) return;
+    if (this.data.isSubmitting || !this.data.book) return;
     this.setData({ isSubmitting: true });
 
     const userId = auth.getUserId();
@@ -1859,7 +2006,7 @@ Page({
       success: (createRes) => {
         if (createRes.statusCode !== 201) {
           wx.hideLoading();
-          wx.showToast({ title: '创建订单失败', icon: 'error' });
+          wx.showToast({ title: createRes.data.error || '创建订单失败', icon: 'error' });
           this.setData({ isSubmitting: false });
           return;
         }
@@ -1871,26 +2018,21 @@ Page({
         wx.request({
           url: `${config.apiBaseUrl}/orders/${orderId}/pay`,
           method: 'POST',
-          data: { openid: auth.getToken() }, // Use stored token as openid for now
+          data: { openid: auth.getToken() },
           success: (payRes) => {
             wx.hideLoading();
             if (payRes.statusCode !== 200) {
-              wx.showToast({ title: '获取支付参数失败', icon: 'error' });
+              wx.showToast({ title: payRes.data.error || '获取支付参数失败', icon: 'error' });
               this.setData({ isSubmitting: false });
               return;
             }
 
-            const payParams = payRes.data.paymentParams;
+            const payParams = payRes.data.result;
             // Step 3: Request payment
             wx.requestPayment({
-              timeStamp: payParams.timeStamp,
-              nonceStr: payParams.nonceStr,
-              package: payParams.package,
-              signType: payParams.signType,
-              paySign: payParams.paySign,
+              ...payParams,
               success: (paymentSuccessRes) => {
                 wx.showToast({ title: '支付成功', icon: 'success' });
-                // Navigate to orders page to see the result
                 setTimeout(() => {
                   wx.switchTab({ url: '/pages/orders/index' });
                 }, 1500);
@@ -1925,20 +2067,26 @@ Page({
 // pages/orders/index.js
 const auth = require('../../utils/auth');
 const config = require('../../config');
+const { ORDER_STATUS } = require('../../utils/constants');
 
 Page({
   data: {
     orderList: [],
     isLoading: true,
     error: null,
-    // MODIFIED: Simplified status map, styling is now in WXSS
     statusMap: {
-      pending_payment: 'Awaiting Payment',
-      paid: 'Awaiting Pickup',
-      pending_pickup: 'Awaiting Pickup', // Keep this for backward compatibility
-      completed: 'Completed',
-      cancelled: 'Cancelled'
-    }
+      PENDING_PAYMENT: '待支付',
+      PENDING_PICKUP: '待取货', 
+      COMPLETED: '已完成',
+      CANCELLED: '已取消',
+      RETURNED: '已退货',
+      // 兼容旧格式
+      pending_payment: '待支付',
+      paid: '待取货',
+      pending_pickup: '待取货',
+      completed: '已完成',
+      cancelled: '已取消'
+    },
   },
   onShow() { this.fetchUserOrders(); },
   fetchUserOrders() {
@@ -1948,7 +2096,7 @@ Page({
     wx.request({
       url: `${config.apiBaseUrl}/orders/user/${userId}`,
       success: (res) => { this.setData({ orderList: res.data }); },
-      fail: (err) => { this.setData({ error: 'Failed to load orders.' }); },
+      fail: (err) => { this.setData({ error: '加载订单失败。' }); },
       complete: () => { this.setData({ isLoading: false }); }
     });
   }

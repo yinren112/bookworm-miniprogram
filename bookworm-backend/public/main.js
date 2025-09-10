@@ -1,140 +1,210 @@
-// public/main.js (fully replaced with final logic)
+// public/main.js (Refactored for clarity and maintainability)
+
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Element Selection ---
-    const addBookForm = document.getElementById('add-book-form');
-    const addBookMessageArea = document.getElementById('add-book-message-area');
-    const isbnInput = document.getElementById('isbn13');
-    const coverPreview = document.getElementById('cover-preview');
-    const scanButton = document.getElementById('scan-btn');
-    const scannerContainer = document.getElementById('scanner-container');
-    const videoElement = document.getElementById('video');
-    const closeScannerButton = document.getElementById('close-scanner');
-    const fulfillForm = document.getElementById('fulfill-order-form');
-    const fulfillMessageArea = document.getElementById('fulfill-order-message-area');
 
-    // --- Helper to display messages ---
-    function showMessage(area, text, type) {
-        area.textContent = text;
-        area.className = `message-area visible ${type}`;
+  /**
+   * A reusable utility to show messages in a designated area.
+   * @param {HTMLElement} area The message container element.
+   * @param {string} text The message to display.
+   * @param {'success' | 'error' | 'info'} type The type of the message for styling.
+   */
+  function showMessage(area, text, type) {
+    area.textContent = text;
+    area.className = `message-area visible ${type}`;
+  }
+
+  /**
+   * Manages the book addition module.
+   */
+  const BookAdder = {
+    form: document.getElementById('add-book-form'),
+    messageArea: document.getElementById('add-book-message-area'),
+    isbnInput: document.getElementById('isbn13'),
+    coverPreview: document.getElementById('cover-preview'),
+
+    init() {
+      this.form.addEventListener('submit', this.handleSubmit.bind(this));
+    },
+
+    async handleSubmit(e) {
+      e.preventDefault();
+      showMessage(this.messageArea, '正在提交...', 'info');
+
+      const formData = new FormData(this.form);
+      const data = {
+        ...Object.fromEntries(formData.entries()),
+        cost: parseFloat(formData.get('cost')),
+        selling_price: parseFloat(formData.get('selling_price')),
+      };
+
+      try {
+        const response = await fetch('/api/inventory/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '未知错误');
+
+        showMessage(this.messageArea, `成功！书籍ID "${result.id}" 已入库。`, 'success');
+        this.form.reset();
+        this.coverPreview.classList.remove('visible');
+      } catch (error) {
+        showMessage(this.messageArea, `错误: ${error.message}`, 'error');
+      }
     }
-    function hideMessage(area) {
-        area.textContent = '';
-        area.className = 'message-area';
+  };
+
+  /**
+   * Manages the order fulfillment module.
+   */
+  const OrderFulfiller = {
+    form: document.getElementById('fulfill-order-form'),
+    messageArea: document.getElementById('fulfill-order-message-area'),
+
+    init() {
+      this.form.addEventListener('submit', this.handleSubmit.bind(this));
+    },
+
+    async handleSubmit(e) {
+      e.preventDefault();
+      showMessage(this.messageArea, '正在核销...', 'info');
+      const pickupCode = new FormData(this.form).get('pickupCode');
+
+      try {
+        const response = await fetch('/api/orders/fulfill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pickupCode }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '未知错误');
+
+        showMessage(this.messageArea, `成功！订单 #${result.id} 已核销。`, 'success');
+        this.form.reset();
+      } catch (error) {
+        showMessage(this.messageArea, `错误: ${error.message}`, 'error');
+      }
     }
+  };
 
-    // --- ZXing Scanner Logic ---
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    scanButton.addEventListener('click', () => {
-        scannerContainer.classList.add('visible');
-        codeReader.listVideoInputDevices()
-            .then((videoInputDevices) => {
-                const backCamera = videoInputDevices.find(device => device.label.toLowerCase().includes('back'));
-                const selectedDeviceId = backCamera ? backCamera.deviceId : (videoInputDevices.length ? videoInputDevices[0].deviceId : null);
-                
-                if (!selectedDeviceId) {
-                    handleScanError('No camera found.');
-                    return;
-                }
+  /**
+   * Manages the pending orders dashboard.
+   */
+  const PendingOrdersDashboard = {
+    container: document.getElementById('pending-orders-container'),
+    messageArea: document.getElementById('pending-orders-message-area'),
+    
+    init() {
+      this.fetchOrders(); // Fetch immediately on load
+      setInterval(this.fetchOrders.bind(this), 10000); // And then every 10 seconds
+    },
 
-                codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
-                    if (result) {
-                        stopScanner();
-                        handleScanSuccess(result.getText());
-                    }
-                    if (err && !(err instanceof ZXing.NotFoundException)) {
-                        handleScanError(err.message);
-                    }
-                });
-            })
-            .catch(err => handleScanError(err.message));
-    });
+    async fetchOrders() {
+      try {
+        const response = await fetch('/api/orders/pending-pickup');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const orders = await response.json();
+        
+        this.render(orders);
+      } catch (error) {
+        showMessage(this.messageArea, `无法加载订单: ${error.message}`, 'error');
+      }
+    },
 
-    function stopScanner() {
-        codeReader.reset();
-        scannerContainer.classList.remove('visible');
+    render(orders) {
+      if (orders.length === 0) {
+        this.container.innerHTML = '<p class="empty-state">当前没有待取货的订单。</p>';
+        return;
+      }
+
+      this.container.innerHTML = orders.map(order => `
+        <div class="order-card">
+          <div class="order-header">
+            <strong>取货码: ${order.pickup_code}</strong>
+            <span>¥${order.total_amount}</span>
+          </div>
+          <ul class="order-item-list">
+            ${order.orderitem.map(item => `
+              <li>${item.inventoryitem.booksku.bookmaster.title} (品相: ${item.inventoryitem.condition})</li>
+            `).join('')}
+          </ul>
+        </div>
+      `).join('');
     }
+  };
 
-    function handleScanError(errorMessage) {
-        stopScanner();
-        showMessage(addBookMessageArea, `扫码失败: ${errorMessage}`, 'error');
-    }
+  /**
+   * Manages the ISBN scanner functionality.
+   */
+  const Scanner = {
+    reader: new ZXing.BrowserMultiFormatReader(),
+    container: document.getElementById('scanner-container'),
+    videoElement: document.getElementById('video'),
+    scanButton: document.getElementById('scan-btn'),
+    closeButton: document.getElementById('close-scanner'),
 
-    async function handleScanSuccess(isbn) {
-        isbnInput.value = isbn;
-        showMessage(addBookMessageArea, '正在查询图书信息...', 'info');
-        coverPreview.classList.remove('visible');
+    init() {
+      this.scanButton.addEventListener('click', this.start.bind(this));
+      this.closeButton.addEventListener('click', this.stop.bind(this));
+    },
 
-        try {
-            const response = await fetch(`/api/books/meta?isbn=${isbn}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+    start() {
+      this.container.classList.add('visible');
+      this.reader.listVideoInputDevices()
+        .then(devices => {
+          const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
+          if (!backCamera) throw new Error('No camera found.');
+          
+          this.reader.decodeFromVideoDevice(backCamera.deviceId, this.videoElement, (result, err) => {
+            if (result) {
+              this.stop();
+              this.handleScanSuccess(result.getText());
             }
-            const metadata = await response.json();
-
-            // Auto-fill the form
-            addBookForm.elements.title.value = metadata.title || '';
-            addBookForm.elements.author.value = metadata.author || '';
-            
-            if (metadata.cover_image_url) {
-                coverPreview.src = metadata.cover_image_url;
-                coverPreview.classList.add('visible');
+            if (err && !(err instanceof ZXing.NotFoundException)) {
+              console.error(err);
+              showMessage(BookAdder.messageArea, `扫码失败: ${err.message}`, 'error');
+              this.stop();
             }
+          });
+        })
+        .catch(err => {
+          showMessage(BookAdder.messageArea, `摄像头错误: ${err.message}`, 'error');
+          this.stop();
+        });
+    },
 
-            showMessage(addBookMessageArea, '信息已自动填充，请确认并填写价格。', 'success');
+    stop() {
+      this.reader.reset();
+      this.container.classList.remove('visible');
+    },
 
-        } catch (error) {
-            console.error('Failed to fetch metadata:', error);
-            showMessage(addBookMessageArea, '未找到图书信息，请手动输入。', 'error');
+    async handleScanSuccess(isbn) {
+      BookAdder.isbnInput.value = isbn;
+      showMessage(BookAdder.messageArea, '正在查询图书信息...', 'info');
+      BookAdder.coverPreview.classList.remove('visible');
+
+      try {
+        const response = await fetch(`/api/books/meta?isbn=${isbn}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const meta = await response.json();
+        
+        BookAdder.form.elements.title.value = meta.title || '';
+        BookAdder.form.elements.author.value = meta.author || '';
+        if (meta.cover_image_url) {
+          BookAdder.coverPreview.src = meta.cover_image_url;
+          BookAdder.coverPreview.classList.add('visible');
         }
+        showMessage(BookAdder.messageArea, '信息已自动填充。', 'success');
+      } catch (error) {
+        showMessage(BookAdder.messageArea, '未找到图书信息，请手动输入。', 'error');
+      }
     }
+  };
 
-    closeScannerButton.addEventListener('click', stopScanner);
-
-    // --- Form Submission Logic ---
-    addBookForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        hideMessage(addBookMessageArea);
-        const formData = new FormData(addBookForm);
-        const data = Object.fromEntries(formData.entries());
-        data.cost = parseFloat(data.cost);
-        data.selling_price = parseFloat(data.selling_price);
-
-        try {
-            const response = await fetch('/api/inventory/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Unknown error');
-            
-            showMessage(addBookMessageArea, `成功！书籍 "${result.id}" 已入库。`, 'success');
-            addBookForm.reset();
-            coverPreview.classList.remove('visible');
-        } catch (error) {
-            showMessage(addBookMessageArea, `错误: ${error.message}`, 'error');
-        }
-    });
-
-    fulfillForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        hideMessage(fulfillMessageArea);
-        const formData = new FormData(fulfillForm);
-        const pickupCode = formData.get('pickupCode');
-
-        try {
-            const response = await fetch('/api/orders/fulfill', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pickupCode }),
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Unknown error');
-
-            showMessage(fulfillMessageArea, `成功！订单 #${result.id} 已核销。`, 'success');
-            fulfillForm.reset();
-        } catch (error) {
-            showMessage(fulfillMessageArea, `错误: ${error.message}`, 'error');
-        }
-    });
+  // Initialize all modules
+  BookAdder.init();
+  OrderFulfiller.init();
+  PendingOrdersDashboard.init();
+  Scanner.init();
 });

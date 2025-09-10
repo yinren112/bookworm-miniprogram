@@ -63,39 +63,36 @@
 }
 
 .specs-card {
-  width: 100%;
-  text-align: left;
+  margin: 20rpx 0;
 }
 
 .spec-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start; /* Changed: Allow vertical alignment for multi-line content */
-  padding: 24rpx 0;
+  display: table;
+  width: 100%;
+  padding: 20rpx 0;
   border-bottom: 1px solid var(--border-color);
-  min-height: 60rpx; /* Ensure consistent height */
+  table-layout: fixed;
 }
 .spec-item:last-child {
   border-bottom: none;
 }
 
 .spec-label {
+  display: table-cell;
   font-size: 28rpx;
   color: var(--text-color-secondary);
-  flex-shrink: 0;
-  width: 160rpx; /* Fixed width for consistent alignment */
-  margin-right: 20rpx;
+  width: 120rpx;
+  vertical-align: top;
 }
 
 .spec-value {
+  display: table-cell;
   font-size: 28rpx;
   font-weight: 500;
-  flex: 1; /* Use remaining space */
   text-align: right;
-  word-wrap: break-word; /* Allow long text to wrap */
-  word-break: break-all; /* Break long words if necessary */
-  max-width: calc(100% - 180rpx); /* Prevent overflow */
-  line-height: 1.4; /* Better line spacing for multi-line text */
+  vertical-align: top;
+  word-break: break-all;
+  padding-left: 20rpx;
 }
 
 .footer-bar {

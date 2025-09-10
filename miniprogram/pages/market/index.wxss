@@ -1,15 +1,25 @@
 /* pages/market/index.wxss */
-@import "../../templates/search-bar.wxss"; /* We will create this next */
+@import "../../templates/search-bar.wxss";
 
 .header-title { font-size: 48rpx; font-weight: bold; margin-bottom: 20rpx; text-align: center; }
 .empty-state, .loading-indicator, .error-message { text-align: center; color: var(--text-color-secondary); padding: 80rpx 0; }
 
-.book-grid { display: flex; flex-wrap: wrap; gap: 30rpx; }
-.book-card-navigator { width: calc(50% - 15rpx); }
+.book-grid {
+  /* The key to the masonry/waterfall layout */
+  column-count: 2;
+  column-gap: 20rpx;
+}
+
+.book-card-navigator {
+  /* This ensures cards don't get split across columns */
+  break-inside: avoid;
+  margin-bottom: 20rpx;
+}
+
 .book-card { padding: 0; overflow: hidden; }
-.book-cover { width: 100%; height: 400rpx; background-color: var(--border-color); }
+.book-cover { width: 100%; /* Height is now auto to maintain aspect ratio */ background-color: var(--border-color); }
 .book-info { padding: 20rpx; }
-.book-title { font-size: 28rpx; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; height: 70rpx; /* 28rpx * 1.6 * 2 lines approx */ }
+.book-title { font-size: 28rpx; font-weight: 500; display: block; /* No need for ellipsis with masonry */ }
 .book-author { font-size: 24rpx; color: var(--text-color-secondary); margin: 8rpx 0; }
 .book-meta { font-size: 22rpx; color: var(--text-color-secondary); margin-bottom: 16rpx; }
 .book-meta text { display: block; }
