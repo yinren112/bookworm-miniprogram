@@ -1,6 +1,6 @@
-// utils/api.js - 统一的API请求工具
+// miniprogram/utils/api.js - 统一的API请求工具
 const config = require('../config');
-const auth = require('./auth');
+const tokenUtil = require('./token'); // 依赖新的、无依赖的模块
 
 /**
  * 统一的API请求函数
@@ -12,7 +12,7 @@ const auth = require('./auth');
  * @returns {Promise} - 返回Promise对象
  */
 const request = ({ url, method = 'GET', data = {} }) => new Promise((resolve, reject) => {
-    const token = auth.getToken();
+    const token = tokenUtil.getToken(); // 从新模块获取token
     wx.request({
         url: `${config.apiBaseUrl}${url}`,
         method,
@@ -26,7 +26,7 @@ const request = ({ url, method = 'GET', data = {} }) => new Promise((resolve, re
             if (res.statusCode === 401) {
                 // 简单处理：提示并让用户重启
                 wx.showToast({ title: '登录过期，请重启小程序', icon: 'none' });
-                auth.logout();
+                tokenUtil.clearToken();
             }
             return reject(res.data || { error: `Request failed with status ${res.statusCode}` });
         },
