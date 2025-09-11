@@ -379,6 +379,7 @@ export async function cancelExpiredOrders() {
         },
         data: {
           status: 'in_stock',
+          updated_at: new Date(),
         },
       });
     }
