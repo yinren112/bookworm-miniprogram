@@ -17,7 +17,7 @@
   "ts-node": {
     "esm": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*.ts", "prisma/seed.ts", "src/jobs/cancelExpiredOrders.ts"],
   "exclude": ["node_modules", "**/*.spec.ts", "src/tests/**/*"],
   "typeRoots": ["node_modules/@types", "src/types"]
 }

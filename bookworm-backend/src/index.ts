@@ -1,5 +1,18 @@
-// src/index.ts (fully replaced with parser fix)
+// src/index.ts
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
+
+// --- Type Augmentation for Fastify ---
+// This declaration merges with the original Fastify types.
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: { userId: number; openid: string };
+  }
+  export interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireRole: (role: 'USER' | 'STAFF') => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+// --- End of Type Augmentation ---
 import * as path from 'path';
 import fastifyStatic from '@fastify/static';
 import config from './config';
@@ -178,7 +191,7 @@ const setupRoutes = () => {
         config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
     }, async (request, reply) => {
         const { code } = request.body as { code: string };
-        if (!code) { return reply.code(400).send({ error: 'Code is required.' }); }
+        if (!code) { throw new ApiError(400, 'Code is required.', 'MISSING_CODE'); }
         const { token, user } = await wxLogin(code);
         reply.send({ token, userId: user.id });
     });
@@ -187,12 +200,12 @@ const setupRoutes = () => {
     fastify.get('/api/books/meta', async (request, reply) => {
         const query = request.query as { isbn?: string };
         if (!query.isbn) { 
-            return reply.code(400).send({ error: 'ISBN parameter is required.' }); 
+            throw new ApiError(400, 'ISBN parameter is required.', 'MISSING_ISBN'); 
         }
         
         const metadata = await getBookMetadata(query.isbn);
         if (!metadata) { 
-            return reply.code(404).send({ error: 'Book metadata not found.' }); 
+            throw new ApiError(404, 'Book metadata not found.', 'BOOK_METADATA_NOT_FOUND'); 
         }
         
         reply.send(metadata);
@@ -212,9 +225,9 @@ const setupRoutes = () => {
     fastify.get('/api/inventory/item/:id', async (request, reply) => {
         const params = request.params as { id: string };
         const id = parseInt(params.id, 10);
-        if (isNaN(id)) { return reply.code(400).send({ error: 'Invalid item ID.' }); }
+        if (isNaN(id)) { throw new ApiError(400, 'Invalid item ID.', 'INVALID_ITEM_ID'); }
         const book = await getBookById(id);
-        if (!book) { return reply.code(404).send({ error: 'Book not found.' }); }
+        if (!book) { throw new ApiError(404, 'Book not found.', 'BOOK_NOT_FOUND'); }
         reply.send(book);
     });
     
@@ -240,11 +253,11 @@ const setupRoutes = () => {
     fastify.get('/api/orders/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
         const { id } = request.params as { id: string };
         const orderId = parseInt(id, 10);
-        if (isNaN(orderId)) return reply.code(400).send({ error: 'Invalid order ID' });
+        if (isNaN(orderId)) throw new ApiError(400, 'Invalid order ID', 'INVALID_ORDER_ID');
         const order = await getOrderById(orderId);
         const user = await prisma.user.findUnique({ where: { id: request.user!.userId }, select: { role: true } });
         if (order.user_id !== request.user!.userId && user?.role !== 'STAFF') {
-            return reply.code(403).send({ error: 'Forbidden' });
+            throw new ApiError(403, 'Forbidden', 'ORDER_ACCESS_DENIED');
         }
         reply.send(order);
     });
@@ -252,7 +265,7 @@ const setupRoutes = () => {
     fastify.get('/api/orders/user/:userId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
         const { userId } = request.params as { userId: string };
         if (parseInt(userId, 10) !== request.user!.userId) {
-            return reply.code(403).send({ error: 'Forbidden' });
+            throw new ApiError(403, 'Forbidden', 'USER_ACCESS_DENIED');
         }
         const orders = await getOrdersByUserId(request.user!.userId);
         reply.send(orders);
@@ -269,7 +282,7 @@ const setupRoutes = () => {
         }
     }, async (request, reply) => {
         const { pickupCode } = request.body as { pickupCode: string };
-        if (!pickupCode) { return reply.code(400).send({ error: 'pickupCode is required.' }); }
+        if (!pickupCode) { throw new ApiError(400, 'pickupCode is required.', 'MISSING_PICKUP_CODE'); }
         const order = await fulfillOrder(pickupCode.toUpperCase());
         reply.send(order);
     });
@@ -280,7 +293,7 @@ const setupRoutes = () => {
     });
 
     fastify.post('/api/orders/:orderId/pay', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-        if (!pay) return reply.code(503).send({ error: 'Payment service is not configured.' });
+        if (!pay) throw new ApiError(503, 'Payment service is not configured.', 'PAYMENT_SERVICE_UNAVAILABLE');
         const { orderId } = request.params as { orderId: string };
         const paymentParams = await generatePaymentParams(pay, parseInt(orderId, 10), request.user!.userId);
         reply.send(paymentParams);
@@ -290,7 +303,7 @@ const setupRoutes = () => {
     fastify.post('/api/payment/notify', { config: { rawBody: true } }, async (request, reply) => {
         if (!pay) {
             request.log.error('WeChat Pay is not configured, cannot process notification.');
-            return reply.code(503).send({ error: 'Payment service unavailable.' });
+            throw new ApiError(503, 'Payment service unavailable.', 'PAYMENT_SERVICE_UNAVAILABLE');
         }
 
         try {
@@ -345,4 +358,4 @@ const start = async () => {
         process.exit(1);
     }
 };
-start();
+start();// trigger restart
