@@ -79,37 +79,85 @@ export async function addBookToInventory(input: AddBookInput) {
   });
 }
 
-// MODIFIED: getAvailableBooks now supports pagination and search
+// OPTIMIZED: getAvailableBooks with pg_trgm-powered search
 export async function getAvailableBooks(options: { searchTerm?: string; page?: number; limit?: number } = {}) {
   const { searchTerm, page = 1, limit = 20 } = options;
   
-  const whereCondition: Prisma.inventoryitemWhereInput = {
-    status: 'in_stock',
-  };
-
-  if (searchTerm) {
-    whereCondition.booksku = {
-      bookmaster: {
-        OR: [
-          { title: { contains: searchTerm, mode: 'insensitive' } },
-          { author: { contains: searchTerm, mode: 'insensitive' } },
-          { isbn13: { contains: searchTerm } },
-        ],
-      },
-    };
-  }
-
   // Calculate pagination parameters
   const take = limit;
   const skip = (page - 1) * limit;
-
+  
   return prisma.$transaction(async (tx) => {
-    // First query: Get total count for pagination metadata
+    let whereCondition: Prisma.inventoryitemWhereInput = {
+      status: 'in_stock',
+    };
+    
+    // Linus式分离：搜索和非搜索是两个完全不同的数据流
+    if (!searchTerm) {
+      // 快路径：无搜索，直接使用高效索引查询
+      const totalCount = await tx.inventoryitem.count({
+        where: whereCondition,
+      });
+
+      const inventoryItems = await tx.inventoryitem.findMany({
+        where: whereCondition,
+        include: {
+          booksku: {
+            include: {
+              bookmaster: true,
+            },
+          },
+        },
+        skip,
+        take,
+      });
+
+      return {
+        data: inventoryItems,
+        meta: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          currentPage: page,
+          itemsPerPage: limit,
+        },
+      };
+    }
+    
+    // 智能路径：使用pg_trgm进行高质量搜索
+    
+    // 第一步：用trigram索引快速找到相关的bookmaster ID
+    // 使用更低的阈值以支持中文搜索 (中文trigram相似度通常较低)
+    const similarBookMasterIds = await tx.$queryRaw<[{ id: number }]>`
+      SELECT id FROM "bookmaster"
+      WHERE similarity((title || ' ' || COALESCE(author, '')), ${searchTerm}) > 0.05
+      ORDER BY similarity((title || ' ' || COALESCE(author, '')), ${searchTerm}) DESC
+      LIMIT 100
+    `;
+    
+    const bookMasterIds = similarBookMasterIds.map(b => b.id);
+    
+    // 如果没找到匹配的书籍，返回空结果
+    if (bookMasterIds.length === 0) {
+      return {
+        data: [],
+        meta: {
+          totalItems: 0,
+          totalPages: 0,
+          currentPage: page,
+          itemsPerPage: limit,
+        },
+      };
+    }
+    
+    // 第二步：基于找到的bookmaster ID进行库存查询
+    whereCondition.booksku = {
+      master_id: { in: bookMasterIds },
+    };
+    
     const totalCount = await tx.inventoryitem.count({
       where: whereCondition,
     });
 
-    // Second query: Get current page data
     const inventoryItems = await tx.inventoryitem.findMany({
       where: whereCondition,
       include: {

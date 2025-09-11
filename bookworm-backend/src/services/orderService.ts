@@ -104,12 +104,37 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
     }));
 }
 
-export async function getOrdersByUserId(userId: number) {
-  // ... (this function is unchanged)
-  return prisma.order.findMany({
-    where: { user_id: userId },
-    include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
-    orderBy: { createdAt: 'desc' },
+export async function getOrdersByUserId(userId: number, options: { page?: number; limit?: number } = {}) {
+  const { page = 1, limit = 10 } = options;
+
+  // Calculate pagination parameters
+  const take = limit;
+  const skip = (page - 1) * limit;
+
+  return prisma.$transaction(async (tx) => {
+    // First query: Get total count for pagination metadata
+    const totalCount = await tx.order.count({
+      where: { user_id: userId },
+    });
+
+    // Second query: Get current page data
+    const orders = await tx.order.findMany({
+      where: { user_id: userId },
+      include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+    });
+
+    return {
+      data: orders,
+      meta: {
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        currentPage: page,
+        itemsPerPage: limit,
+      },
+    };
   });
 }
 
@@ -295,29 +320,56 @@ export async function processPaymentNotification(notificationData: any) {
 }
 
 export async function getPendingPickupOrders() {
-  return prisma.order.findMany({
+  // Linus式方案：分离查询，手动聚合，消除N+1
+  
+  // 1. 获取所有待取货订单及其orderitem（一层include）
+  const ordersWithItems = await prisma.order.findMany({
+    where: { status: 'PENDING_PICKUP' },
+    include: {
+      orderitem: true, // 只include一层，避免深层嵌套
+    },
+    orderBy: { paid_at: 'asc' },
+  });
+
+  // 2. 提取所有inventory_item_id
+  const inventoryItemIds = ordersWithItems.flatMap(o => 
+    o.orderitem.map(item => item.inventory_item_id)
+  );
+
+  // 如果没有订单，直接返回空数组
+  if (inventoryItemIds.length === 0) {
+    return [];
+  }
+
+  // 3. 一次性查询所有相关的inventory数据
+  const inventoryItems = await prisma.inventoryitem.findMany({
     where: {
-      status: 'PENDING_PICKUP',
+      id: { in: inventoryItemIds },
     },
     include: {
-      orderitem: {
+      booksku: {
         include: {
-          inventoryitem: {
-            include: {
-              booksku: {
-                include: {
-                  bookmaster: true,
-                },
-              },
-            },
-          },
+          bookmaster: true,
         },
       },
     },
-    orderBy: {
-      paid_at: 'asc', // 按支付时间升序，先付钱的先备货
-    },
   });
+
+  // 4. 创建inventory数据的快速查找Map
+  const inventoryMap = new Map(
+    inventoryItems.map(item => [item.id, item])
+  );
+
+  // 5. 手动聚合数据：将完整的inventory信息附加到每个orderitem上
+  const enrichedOrders = ordersWithItems.map(order => ({
+    ...order,
+    orderitem: order.orderitem.map(item => ({
+      ...item,
+      inventoryitem: inventoryMap.get(item.inventory_item_id)!,
+    })),
+  }));
+
+  return enrichedOrders;
 }
 
 export async function cancelExpiredOrders() {
