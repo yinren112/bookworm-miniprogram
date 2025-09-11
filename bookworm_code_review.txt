@@ -1,12 +1,13 @@
 ================================================================================
 BOOKWORM PROJECT - CORE CODE REVIEW
 ================================================================================
-Generated on: 2025-09-10 18:04:18
+Generated on: 2025-09-11 16:13:24
 Mode: Core files only. This report contains the architectural backbone of the project.
 
 ### 📁 PROJECT FILE TREE ###
 ----------------------------------------
 miniprogram-13/
+├── CUserswapadilWeChatProjectsminiprogram-13miniprogrampageswebview/
 ├── bookworm-backend/
 │   ├── coverage/
 │   │   ├── prisma/
@@ -45,9 +46,15 @@ miniprogram-13/
 │   │   ├── style.css
 │   │   └── zxing.min.js
 │   ├── src/
+│   │   ├── jobs/
+│   │   │   └── cancelExpiredOrders.ts
+│   │   ├── plugins/
+│   │   │   ├── auth.ts
+│   │   │   └── metrics.ts
 │   │   ├── services/
 │   │   │   ├── authService.ts
 │   │   │   ├── bookMetadataService.ts
+│   │   │   ├── contentService.ts
 │   │   │   ├── inventoryService.ts
 │   │   │   └── orderService.ts
 │   │   ├── tests/
@@ -55,16 +62,25 @@ miniprogram-13/
 │   │   │   ├── orderService.test.ts
 │   │   │   ├── paymentService.test.ts
 │   │   │   └── setup.ts
+│   │   ├── types/
+│   │   │   └── fastify.d.ts
 │   │   ├── config.ts
 │   │   ├── db.ts
+│   │   ├── errors.ts
 │   │   └── index.ts
 │   ├── .env
 │   ├── .gitignore
+│   ├── Dockerfile
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vitest.config.ts
 ├── miniprogram/
 │   ├── components/
+│   │   └── skeleton/
+│   │       ├── skeleton.js
+│   │       ├── skeleton.json
+│   │       ├── skeleton.wxml
+│   │       └── skeleton.wxss
 │   ├── images/
 │   │   ├── icons/
 │   │   │   ├── arrow-right.png
@@ -111,6 +127,11 @@ miniprogram-13/
 │   │   │   ├── index.json
 │   │   │   ├── index.wxml
 │   │   │   └── index.wxss
+│   │   ├── customer-service/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
 │   │   ├── market/
 │   │   │   ├── index.js
 │   │   │   ├── index.json
@@ -121,12 +142,22 @@ miniprogram-13/
 │   │   │   ├── index.json
 │   │   │   ├── index.wxml
 │   │   │   └── index.wxss
+│   │   ├── order-detail/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
 │   │   ├── orders/
 │   │   │   ├── index.js
 │   │   │   ├── index.json
 │   │   │   ├── index.wxml
 │   │   │   └── index.wxss
-│   │   └── profile/
+│   │   ├── profile/
+│   │   │   ├── index.js
+│   │   │   ├── index.json
+│   │   │   ├── index.wxml
+│   │   │   └── index.wxss
+│   │   └── webview/
 │   │       ├── index.js
 │   │       ├── index.json
 │   │       ├── index.wxml
@@ -135,6 +166,7 @@ miniprogram-13/
 │   │   ├── search-bar.wxml
 │   │   └── search-bar.wxss
 │   ├── utils/
+│   │   ├── api.js
 │   │   ├── auth.js
 │   │   ├── constants.js
 │   │   └── formatter.wxs
@@ -150,6 +182,7 @@ miniprogram-13/
 ├── bookworm_code_review.txt
 ├── package.json
 ├── project.config.json
+├── 审查 (v2 - 带脱敏功能).py
 └── 审查.py
 
 
@@ -494,6 +527,9 @@ WXPAY_CERT_SERIAL_NO="your_merchant_cert_serial_no"
 WXPAY_API_V3_KEY="your_api_v3_key"
 WXPAY_NOTIFY_URL="https://your.domain.com/api/payment/notify"
 
+# Tanshu API Key
+TANSHU_API_KEY="9dd563ab0eaed4055cfa0e2301f4f1fb"
+
 
 ================================================================================
 ### FILE: bookworm-backend\package.json
@@ -509,16 +545,22 @@ WXPAY_NOTIFY_URL="https://your.domain.com/api/payment/notify"
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run --coverage",
+    "migrate:dev": "npx prisma migrate dev",
     "seed": "npx ts-node prisma/seed.ts",
+    "job:cancel-orders": "npx ts-node src/jobs/cancelExpiredOrders.ts",
     "postinstall": "cp node_modules/@zxing/library/umd/index.min.js public/zxing.min.js"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^9.1.0",
     "@fastify/static": "^7.0.4",
     "@prisma/client": "^5.15.0",
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
     "fastify": "^4.27.0",
+    "fastify-plugin": "^5.0.1",
+    "fastify-raw-body": "^4.3.0",
     "jsonwebtoken": "^9.0.2",
+    "prom-client": "^15.1.3",
     "wechatpay-node-v3": "^2.2.1"
   },
   "devDependencies": {
@@ -572,8 +614,10 @@ model Order {
 model User {
   id         Int      @id @default(autoincrement())
   openid     String   @unique @db.VarChar(255)
+  unionid    String?  @unique @db.VarChar(255)
   nickname   String?  @db.VarChar(255)
   avatar_url String?  @db.VarChar(255)
+  role       Role     @default(USER)
   created_at DateTime @default(now()) @db.Timestamptz(6)
   Order      Order[]
 }
@@ -630,6 +674,17 @@ model orderitem {
   Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
 }
 
+model Content {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique @db.VarChar(255)
+  title     String   @db.VarChar(255)
+  body      String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@index([slug], map: "idx_content_slug")
+}
+
 enum book_condition {
   A
   B
@@ -642,6 +697,11 @@ enum inventory_status {
   sold
   returned
   damaged
+}
+
+enum Role {
+  USER
+  STAFF
 }
 
 enum OrderStatus {
@@ -969,8 +1029,8 @@ document.addEventListener('DOMContentLoaded', () => {
 ================================================================================
 
 // src/config.ts
-import dotenv from 'dotenv';
-import fs from 'fs';
+import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 
 dotenv.config();
 
@@ -1005,6 +1065,9 @@ const config = {
   wxPayApiV3Key: process.env.WXPAY_API_V3_KEY,
   wxPayNotifyUrl: process.env.WXPAY_NOTIFY_URL,
 
+  // Tanshu API config
+  tanshuApiKey: process.env.TANSHU_API_KEY,
+
   // Database URL is read by Prisma from .env directly
 };
 
@@ -1017,6 +1080,9 @@ if (config.wxAppId === 'YOUR_APP_ID' || config.wxAppSecret === 'YOUR_APP_SECRET'
 }
 if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
     console.warn('!!! WARNING: WeChat Pay configuration is incomplete. Payment features will not work.');
+}
+if (!config.tanshuApiKey) { 
+    console.warn('!!! WARNING: TANSHU_API_KEY is not configured.'); 
 }
 
 export default config;
@@ -1038,22 +1104,27 @@ export default prisma;
 
 // src/index.ts (fully replaced with parser fix)
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
-import path from 'path';
+import * as path from 'path';
 import fastifyStatic from '@fastify/static';
 import config from './config';
-import { addBookToInventory, getAvailableBooks, getBookById, getBookMetadata } from './services/inventoryService';
-import { createOrder, getOrdersByUserId, fulfillOrder, generatePaymentParams, processPaymentNotification, getPendingPickupOrders, cancelExpiredOrders, ItemNotAvailableError, FulfillmentError } from './services/orderService';
+import { addBookToInventory, getAvailableBooks, getBookById } from './services/inventoryService';
+import { getBookMetadata } from './services/bookMetadataService';
+import { getContentBySlug } from './services/contentService';
+import { createOrder, getOrdersByUserId, getOrderById, fulfillOrder, generatePaymentParams, processPaymentNotification, getPendingPickupOrders } from './services/orderService';
+import { ApiError } from './errors';
 import { wxLogin } from './services/authService';
-import WechatPay from 'wechatpay-node-v3';
+import authPlugin from './plugins/auth';
+import metricsPlugin from './plugins/metrics';
+import fastifyRawBody from 'fastify-raw-body';
+import rateLimit from '@fastify/rate-limit';
+const WechatPay = require('wechatpay-node-v3');
 import { Prisma } from '@prisma/client';
-import fs from 'fs';
-
+import prisma from './db';
+import * as fs from 'fs';
 const fastify = Fastify({ logger: true });
 
-fastify.register(fastifyStatic, { root: path.join(__dirname, '..', 'public'), prefix: '/admin/' });
-
 // --- Wechat Pay Setup ---
-let pay: WechatPay | null = null;
+let pay: any | null = null;
 try {
     if (
         config.wxPayMchId &&
@@ -1085,183 +1156,287 @@ try {
 fastify.setErrorHandler(async (error: Error, request: FastifyRequest, reply: FastifyReply) => {
     request.log.error({ err: error, req: request }, 'An error occurred during the request');
 
-    // Handle specific business logic errors
-    if (error instanceof ItemNotAvailableError || error instanceof FulfillmentError) {
-        return reply.code(409).send({ error: error.message });
+    // Handle ApiError - our standardized business logic errors
+    if (error instanceof ApiError) {
+        return reply.code(error.statusCode).send({ 
+            error: error.message, 
+            errorCode: error.errorCode 
+        });
     }
 
     // Handle Prisma errors
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return reply.code(404).send({ error: 'Record not found.' });
+        return reply.code(404).send({ 
+            error: 'Record not found.', 
+            errorCode: 'RECORD_NOT_FOUND' 
+        });
     }
 
     // For all other unknown errors, send a generic 500 response
-    reply.code(500).send({ error: 'Internal Server Error' });
+    reply.code(500).send({ 
+        error: 'Internal Server Error', 
+        errorCode: 'INTERNAL_ERROR' 
+    });
 });
 
-// --- API Routes ---
-
-// Auth
-fastify.post('/api/auth/login', async (request, reply) => {
-    const { code } = request.body as { code: string };
-    if (!code) { return reply.code(400).send({ error: 'Code is required.' }); }
-    const { token, user } = await wxLogin(code);
-    reply.send({ token, userId: user.id });
-});
-
-// Books metadata
-fastify.get('/api/books/meta', async (request, reply) => {
-    const query = request.query as { isbn?: string };
-    if (!query.isbn) { 
-        return reply.code(400).send({ error: 'ISBN parameter is required.' }); 
-    }
-    
-    const metadata = await getBookMetadata(query.isbn);
-    if (!metadata) { 
-        return reply.code(404).send({ error: 'Book metadata not found.' }); 
-    }
-    
-    reply.send(metadata);
-});
-
-// Inventory
-fastify.get('/api/inventory/available', async (request, reply) => {
-    const query = request.query as { search?: string };
-    const books = await getAvailableBooks(query.search);
-    reply.send(books);
-});
-fastify.get('/api/inventory/item/:id', async (request, reply) => {
-    const params = request.params as { id: string };
-    const id = parseInt(params.id, 10);
-    if (isNaN(id)) { return reply.code(400).send({ error: 'Invalid item ID.' }); }
-    const book = await getBookById(id);
-    if (!book) { return reply.code(404).send({ error: 'Book not found.' }); }
-    reply.send(book);
-});
-fastify.post('/api/inventory/add', async (request, reply) => {
-    console.log('DEBUG: request.body =', request.body);
-    console.log('DEBUG: request.body type =', typeof request.body);
-    const newItem = await addBookToInventory(request.body as any);
-    reply.code(201).send(newItem);
-});
-
-// Orders
-fastify.post('/api/orders/create', async (request, reply) => {
-    const order = await createOrder(request.body as any);
-    reply.code(201).send(order);
-});
-fastify.get('/api/orders/user/:userId', async (request, reply) => {
-    const params = request.params as { userId: string };
-    const userId = parseInt(params.userId, 10);
-    if (isNaN(userId)) { return reply.code(400).send({ error: 'Invalid user ID.' }); }
-    const orders = await getOrdersByUserId(userId);
-    reply.send(orders);
-});
-fastify.post('/api/orders/fulfill', async (request, reply) => {
-    const { pickupCode } = request.body as { pickupCode: string };
-    if (!pickupCode) { return reply.code(400).send({ error: 'pickupCode is required.' }); }
-    const order = await fulfillOrder(pickupCode.toUpperCase());
-    reply.send(order);
-});
-fastify.get('/api/orders/pending-pickup', async (request, reply) => {
-    const orders = await getPendingPickupOrders();
-    reply.send(orders);
-});
-
-// Generate payment parameters for an order
-fastify.post('/api/orders/:orderId/pay', async (request, reply) => {
-    if (!pay) {
-        return reply.code(503).send({ error: 'Payment service is not configured.' });
-    }
-    
-    const params = request.params as { orderId: string };
-    const orderId = parseInt(params.orderId, 10);
-    if (isNaN(orderId)) { return reply.code(400).send({ error: 'Invalid order ID.' }); }
-    
-    const { openid } = request.body as { openid: string };
-    if (!openid) { return reply.code(400).send({ error: 'openid is required.' }); }
-    
-    const paymentData = await generatePaymentParams(pay, orderId, openid);
-    reply.send(paymentData);
-});
-
-// Payment Notification Webhook
-// We create a custom content-type for WeChat Pay to avoid conflicts
-fastify.addContentTypeParser('application/wechat-pay', { parseAs: 'buffer' }, (request, payload, done) => {
-    done(null, payload);
-});
-
-fastify.post('/api/payment/notify', { config: { rawBody: true } }, async (request, reply) => {
-    if (!pay) {
-        request.log.error('WeChat Pay is not configured, cannot process notification.');
-        return reply.code(503).send({ error: 'Payment service unavailable.' });
+// Production configuration validation
+const validateProductionConfig = () => {
+    if (process.env.NODE_ENV !== 'production') {
+        return; // Only validate in production
     }
 
-    try {
-        // Convert Buffer to string for processing
-        const rawBody = (request.body as Buffer).toString('utf8');
+    const criticalMissingConfigs: string[] = [];
 
-        // Step 1: Verify the signature
-        const isVerified = pay.verifySign({
-            timestamp: request.headers['wechatpay-timestamp'] as string,
-            nonce: request.headers['wechatpay-nonce'] as string,
-            body: rawBody, // Now string type, compatible with verifySign
-            signature: request.headers['wechatpay-signature'] as string,
-            serial: request.headers['wechatpay-serial'] as string,
+    // JWT Secret validation
+    if (config.jwtSecret === 'default-secret-for-dev' || !config.jwtSecret) {
+        criticalMissingConfigs.push('JWT_SECRET');
+    }
+
+    // WeChat App validation
+    if (config.wxAppId === 'YOUR_APP_ID' || !config.wxAppId) {
+        criticalMissingConfigs.push('WX_APP_ID');
+    }
+    if (config.wxAppSecret === 'YOUR_APP_SECRET' || !config.wxAppSecret) {
+        criticalMissingConfigs.push('WX_APP_SECRET');
+    }
+
+    // Database URL validation
+    if (!process.env.DATABASE_URL) {
+        criticalMissingConfigs.push('DATABASE_URL');
+    }
+
+    if (criticalMissingConfigs.length > 0) {
+        console.error('');
+        console.error('🚨 FATAL ERROR: Critical configuration missing in production environment!');
+        console.error('❌ Missing required environment variables:');
+        criticalMissingConfigs.forEach(config => {
+            console.error(`   - ${config}`);
         });
-
-        if (!isVerified) {
-            request.log.warn('Payment notification signature verification failed.');
-            return reply.code(400).send({ code: 'FAIL', message: '验签失败' });
-        }
-
-        // Step 2: Parse JSON to get encrypted resource
-        const requestData = JSON.parse(rawBody);
-        const { resource } = requestData;
-        
-        // Step 3: Decrypt the notification content
-        const decryptedData = pay.decipher_gcm(
-            resource.ciphertext,
-            resource.associated_data,
-            resource.nonce,
-            config.wxPayApiV3Key!
-        );
-        
-        // Step 4: Parse decrypted data with type assertion
-        const notificationData = JSON.parse(decryptedData as string);
-
-        // Step 5: Process the business logic
-        if (notificationData.trade_state === 'SUCCESS') {
-            await processPaymentNotification(notificationData);
-        }
-
-        reply.code(200).send({ code: 'SUCCESS', message: '成功' });
-
-    } catch (e) {
-        request.log.error({ err: e }, 'Payment notification processing failed');
-        reply.code(400).send({ code: 'FAIL', message: '处理失败' });
+        console.error('');
+        console.error('📋 Please set these environment variables and restart the application.');
+        console.error('🛑 Shutting down to prevent production deployment with insecure configuration.');
+        console.error('');
+        process.exit(1);
     }
-});
+
+    console.log('✅ Production configuration validation passed');
+};
+
+const setupPluginsAndRoutes = async () => {
+    // Register plugins first - MUST be awaited in correct order
+    await fastify.register(fastifyStatic, { root: path.join(__dirname, '..', 'public'), prefix: '/admin/' });
+    await fastify.register(authPlugin);
+    await fastify.register(metricsPlugin);
+    await fastify.register(fastifyRawBody, {
+        field: 'rawBody',
+        global: false, // 只在需要的路由上启用
+        encoding: 'utf8',
+        runFirst: true
+    });
+    await fastify.register(rateLimit, {
+        global: false, // 我们按路由单独配置
+    });
+
+    // Now all routes can be defined safely
+    setupRoutes();
+};
+
+const setupRoutes = () => {
+    // Health Check Endpoint
+    fastify.get('/api/health', async (request, reply) => {
+        const checks: { [key: string]: string } = {};
+        let allHealthy = true;
+
+        // Database connectivity check
+        try {
+            await prisma.$queryRaw`SELECT 1`;
+            checks.database = 'ok';
+        } catch (error) {
+            request.log.error(error, 'Database health check failed');
+            checks.database = 'failed';
+            allHealthy = false;
+        }
+
+        if (allHealthy) {
+            reply.send({
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                checks
+            });
+        } else {
+            reply.code(503).send({
+                status: 'error',
+                timestamp: new Date().toISOString(),
+                checks
+            });
+        }
+    });
+
+    // Auth routes
+    fastify.post('/api/auth/login', {
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    }, async (request, reply) => {
+        const { code } = request.body as { code: string };
+        if (!code) { return reply.code(400).send({ error: 'Code is required.' }); }
+        const { token, user } = await wxLogin(code);
+        reply.send({ token, userId: user.id });
+    });
+
+    // Books metadata
+    fastify.get('/api/books/meta', async (request, reply) => {
+        const query = request.query as { isbn?: string };
+        if (!query.isbn) { 
+            return reply.code(400).send({ error: 'ISBN parameter is required.' }); 
+        }
+        
+        const metadata = await getBookMetadata(query.isbn);
+        if (!metadata) { 
+            return reply.code(404).send({ error: 'Book metadata not found.' }); 
+        }
+        
+        reply.send(metadata);
+    });
+
+    // Inventory routes
+    fastify.get('/api/inventory/available', async (request, reply) => {
+        const query = request.query as { search?: string };
+        const books = await getAvailableBooks(query.search);
+        reply.send(books);
+    });
+    
+    fastify.get('/api/inventory/item/:id', async (request, reply) => {
+        const params = request.params as { id: string };
+        const id = parseInt(params.id, 10);
+        if (isNaN(id)) { return reply.code(400).send({ error: 'Invalid item ID.' }); }
+        const book = await getBookById(id);
+        if (!book) { return reply.code(404).send({ error: 'Book not found.' }); }
+        reply.send(book);
+    });
+    
+    fastify.post('/api/inventory/add', { preHandler: [fastify.authenticate, fastify.requireRole('STAFF')] }, async (request, reply) => {
+        console.log('DEBUG: request.body =', request.body);
+        console.log('DEBUG: request.body type =', typeof request.body);
+        const newItem = await addBookToInventory(request.body as any);
+        reply.code(201).send(newItem);
+    });
+
+    // Content Management
+    fastify.get('/api/content/:slug', async (request, reply) => {
+        const params = request.params as { slug: string };
+        const content = await getContentBySlug(params.slug);
+        reply.send(content);
+    });
+
+    // Order routes
+    fastify.post('/api/orders/create', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+        const { inventoryItemIds } = request.body as { inventoryItemIds: number[] };
+        const order = await createOrder({ userId: request.user!.userId, inventoryItemIds });
+        reply.code(201).send(order);
+    });
+
+    fastify.get('/api/orders/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const orderId = parseInt(id, 10);
+        if (isNaN(orderId)) return reply.code(400).send({ error: 'Invalid order ID' });
+        const order = await getOrderById(orderId);
+        const user = await prisma.user.findUnique({ where: { id: request.user!.userId }, select: { role: true } });
+        if (order.user_id !== request.user!.userId && user?.role !== 'STAFF') {
+            return reply.code(403).send({ error: 'Forbidden' });
+        }
+        reply.send(order);
+    });
+
+    fastify.get('/api/orders/user/:userId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+        const { userId } = request.params as { userId: string };
+        if (parseInt(userId, 10) !== request.user!.userId) {
+            return reply.code(403).send({ error: 'Forbidden' });
+        }
+        const orders = await getOrdersByUserId(request.user!.userId);
+        reply.send(orders);
+    });
+
+    fastify.post('/api/orders/fulfill', {
+        preHandler: [fastify.authenticate, fastify.requireRole('STAFF')],
+        config: {
+            rateLimit: {
+                max: 30,
+                timeWindow: '1 minute',
+                keyGenerator: (req) => req.user?.userId.toString() || req.ip
+            }
+        }
+    }, async (request, reply) => {
+        const { pickupCode } = request.body as { pickupCode: string };
+        if (!pickupCode) { return reply.code(400).send({ error: 'pickupCode is required.' }); }
+        const order = await fulfillOrder(pickupCode.toUpperCase());
+        reply.send(order);
+    });
+
+    fastify.get('/api/orders/pending-pickup', { preHandler: [fastify.authenticate, fastify.requireRole('STAFF')] }, async (request, reply) => {
+        const orders = await getPendingPickupOrders();
+        reply.send(orders);
+    });
+
+    fastify.post('/api/orders/:orderId/pay', { preHandler: [fastify.authenticate] }, async (request, reply) => {
+        if (!pay) return reply.code(503).send({ error: 'Payment service is not configured.' });
+        const { orderId } = request.params as { orderId: string };
+        const paymentParams = await generatePaymentParams(pay, parseInt(orderId, 10), request.user!.userId);
+        reply.send(paymentParams);
+    });
+
+    // Payment callback
+    fastify.post('/api/payment/notify', { config: { rawBody: true } }, async (request, reply) => {
+        if (!pay) {
+            request.log.error('WeChat Pay is not configured, cannot process notification.');
+            return reply.code(503).send({ error: 'Payment service unavailable.' });
+        }
+
+        try {
+            const rawBody = (request as any).rawBody as string;
+            if (!rawBody) {
+                throw new Error("Missing raw body for payment notification");
+            }
+
+            const isVerified = pay.verifySign({
+                timestamp: request.headers['wechatpay-timestamp'] as string,
+                nonce: request.headers['wechatpay-nonce'] as string,
+                body: rawBody,
+                signature: request.headers['wechatpay-signature'] as string,
+                serial: request.headers['wechatpay-serial'] as string,
+            });
+
+            if (!isVerified) {
+                request.log.warn('Payment notification signature verification failed.');
+                return reply.code(400).send({ code: 'FAIL', message: '验签失败' });
+            }
+
+            const { resource } = JSON.parse(rawBody);
+            const decryptedData = pay.decipher_gcm(
+                resource.ciphertext,
+                resource.associated_data,
+                resource.nonce,
+                config.wxPayApiV3Key!
+            );
+            
+            const notificationData = JSON.parse(decryptedData as string);
+
+            if (notificationData.trade_state === 'SUCCESS') {
+                await processPaymentNotification(notificationData);
+            }
+
+            reply.code(200).send({ code: 'SUCCESS', message: '成功' });
+
+        } catch (e) {
+            request.log.error({ err: e }, 'Payment notification processing failed');
+            reply.code(400).send({ code: 'FAIL', message: '处理失败' });
+        }
+    });
+};
 
 const start = async () => {
     try {
+        validateProductionConfig();
+        await setupPluginsAndRoutes();
         await fastify.listen({ port: config.port as number, host: '0.0.0.0' });
-        
-        // Start the background job to cancel expired orders
-        const cleanupInterval = 60 * 1000; // Run every 60 seconds
-        setInterval(async () => {
-            try {
-                fastify.log.info('Running background job: cancelExpiredOrders...');
-                const { cancelledCount } = await cancelExpiredOrders();
-                if (cancelledCount > 0) {
-                    fastify.log.info(`Background job finished: Cancelled ${cancelledCount} expired orders.`);
-                } else {
-                    fastify.log.info('Background job finished: No expired orders found.');
-                }
-            } catch (error) {
-                fastify.log.error(error, 'Error running cancelExpiredOrders background job');
-            }
-        }, cleanupInterval);
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -1276,7 +1451,7 @@ start();
 
 // src/services/authService.ts
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import config from '../config'; // <-- Import config
 import prisma from '../db';
 
@@ -1286,8 +1461,52 @@ export async function wxLogin(code: string) {
   
   if (wxSession.errcode) { throw new Error(`WeChat API Error: ${wxSession.errmsg}`); }
 
-  const { openid } = wxSession;
-  const user = await prisma.user.upsert({ where: { openid }, update: {}, create: { openid } });
+  const { openid, unionid } = wxSession;
+  
+  const user = await prisma.$transaction(async (tx) => {
+    let user = null;
+    
+    if (unionid) {
+      user = await tx.user.findUnique({ where: { unionid } });
+      
+      if (user !== null) {
+        if (user.openid !== openid) {
+          user = await tx.user.update({
+            where: { id: user.id },
+            data: { openid }
+          });
+        }
+        return user;
+      }
+      
+      user = await tx.user.findUnique({ where: { openid } });
+      
+      if (user !== null) {
+        user = await tx.user.update({
+          where: { id: user.id },
+          data: { unionid }
+        });
+        return user;
+      }
+      
+      user = await tx.user.create({
+        data: { openid, unionid }
+      });
+      return user;
+      
+    } else {
+      user = await tx.user.findUnique({ where: { openid } });
+      
+      if (user !== null) {
+        return user;
+      }
+      
+      user = await tx.user.create({
+        data: { openid }
+      });
+      return user;
+    }
+  });
   
   const token = jwt.sign({ userId: user.id, openid: user.openid }, config.jwtSecret, { expiresIn: '7d' });
 
@@ -1302,6 +1521,7 @@ export async function wxLogin(code: string) {
 // src/services/inventoryService.ts (fully replaced)
 import { Prisma, book_condition } from '@prisma/client';
 import prisma from '../db';
+import { getBookMetadata } from './bookMetadataService';
 
 interface AddBookInput {
   isbn13: string;
@@ -1315,15 +1535,30 @@ interface AddBookInput {
 
 export async function addBookToInventory(input: AddBookInput) {
   return prisma.$transaction(async (tx) => {
+    
+    // NEW: Attempt to fetch external metadata
+    const metadata = await getBookMetadata(input.isbn13);
+    
     // Step 1: Find or create the master book record (based on ISBN).
-    // This represents the abstract concept of the book.
+    // Use metadata if available, otherwise use input data (manual entry)
     const bookMaster = await tx.bookmaster.upsert({
       where: { isbn13: input.isbn13 },
-      update: {}, // No updates needed if it exists
+      update: {
+        // If metadata is available, update title/author/publisher
+        ...(metadata && {
+          title: metadata.title,
+          author: metadata.author,
+          publisher: metadata.publisher,
+          original_price: metadata.original_price,
+        }),
+      }, 
       create: {
         isbn13: input.isbn13,
-        title: input.title,
-        author: input.author,
+        // Use metadata or fall back to input
+        title: metadata?.title || input.title, 
+        author: metadata?.author || input.author,
+        publisher: metadata?.publisher,
+        original_price: metadata?.original_price,
       },
     });
 
@@ -1336,10 +1571,16 @@ export async function addBookToInventory(input: AddBookInput) {
           edition: input.edition || "default",
         },
       },
-      update: {}, // No updates needed if it exists
+      update: {
+        // If metadata is available, update cover image URL
+        ...(metadata && {
+          cover_image_url: metadata.cover_image_url,
+        }),
+      },
       create: {
         master_id: bookMaster.id,
         edition: input.edition || "default",
+        cover_image_url: metadata?.cover_image_url, // Use metadata cover image
       },
     });
 
@@ -1403,32 +1644,6 @@ export async function getBookById(id: number) {
   });
 }
 
-// NEW: Function to get book metadata by ISBN
-export async function getBookMetadata(isbn: string) {
-  // First check if we have the book in our database
-  const existingBook = await prisma.bookmaster.findUnique({
-    where: { isbn13: isbn },
-    include: {
-      booksku: true,
-    },
-  });
-
-  if (existingBook) {
-    return {
-      isbn13: existingBook.isbn13,
-      title: existingBook.title,
-      author: existingBook.author,
-      publisher: existingBook.publisher,
-      original_price: existingBook.original_price ? Number(existingBook.original_price) : null,
-      cover_image_url: existingBook.booksku[0]?.cover_image_url || null,
-    };
-  }
-
-  // If not found locally, we could integrate with external APIs here
-  // For now, return null to indicate not found
-  return null;
-}
-
 
 ================================================================================
 ### FILE: bookworm-backend\src\services\orderService.ts
@@ -1437,61 +1652,67 @@ export async function getBookMetadata(isbn: string) {
 // src/services/orderService.ts (fully replaced)
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import WechatPay from 'wechatpay-node-v3';
+import * as crypto from 'crypto';
+const WechatPay = require('wechatpay-node-v3');
 import config from '../config';
 import prisma from '../db';
-
-// ... (ItemNotAvailableError class remains the same)
-export class ItemNotAvailableError extends Error {
-  constructor(message: string) { super(message); this.name = 'ItemNotAvailableError'; }
-}
-
-// NEW: Custom error for fulfillment logic
-export class FulfillmentError extends Error {
-  constructor(message: string) { super(message); this.name = 'FulfillmentError'; }
-}
+import { ApiError } from '../errors';
 
 export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
-  return prisma.$transaction(async (tx) => {
-    // ... (user upsert logic is the same)
-    const user = await tx.user.upsert({
-      where: { id: input.userId },
-      update: {},
-      create: { id: input.userId, openid: `fake_openid_${input.userId}_${Date.now()}` }
+    return prisma.$transaction(async (tx) => {
+        const itemIds = Array.from(new Set(input.inventoryItemIds));
+        if (itemIds.length === 0) {
+            throw new ApiError(400, '没有选择任何书籍', 'EMPTY_ITEMS');
+        }
+
+        // 1. 原子抢占：尝试将 'in_stock' 状态更新为 'reserved'
+        const updateResult = await tx.inventoryitem.updateMany({
+            where: {
+                id: { in: itemIds },
+                status: 'in_stock'
+            },
+            data: { status: 'reserved' }
+        });
+
+        // 2. 检查结果：如果更新的行数不等于请求的物品数量，说明有物品被别人抢先了
+        if (updateResult.count !== itemIds.length) {
+            // 事务会自动回滚所有更改，所以我们只需要抛出错误
+            throw new ApiError(409, '部分书籍已被抢购，请重新下单', 'INSUFFICIENT_INVENTORY');
+        }
+
+        // 3. 读取已成功抢占的物品信息，用于计算总价
+        const reservedItems = await tx.inventoryitem.findMany({
+            where: { id: { in: itemIds } }
+        });
+
+        const totalAmount = reservedItems.reduce(
+            (sum, item) => sum.add(new Prisma.Decimal(item.selling_price)),
+            new Prisma.Decimal(0)
+        );
+
+        // 4. 创建订单和订单项
+        const order = await tx.order.create({
+            data: {
+                user_id: input.userId,
+                status: 'PENDING_PAYMENT',
+                total_amount: totalAmount,
+                pickup_code: crypto.randomBytes(3).toString('hex').toUpperCase(),
+                paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15分钟后过期
+            },
+        });
+
+        await tx.orderitem.createMany({
+            data: reservedItems.map(item => ({
+                order_id: order.id,
+                inventory_item_id: item.id,
+                price: item.selling_price,
+            })),
+        });
+
+        return order;
+    }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // 使用最高隔离级别保证一致性
     });
-
-    // ... (item fetching and validation is the same)
-    const items = await tx.inventoryitem.findMany({ where: { id: { in: input.inventoryItemIds } } });
-    if (items.length !== input.inventoryItemIds.length) { throw new ItemNotAvailableError('One or more items do not exist.'); }
-    for (const item of items) { if (item.status !== 'in_stock') { throw new ItemNotAvailableError(`Item ${item.id} is not available.`); } }
-
-    const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.selling_price.toString()), 0);
-
-    const order = await tx.order.create({
-      data: {
-        user_id: user.id,
-        status: 'PENDING_PAYMENT',
-        total_amount: totalAmount,
-        pickup_code: randomBytes(3).toString('hex').toUpperCase(),
-        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-      },
-    });
-
-    await tx.orderitem.createMany({
-      data: items.map(item => ({
-        order_id: order.id,
-        inventory_item_id: item.id,
-        price: item.selling_price,
-      })),
-    });
-
-    await tx.inventoryitem.updateMany({
-      where: { id: { in: input.inventoryItemIds } },
-      data: { status: 'reserved' },
-    });
-
-    return order;
-  });
 }
 
 export async function getOrdersByUserId(userId: number) {
@@ -1514,10 +1735,10 @@ export async function fulfillOrder(pickupCode: string) {
 
     // 2. Validate
     if (!order) {
-      throw new FulfillmentError(`取货码 "${pickupCode}" 无效。`);
+      throw new ApiError(404, `取货码 "${pickupCode}" 无效`, 'INVALID_PICKUP_CODE');
     }
     if (order.status !== 'PENDING_PICKUP') {
-      throw new FulfillmentError(`此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`);
+      throw new ApiError(409, `此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`, 'ORDER_STATE_INVALID');
     }
 
     // 3. Update the Order status
@@ -1540,73 +1761,41 @@ export async function fulfillOrder(pickupCode: string) {
   });
 }
 
-// NEW: Generate WeChat Pay payment parameters
-export async function generatePaymentParams(pay: WechatPay, orderId: number, openid: string) {
-  // 1. Fetch the order details
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      orderitem: {
-        include: {
-          inventoryitem: {
-            include: {
-              booksku: {
-                include: {
-                  bookmaster: true
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
+export async function generatePaymentParams(pay: any, orderId: number, userId: number) {
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    if (order.user_id !== userId) throw new ApiError(403, '无权支付此订单', 'FORBIDDEN');
+    if (order.status !== 'PENDING_PAYMENT') throw new ApiError(409, '订单状态不正确', 'ORDER_STATE_INVALID');
 
-  if (!order) {
-    throw new Error('Order not found');
-  }
-
-  if (order.status !== 'PENDING_PAYMENT') {
-    throw new Error('Order is not in PENDING_PAYMENT status');
-  }
-
-
-  // 3. Generate description from order items
-  const bookTitles = order.orderitem.map(item => 
-    item.inventoryitem.booksku.bookmaster.title
-  ).slice(0, 3); // Limit to first 3 books
-  const description = bookTitles.length > 3 
-    ? `${bookTitles.join('、')}等${order.orderitem.length}本书籍`
-    : bookTitles.join('、');
-
-  // 4. Call WeChat Pay unified order API
-  const unifiedOrderParams = {
-    appid: config.wxAppId,
-    mchid: config.wxPayMchId,
-    description: description,
-    out_trade_no: `BOOKWORM_${order.id}`, // Simple and unique
-    notify_url: config.wxPayNotifyUrl || '',
-    amount: {
-      total: Math.round(Number(order.total_amount) * 100), // Convert to cents
-      currency: 'CNY'
-    },
-    payer: {
-      openid: openid
-    }
-  };
-
-  try {
-    const result = await pay.transactions_jsapi(unifiedOrderParams);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { openid: true } });
     
-    // 5. Return the result for mini-program payment
-    return {
-      result,
-      outTradeNo: unifiedOrderParams.out_trade_no
-    };
-  } catch (error) {
-    console.error('WeChat Pay API error:', error);
-    throw new Error('Failed to generate payment parameters');
-  }
+    const orderItems = await prisma.orderitem.findMany({ 
+        where: { order_id: orderId },
+        include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } }
+    });
+    const titles = orderItems.map(i => i.inventoryitem.booksku.bookmaster.title);
+    const description = titles.slice(0, 3).join('、') + (titles.length > 3 ? `等${titles.length}本书籍` : '');
+
+    const unifiedOrderResult = await pay.transactions_jsapi({
+        appid: config.wxAppId!,
+        mchid: config.wxPayMchId!,
+        description,
+        out_trade_no: `BOOKWORM_${order.id}_${Date.now()}`, // 加入时间戳防重试
+        notify_url: config.wxPayNotifyUrl!,
+        amount: { total: Math.round(Number(order.total_amount) * 100), currency: 'CNY' },
+        payer: { openid: user.openid }
+    });
+
+    const { prepay_id } = unifiedOrderResult as any;
+    if (!prepay_id) throw new ApiError(500, '微信下单失败，未返回prepay_id', 'WECHAT_PAY_ERROR');
+    
+    const timeStamp = Math.floor(Date.now() / 1000).toString();
+    const nonceStr = crypto.randomBytes(16).toString('hex');
+    const pkg = `prepay_id=${prepay_id}`;
+    const toSign = `${config.wxAppId}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
+
+    const paySign = pay.sign(toSign);
+
+    return { timeStamp, nonceStr, package: pkg, signType: 'RSA', paySign };
 }
 
 // NEW: Process WeChat Pay payment notification
@@ -1616,12 +1805,12 @@ export async function processPaymentNotification(notificationData: any) {
     
     // 1. Validate payment success
     if (trade_state !== 'SUCCESS') {
-      throw new Error(`Payment not successful. Trade state: ${trade_state}`);
+      throw new ApiError(400, `支付未成功，状态：${trade_state}`, 'PAYMENT_NOT_SUCCESS');
     }
 
     // 2. Extract order ID from out_trade_no (format: BOOKWORM_{orderId})
     if (!out_trade_no.startsWith('BOOKWORM_')) {
-      throw new Error(`Invalid out_trade_no format: ${out_trade_no}`);
+      throw new ApiError(400, `订单号格式无效：${out_trade_no}`, 'INVALID_TRADE_NO');
     }
     const orderId = parseInt(out_trade_no.split('_')[1], 10);
 
@@ -1632,7 +1821,7 @@ export async function processPaymentNotification(notificationData: any) {
     });
 
     if (!order) {
-      throw new Error(`Order not found: ${orderId}`);
+      throw new ApiError(404, `订单不存在：${orderId}`, 'ORDER_NOT_FOUND');
     }
 
     // 4. Check if already processed (idempotency)
@@ -1643,13 +1832,13 @@ export async function processPaymentNotification(notificationData: any) {
 
     // 5. Validate order status
     if (order.status !== 'PENDING_PAYMENT') {
-      throw new Error(`Invalid order status: ${order.status}. Expected: PENDING_PAYMENT`);
+      throw new ApiError(409, `订单状态无效：${order.status}，期望：PENDING_PAYMENT`, 'ORDER_STATE_INVALID');
     }
 
     // 6. Validate amount (convert from cents to yuan)
     const expectedAmount = Math.round(Number(order.total_amount) * 100);
     if (amount.total !== expectedAmount) {
-      throw new Error(`Amount mismatch. Expected: ${expectedAmount}, Received: ${amount.total}`);
+      throw new ApiError(400, `金额不匹配。期望：${expectedAmount}，实际：${amount.total}`, 'AMOUNT_MISMATCH');
     }
 
     // 7. Update order status to paid
@@ -1760,26 +1949,80 @@ export async function cancelExpiredOrders() {
   });
 }
 
+export async function getOrderById(orderId: number) {
+  return prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    include: {
+      orderitem: {
+        include: {
+          inventoryitem: {
+            include: {
+              booksku: {
+                include: {
+                  bookmaster: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 
 ================================================================================
 ### FILE: miniprogram\app.js
 ================================================================================
 
-// app.js
+// miniprogram/app.js
 const auth = require('./utils/auth');
 
 App({
   onLaunch() {
-    // Perform login when the app launches
     auth.login()
       .then(res => {
         console.log('Login successful', res);
-        // You can store user info globally if needed
-        // this.globalData.userInfo = ...
+        this.checkTermsAgreement();
       })
       .catch(err => {
         console.error('Login failed on launch', err);
       });
+  },
+
+  checkTermsAgreement() {
+    const hasAgreed = wx.getStorageSync('hasAgreedToTerms');
+    if (!hasAgreed) {
+      wx.showModal({
+        title: '服务协议与隐私政策',
+        content: '欢迎使用！为了保障您的权益，请在使用前仔细阅读并同意我们的《用户服务协议》与《隐私政策》。您可以在"我的-设置"中随时查看。',
+        confirmText: '同意',
+        cancelText: '拒绝',
+        success: (res) => {
+          if (res.confirm) {
+            wx.setStorageSync('hasAgreedToTerms', true);
+          } else if (res.cancel) {
+            // 用户拒绝，可以引导退出或提示无法使用
+            wx.showToast({
+              title: '您需要同意协议才能使用本服务',
+              icon: 'none',
+              duration: 3000
+            });
+            // 简单处理，可以让用户无法进行核心操作
+          }
+        }
+      });
+    }
+  },
+
+  // 增加一个全局方法，方便其他页面调用
+  showTerms() {
+    wx.showModal({
+      title: '服务协议与隐私政策',
+      content: '这里是完整的《用户服务协议》与《隐私政策》内容...（此处应从服务器获取或本地预置长文本）',
+      showCancel: false,
+      confirmText: '我已知晓',
+    });
   }
 });
 
@@ -1794,13 +2037,16 @@ App({
     "pages/orders/index",
     "pages/profile/index",
     "pages/book-detail/index",
-    "pages/order-confirm/index"
+    "pages/order-confirm/index",
+    "pages/order-detail/index",
+    "pages/webview/index",
+    "pages/customer-service/index"
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#f8f9fa",
-    "navigationBarTitleText": "二手书市场",
-    "navigationBarTextStyle": "black"
+    "navigationBarBackgroundColor": "#2c5f2d",
+    "navigationBarTitleText": "校园书",
+    "navigationBarTextStyle": "white"
   },
   "tabBar": {
     "color": "#6b6b6b",
@@ -1839,44 +2085,109 @@ App({
 
 /* app.wxss */
 
-/* --- Global Design System --- */
-
-/* 1. Color Palette (based on UI mockups) */
+/* --- 1. 全局设计语言 (The Law) --- */
 page {
-  --primary-color: #2c5f2d; /* Brand Green */
-  --secondary-color: #558056;
-  --text-color-primary: #1a1a1a;
-  --text-color-secondary: #6b6b6b;
+  /* 色彩 (Color) */
+  --primary-color: #2c5f2d;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
   --background-color: #f8f9fa;
-  --card-background-color: #ffffff;
+  --card-background: #ffffff;
   --border-color: #e9ecef;
-  --price-color: #333; /* Price is now more subtle */
-}
+  --success-color: #28a745;
+  --error-color: #dc3545;
+  --warning-color: #ffc107;
 
-/* 2. Typography */
-page {
+  /* 排版 (Typography) */
+  --font-size-display: 48rpx;
+  --font-size-title: 36rpx;
+  --font-size-body: 28rpx;
+  --font-size-caption: 24rpx;
+  --font-weight-normal: 400;
+  --font-weight-bold: 600;
+
+  /* 间距 (Spacing) */
+  --space-xs: 8rpx;
+  --space-s: 16rpx;
+  --space-m: 24rpx;
+  --space-l: 32rpx;
+  --space-xl: 48rpx;
+
+  /* 基础样式 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 28rpx;
-  line-height: 1.6;
-  color: var(--text-color-primary);
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
   background-color: var(--background-color);
+  line-height: 1.6;
 }
 
-/* 3. Global Component Styles */
+/* --- 2. 全局组件 (Components) --- */
+
+/* 容器 */
 .container {
-  padding: 20rpx 30rpx;
+  padding: var(--space-m) var(--space-l);
 }
 
+/* 卡片 */
 .card {
-  background-color: var(--card-background-color);
+  background-color: var(--card-background);
   border-radius: 24rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+  padding: var(--space-l);
+  margin-bottom: var(--space-m);
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
 }
 
-/* --- Global Navigation Bar & TabBar --- */
-/* Note: These are configured in app.json, but we keep the design intent here */
+/* 按钮 */
+.btn {
+  display: inline-block;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 var(--space-l);
+  border-radius: 16rpx;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  text-align: center;
+  vertical-align: middle;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn:active {
+  opacity: 0.8;
+}
+.btn-primary {
+  background-color: var(--primary-color);
+  color: #ffffff;
+}
+.btn-sm {
+  height: 60rpx;
+  line-height: 60rpx;
+  padding: 0 var(--space-s);
+  font-size: var(--font-size-caption);
+  border-radius: 12rpx;
+}
+.btn[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 状态标签 */
+.status-tag {
+  display: inline-block;
+  padding: var(--space-xs) var(--space-s);
+  border-radius: 8rpx;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  color: #ffffff;
+}
+.status-tag.success { background-color: var(--success-color); }
+.status-tag.error { background-color: var(--error-color); }
+.status-tag.warning { background-color: var(--warning-color); }
+
+/* 全局点击反馈 */
+.item-hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
 
 
 ================================================================================
@@ -1885,7 +2196,7 @@ page {
 
 // miniprogram/config.js
 const config = {
-  apiBaseUrl: 'http://127.0.0.1:3000/api'
+  apiBaseUrl: 'http://172.20.10.4:3000/api'
 };
 
 module.exports = config;
@@ -1902,7 +2213,7 @@ module.exports = config;
 
 // pages/book-detail/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const { request } = require('../../utils/api');
 
 Page({
   data: {
@@ -1919,25 +2230,24 @@ Page({
     }
   },
 
-  fetchBookDetails(id) {
+  async fetchBookDetails(id) {
     this.setData({ isLoading: true, error: null });
-    wx.request({
-      url: `${config.apiBaseUrl}/inventory/item/${id}`,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          this.setData({ bookDetail: res.data });
-        } else {
-          this.setData({ error: '无法加载书籍详情' });
-        }
-      },
-      fail: (err) => {
-        this.setData({ error: '网络请求失败' });
-      },
-      complete: () => {
-        this.setData({ isLoading: false });
-      }
-    });
+    try {
+      const data = await request({
+        url: `/inventory/item/${id}`,
+        method: 'GET'
+      });
+      this.setData({ bookDetail: data });
+    } catch (error) {
+      console.error('API request failed', error);
+      this.setData({ error: error.error || '加载失败' });
+      wx.showToast({
+        title: error.error || '加载失败',
+        icon: 'none'
+      });
+    } finally {
+      this.setData({ isLoading: false });
+    }
   },
 
   handleBuyNow() {
@@ -1955,7 +2265,7 @@ Page({
 
 // pages/market/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const { request } = require('../../utils/api');
 
 Page({
   data: {
@@ -1971,31 +2281,32 @@ Page({
   },
 
   // MODIFIED: fetchAvailableBooks now takes a search term
-  fetchAvailableBooks() {
+  async fetchAvailableBooks() {
     this.setData({ isLoading: true, error: null });
-    let url = `${config.apiBaseUrl}/inventory/available`;
+    let url = `/inventory/available`;
     if (this.data.searchTerm) {
       url += `?search=${encodeURIComponent(this.data.searchTerm)}`;
     }
 
-    wx.request({
-      url: url,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          this.setData({ bookList: res.data });
-        } else {
-          this.setData({ error: '无法加载书籍列表', bookList: [] });
-        }
-      },
-      fail: (err) => {
-        console.error('API request failed', err);
-        this.setData({ error: '网络请求失败，请检查后端服务是否开启', bookList: [] });
-      },
-      complete: () => {
-        this.setData({ isLoading: false });
-      }
-    })
+    try {
+      const data = await request({
+        url: url,
+        method: 'GET'
+      });
+      this.setData({ bookList: data });
+    } catch (error) {
+      console.error('API request failed', error);
+      this.setData({ 
+        error: error.error || '加载失败', 
+        bookList: [] 
+      });
+      wx.showToast({
+        title: error.error || '加载失败',
+        icon: 'none'
+      });
+    } finally {
+      this.setData({ isLoading: false });
+    }
   },
 
   // NEW: Handle input change
@@ -2011,8 +2322,11 @@ Page({
     this.fetchAvailableBooks();
   },
 
-  // We are moving the "BuyNow" logic to the detail page,
-  // so the handleBuyNow function is removed from this page.
+  // Pull down refresh
+  async onPullDownRefresh() {
+    await this.fetchAvailableBooks();
+    wx.stopPullDownRefresh();
+  }
 });
 
 
@@ -2022,7 +2336,17 @@ Page({
 
 // pages/order-confirm/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const api = require('../../utils/api');
+
+function promisifiedPayment(options) {
+  return new Promise((resolve, reject) => {
+    wx.requestPayment({
+      ...options,
+      success: resolve,
+      fail: reject
+    });
+  });
+}
 
 Page({
   data: {
@@ -2040,27 +2364,28 @@ Page({
     }
   },
 
-  fetchBookDetails(id) {
+  async fetchBookDetails(id) {
     this.setData({ isLoading: true, error: null });
-    wx.request({
-      url: `${config.apiBaseUrl}/inventory/item/${id}`,
-      success: (res) => {
-        if (res.statusCode === 200 && res.data.status === 'in_stock') {
-          this.setData({ book: res.data });
-        } else {
-          this.setData({ error: res.data.error || '该书籍已售出或不可用' });
-        }
-      },
-      fail: (err) => {
-        this.setData({ error: '网络请求失败，无法获取书籍信息' });
-      },
-      complete: () => {
-        this.setData({ isLoading: false });
+    
+    try {
+      const data = await api.request({
+        url: `/inventory/item/${id}`,
+        method: 'GET'
+      });
+      
+      if (data.status === 'in_stock') {
+        this.setData({ book: data });
+      } else {
+        this.setData({ error: '该书籍已售出或不可用' });
       }
-    });
+    } catch (error) {
+      this.setData({ error: error.error || '网络请求失败，无法获取书籍信息' });
+    } finally {
+      this.setData({ isLoading: false });
+    }
   },
   
-  handlePayment() {
+  async handlePayment() {
     if (this.data.isSubmitting || !this.data.book) return;
     this.setData({ isSubmitting: true });
 
@@ -2073,66 +2398,41 @@ Page({
       return;
     }
 
-    wx.showLoading({ title: '正在创建订单...' });
+    try {
+      wx.showLoading({ title: '正在创建订单...' });
 
-    // Step 1: Create the order
-    wx.request({
-      url: `${config.apiBaseUrl}/orders/create`,
-      method: 'POST',
-      data: { userId, inventoryItemIds: [inventoryItemId] },
-      success: (createRes) => {
-        if (createRes.statusCode !== 201) {
-          wx.hideLoading();
-          wx.showToast({ title: createRes.data.error || '创建订单失败', icon: 'error' });
-          this.setData({ isSubmitting: false });
-          return;
-        }
-        
-        const orderId = createRes.data.id;
-        wx.showLoading({ title: '获取支付参数...' });
+      const createData = await api.request({
+        url: '/orders/create',
+        method: 'POST',
+        data: { inventoryItemIds: [inventoryItemId] }
+      });
 
-        // Step 2: Get payment parameters
-        wx.request({
-          url: `${config.apiBaseUrl}/orders/${orderId}/pay`,
-          method: 'POST',
-          data: { openid: auth.getToken() },
-          success: (payRes) => {
-            wx.hideLoading();
-            if (payRes.statusCode !== 200) {
-              wx.showToast({ title: payRes.data.error || '获取支付参数失败', icon: 'error' });
-              this.setData({ isSubmitting: false });
-              return;
-            }
+      const orderId = createData.id;
+      wx.showLoading({ title: '获取支付参数...' });
 
-            const payParams = payRes.data.result;
-            // Step 3: Request payment
-            wx.requestPayment({
-              ...payParams,
-              success: (paymentSuccessRes) => {
-                wx.showToast({ title: '支付成功', icon: 'success' });
-                setTimeout(() => {
-                  wx.switchTab({ url: '/pages/orders/index' });
-                }, 1500);
-              },
-              fail: (paymentFailRes) => {
-                wx.showToast({ title: '支付已取消', icon: 'none' });
-                this.setData({ isSubmitting: false });
-              }
-            });
-          },
-          fail: (err) => {
-            wx.hideLoading();
-            wx.showToast({ title: '网络请求失败', icon: 'error' });
-            this.setData({ isSubmitting: false });
-          }
-        });
-      },
-      fail: (err) => {
-        wx.hideLoading();
-        wx.showToast({ title: '网络请求失败', icon: 'error' });
+      const payParams = await api.request({
+        url: `/orders/${orderId}/pay`,
+        method: 'POST' // body为空，所有信息都在JWT里
+      });
+
+      wx.hideLoading();
+
+      try {
+        await promisifiedPayment(payParams); // 直接使用后端返回的签名参数
+        wx.showToast({ title: '支付成功', icon: 'success' });
+        setTimeout(() => {
+          wx.switchTab({ url: '/pages/orders/index' });
+        }, 1500);
+      } catch (paymentError) {
+        wx.showToast({ title: '支付已取消', icon: 'none' });
         this.setData({ isSubmitting: false });
       }
-    });
+
+    } catch (error) {
+      wx.hideLoading();
+      wx.showToast({ title: error.error || '网络请求失败', icon: 'error' });
+      this.setData({ isSubmitting: false });
+    }
   }
 });
 
@@ -2143,7 +2443,7 @@ Page({
 
 // pages/orders/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
 
 Page({
@@ -2154,16 +2454,36 @@ Page({
     statusMap: ORDER_STATUS,
   },
   onShow() { this.fetchUserOrders(); },
-  fetchUserOrders() {
+  navigateToDetail(event) {
+    const orderId = event.currentTarget.dataset.orderId;
+    if (orderId) {
+      wx.navigateTo({
+        url: `/pages/order-detail/index?id=${orderId}`
+      });
+    }
+  },
+  async fetchUserOrders() {
     const userId = auth.getUserId();
     if (!userId) { return; }
     this.setData({ isLoading: true, error: null });
-    wx.request({
-      url: `${config.apiBaseUrl}/orders/user/${userId}`,
-      success: (res) => { this.setData({ orderList: res.data }); },
-      fail: (err) => { this.setData({ error: '加载订单失败。' }); },
-      complete: () => { this.setData({ isLoading: false }); }
-    });
+    
+    try {
+      const data = await request({
+        url: `/orders/user/${userId}`,
+        method: 'GET'
+      });
+      this.setData({ orderList: data });
+    } catch (error) {
+      this.setData({ error: error.error || '加载订单失败。' });
+    } finally {
+      this.setData({ isLoading: false });
+    }
+  },
+
+  // Pull down refresh
+  async onPullDownRefresh() {
+    await this.fetchUserOrders();
+    wx.stopPullDownRefresh();
   }
 });
 
@@ -2173,34 +2493,34 @@ Page({
 ================================================================================
 
 // utils/auth.js
-const config = require('../config');
+const { request } = require('./api');
 const TOKEN_KEY = 'authToken';
 const USER_ID_KEY = 'userId';
 
 const login = () => {
   return new Promise((resolve, reject) => {
     wx.login({
-      success: (res) => {
+      success: async (res) => {
         if (res.code) {
-          wx.request({
-            url: `${config.apiBaseUrl}/auth/login`,
-            method: 'POST',
-            data: {
-              code: res.code
-            },
-            success: (loginRes) => {
-              if (loginRes.statusCode === 200 && loginRes.data.token) {
-                setToken(loginRes.data.token);
-                setUserId(loginRes.data.userId);
-                resolve(loginRes.data);
-              } else {
-                reject(new Error('Login failed on server.'));
+          try {
+            const data = await request({
+              url: '/auth/login',
+              method: 'POST',
+              data: {
+                code: res.code
               }
-            },
-            fail: (err) => {
-              reject(err);
+            });
+            
+            if (data.token) {
+              setToken(data.token);
+              setUserId(data.userId);
+              resolve(data);
+            } else {
+              reject(new Error('Login failed on server.'));
             }
-          });
+          } catch (error) {
+            reject(new Error(error.error || 'Login failed on server.'));
+          }
         } else {
           reject(new Error('wx.login failed, no code returned.'));
         }

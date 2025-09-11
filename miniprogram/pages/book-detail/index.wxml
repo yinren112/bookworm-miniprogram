@@ -1,15 +1,7 @@
 <!-- pages/book-detail/index.wxml -->
 <view class="container">
   <!-- Skeleton -->
-  <view wx:if="{{isLoading}}" class="skeleton-container">
-    <view class="skeleton-image-large"></view>
-    <view class="skeleton-text title"></view>
-    <view class="skeleton-text"></view>
-    <view class="skeleton-text short"></view>
-    <view class="skeleton-divider"></view>
-    <view class="skeleton-text"></view>
-    <view class="skeleton-text"></view>
-  </view>
+  <skeleton wx:if="{{isLoading}}" type="detail" />
 
   <!-- Real Content -->
   <view wx:if="{{!isLoading && bookDetail}}" class="detail-container animated">

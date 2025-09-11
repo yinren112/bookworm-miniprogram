@@ -9,20 +9,24 @@
   </view>
 
   <view class="menu-card card">
-    <view class="menu-item" bindtap="copyWechatId">
+    <view class="menu-item" bindtap="copyWechatId" hover-class="item-hover">
       <text class="menu-text">联系客服</text>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </view>
-    <button class="menu-item share-button" open-type="share">
+    <button class="menu-item share-button" open-type="share" hover-class="item-hover">
       <text class="menu-text">分享给好友</text>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </button>
-    <view class="menu-item" bindtap="showTerms">
+    <view class="menu-item" bindtap="showTerms" hover-class="item-hover">
       <text class="menu-text">用户服务协议</text>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </view>
-    <view class="menu-item" bindtap="showTerms">
+    <view class="menu-item" bindtap="showPrivacy" hover-class="item-hover">
       <text class="menu-text">隐私政策</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+    <view class="menu-item" bindtap="goToCustomerService" hover-class="item-hover">
+      <text class="menu-text">联系客服与帮助</text>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </view>
   </view>

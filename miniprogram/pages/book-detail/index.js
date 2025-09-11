@@ -1,6 +1,6 @@
 // pages/book-detail/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const { request } = require('../../utils/api');
 
 Page({
   data: {
@@ -17,25 +17,24 @@ Page({
     }
   },
 
-  fetchBookDetails(id) {
+  async fetchBookDetails(id) {
     this.setData({ isLoading: true, error: null });
-    wx.request({
-      url: `${config.apiBaseUrl}/inventory/item/${id}`,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          this.setData({ bookDetail: res.data });
-        } else {
-          this.setData({ error: '无法加载书籍详情' });
-        }
-      },
-      fail: (err) => {
-        this.setData({ error: '网络请求失败' });
-      },
-      complete: () => {
-        this.setData({ isLoading: false });
-      }
-    });
+    try {
+      const data = await request({
+        url: `/inventory/item/${id}`,
+        method: 'GET'
+      });
+      this.setData({ bookDetail: data });
+    } catch (error) {
+      console.error('API request failed', error);
+      this.setData({ error: error.error || '加载失败' });
+      wx.showToast({
+        title: error.error || '加载失败',
+        icon: 'none'
+      });
+    } finally {
+      this.setData({ isLoading: false });
+    }
   },
 
   handleBuyNow() {

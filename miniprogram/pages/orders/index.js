@@ -1,6 +1,6 @@
 // pages/orders/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
 
 Page({
@@ -11,15 +11,35 @@ Page({
     statusMap: ORDER_STATUS,
   },
   onShow() { this.fetchUserOrders(); },
-  fetchUserOrders() {
+  navigateToDetail(event) {
+    const orderId = event.currentTarget.dataset.orderId;
+    if (orderId) {
+      wx.navigateTo({
+        url: `/pages/order-detail/index?id=${orderId}`
+      });
+    }
+  },
+  async fetchUserOrders() {
     const userId = auth.getUserId();
     if (!userId) { return; }
     this.setData({ isLoading: true, error: null });
-    wx.request({
-      url: `${config.apiBaseUrl}/orders/user/${userId}`,
-      success: (res) => { this.setData({ orderList: res.data }); },
-      fail: (err) => { this.setData({ error: '加载订单失败。' }); },
-      complete: () => { this.setData({ isLoading: false }); }
-    });
+    
+    try {
+      const data = await request({
+        url: `/orders/user/${userId}`,
+        method: 'GET'
+      });
+      this.setData({ orderList: data });
+    } catch (error) {
+      this.setData({ error: error.error || '加载订单失败。' });
+    } finally {
+      this.setData({ isLoading: false });
+    }
+  },
+
+  // Pull down refresh
+  async onPullDownRefresh() {
+    await this.fetchUserOrders();
+    wx.stopPullDownRefresh();
   }
 });

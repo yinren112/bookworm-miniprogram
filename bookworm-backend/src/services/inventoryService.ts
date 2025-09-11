@@ -14,11 +14,10 @@ interface AddBookInput {
 }
 
 export async function addBookToInventory(input: AddBookInput) {
+  // Fetch external metadata BEFORE the transaction to avoid locking the database
+  const metadata = await getBookMetadata(input.isbn13).catch(() => null);
+  
   return prisma.$transaction(async (tx) => {
-    
-    // NEW: Attempt to fetch external metadata
-    const metadata = await getBookMetadata(input.isbn13);
-    
     // Step 1: Find or create the master book record (based on ISBN).
     // Use metadata if available, otherwise use input data (manual entry)
     const bookMaster = await tx.bookmaster.upsert({

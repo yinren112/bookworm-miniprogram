@@ -17,7 +17,21 @@ Page({
   },
 
   showTerms() {
-    app.showTerms(); // 调用在app.js里定义的全局方法
+    wx.navigateTo({
+      url: '/pages/webview/index?slug=terms-of-service'
+    });
+  },
+
+  showPrivacy() {
+    wx.navigateTo({
+      url: '/pages/webview/index?slug=privacy-policy'
+    });
+  },
+
+  goToCustomerService() {
+    wx.navigateTo({
+      url: '/pages/customer-service/index'
+    });
   },
 
   onShareAppMessage() {

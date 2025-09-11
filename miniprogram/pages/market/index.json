@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "二手书市场"
+  "navigationBarTitleText": "书市",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "skeleton": "../../components/skeleton/skeleton"
+  }
 }

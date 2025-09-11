@@ -4,13 +4,16 @@
     "pages/orders/index",
     "pages/profile/index",
     "pages/book-detail/index",
-    "pages/order-confirm/index"
+    "pages/order-confirm/index",
+    "pages/order-detail/index",
+    "pages/webview/index",
+    "pages/customer-service/index"
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#f8f9fa",
-    "navigationBarTitleText": "二手书市场",
-    "navigationBarTextStyle": "black"
+    "navigationBarBackgroundColor": "#2c5f2d",
+    "navigationBarTitleText": "校园书",
+    "navigationBarTextStyle": "white"
   },
   "tabBar": {
     "color": "#6b6b6b",

@@ -12,7 +12,7 @@ model Order {
   user_id           Int
   status            OrderStatus @default(PENDING_PAYMENT)
   total_amount      Decimal     @db.Decimal(10, 2)
-  pickup_code       String      @unique @db.VarChar(10)
+  pickup_code       String      @unique @db.VarChar(16)
   createdAt         DateTime    @default(now()) @db.Timestamptz(6)
   paymentExpiresAt  DateTime    @db.Timestamptz(6)
   pickupExpiresAt   DateTime?   @db.Timestamptz(6)
@@ -21,6 +21,7 @@ model Order {
   cancelled_at      DateTime?   @db.Timestamptz(6)
   User              User        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
   orderitem         orderitem[]
+  PaymentRecord     PaymentRecord[]
 
   @@index([user_id, status], map: "idx_order_user_id_status")
 }
@@ -28,8 +29,10 @@ model Order {
 model User {
   id         Int      @id @default(autoincrement())
   openid     String   @unique @db.VarChar(255)
+  unionid    String?  @unique @db.VarChar(255)
   nickname   String?  @db.VarChar(255)
   avatar_url String?  @db.VarChar(255)
+  role       Role     @default(USER)
   created_at DateTime @default(now()) @db.Timestamptz(6)
   Order      Order[]
 }
@@ -42,7 +45,7 @@ model bookmaster {
   publisher      String?   @db.VarChar(255)
   original_price Decimal?  @db.Decimal(10, 2)
   created_at     DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @updatedAt @db.Timestamptz(6)
   booksku        booksku[]
 
   @@index([isbn13], map: "idx_book_master_isbn13")
@@ -55,13 +58,15 @@ model booksku {
   description     String?
   cover_image_url String?         @db.VarChar(255)
   created_at      DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @updatedAt @db.Timestamptz(6)
   bookmaster      bookmaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
   inventoryitem   inventoryitem[]
 
   @@unique([master_id, edition])
 }
 
+// 注意: Prisma 的 @updatedAt 在 `updateMany` 操作时不会自动触发。
+// 在批量更新 inventoryitem 状态的后台任务中，必须手动设置 `updated_at: new Date()`。
 model inventoryitem {
   id            Int              @id @default(autoincrement())
   sku_id        Int
@@ -70,26 +75,43 @@ model inventoryitem {
   selling_price Decimal          @db.Decimal(10, 2)
   status        inventory_status @default(in_stock)
   created_at    DateTime         @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime         @updatedAt @db.Timestamptz(6)
   booksku       booksku          @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
-  orderitem     orderitem?
+  orderitem     orderitem[]
 
   @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
 }
 
+// 注意：`inventory_item_id` 不再是唯一的。
+// 库存的唯一售出保证，由 `inventoryitem.status` 的状态流转（in_stock -> reserved -> sold）
+// 在 `createOrder` 服务的原子化事务中严格控制。
+// 保留所有 orderitem 记录（包括已取消的）用于数据审计。
 model orderitem {
   id                Int           @id @default(autoincrement())
   order_id          Int
-  inventory_item_id Int           @unique
+  inventory_item_id Int
   price             Decimal       @db.Decimal(10, 2)
   inventoryitem     inventoryitem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
   Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
+  
+  @@index([inventory_item_id], map: "idx_orderitem_inventory_item_id")
+}
+
+model Content {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique @db.VarChar(255)
+  title     String   @db.VarChar(255)
+  body      String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@index([slug], map: "idx_content_slug")
 }
 
 enum book_condition {
-  A
-  B
-  C
+  NEW        // A - 全新或接近全新
+  GOOD       // B - 有轻微使用痕迹，无破损
+  ACCEPTABLE // C - 有明显使用痕迹、笔记或轻微破损，但不影响阅读
 }
 
 enum inventory_status {
@@ -100,10 +122,45 @@ enum inventory_status {
   damaged
 }
 
+enum Role {
+  USER
+  STAFF
+}
+
 enum OrderStatus {
   PENDING_PAYMENT
   PENDING_PICKUP
   COMPLETED
   CANCELLED
   RETURNED
+}
+
+model PaymentRecord {
+  id             Int      @id @default(autoincrement())
+  order_id       Int
+  out_trade_no   String   @unique @db.VarChar(100)
+  transaction_id String?  @unique @db.VarChar(100)
+  status         PaymentStatus @default(PENDING)
+  amount_total   Int      // 微信支付侧的金额，单位：分
+  payer_openid   String?  @db.VarChar(255)
+  appid          String?  @db.VarChar(100)
+  mchid          String?  @db.VarChar(100)
+  
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+  notified_at    DateTime? // 微信通知首次到达时间
+  refunded_at    DateTime? // 退款完成时间
+
+  Order          Order    @relation(fields: [order_id], references: [id])
+  
+  @@index([order_id])
+  @@index([status, createdAt])
+}
+
+enum PaymentStatus {
+  PENDING         // 待支付
+  SUCCESS         // 支付成功
+  REFUND_REQUIRED // 需退款（如订单已取消但支付成功）
+  REFUNDED        // 已退款
+  FAILED          // 支付失败
 }

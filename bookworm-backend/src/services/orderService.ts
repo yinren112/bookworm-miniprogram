@@ -1,61 +1,107 @@
 // src/services/orderService.ts (fully replaced)
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import WechatPay from 'wechatpay-node-v3';
+import * as crypto from 'crypto';
+const WechatPay = require('wechatpay-node-v3');
 import config from '../config';
 import prisma from '../db';
+import { ApiError } from '../errors';
 
-// ... (ItemNotAvailableError class remains the same)
-export class ItemNotAvailableError extends Error {
-  constructor(message: string) { super(message); this.name = 'ItemNotAvailableError'; }
-}
-
-// NEW: Custom error for fulfillment logic
-export class FulfillmentError extends Error {
-  constructor(message: string) { super(message); this.name = 'FulfillmentError'; }
+// 通用的事务重试辅助函数
+async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      // 检查是否为 Prisma 的序列化失败
+      if (e.code === 'P2034' || e.message?.includes('could not serialize')) {
+        // 指数退避+抖动等待
+        await new Promise(r => setTimeout(r, 20 * Math.pow(2, i) + Math.random() * 40));
+        continue;
+      }
+      // 非可重试错误，立即抛出
+      throw e;
+    }
+  }
+  // 重试3次后仍失败
+  throw new ApiError(409, '系统繁忙，请稍后重试', 'TX_RETRY_EXCEEDED');
 }
 
 export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
-  return prisma.$transaction(async (tx) => {
-    // ... (user upsert logic is the same)
-    const user = await tx.user.upsert({
-      where: { id: input.userId },
-      update: {},
-      create: { id: input.userId, openid: `fake_openid_${input.userId}_${Date.now()}` }
-    });
+    return withTxRetry(() => prisma.$transaction(async (tx) => {
+        const itemIds = Array.from(new Set(input.inventoryItemIds));
+        if (itemIds.length === 0) {
+            throw new ApiError(400, '没有选择任何书籍', 'EMPTY_ITEMS');
+        }
 
-    // ... (item fetching and validation is the same)
-    const items = await tx.inventoryitem.findMany({ where: { id: { in: input.inventoryItemIds } } });
-    if (items.length !== input.inventoryItemIds.length) { throw new ItemNotAvailableError('One or more items do not exist.'); }
-    for (const item of items) { if (item.status !== 'in_stock') { throw new ItemNotAvailableError(`Item ${item.id} is not available.`); } }
+        // 1. 原子抢占：尝试将 'in_stock' 状态更新为 'reserved'
+        const updateResult = await tx.inventoryitem.updateMany({
+            where: {
+                id: { in: itemIds },
+                status: 'in_stock'
+            },
+            data: { status: 'reserved' }
+        });
 
-    const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.selling_price.toString()), 0);
+        // 2. 检查结果：如果更新的行数不等于请求的物品数量，说明有物品被别人抢先了
+        if (updateResult.count !== itemIds.length) {
+            // 事务会自动回滚所有更改，所以我们只需要抛出错误
+            throw new ApiError(409, '部分书籍已被抢购，请重新下单', 'INSUFFICIENT_INVENTORY');
+        }
 
-    const order = await tx.order.create({
-      data: {
-        user_id: user.id,
-        status: 'PENDING_PAYMENT',
-        total_amount: totalAmount,
-        pickup_code: randomBytes(3).toString('hex').toUpperCase(),
-        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-      },
-    });
+        // 3. 读取已成功抢占的物品信息，用于计算总价
+        const reservedItems = await tx.inventoryitem.findMany({
+            where: { id: { in: itemIds } }
+        });
 
-    await tx.orderitem.createMany({
-      data: items.map(item => ({
-        order_id: order.id,
-        inventory_item_id: item.id,
-        price: item.selling_price,
-      })),
-    });
+        const totalAmount = reservedItems.reduce(
+            (sum, item) => sum.add(new Prisma.Decimal(item.selling_price)),
+            new Prisma.Decimal(0)
+        );
 
-    await tx.inventoryitem.updateMany({
-      where: { id: { in: input.inventoryItemIds } },
-      data: { status: 'reserved' },
-    });
+        // 4. 创建订单（包含 pickup_code 重试逻辑）
+        let order;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const pickup_code = crypto.randomBytes(5).toString('hex').toUpperCase().substring(0, 8);
+            try {
+                order = await tx.order.create({
+                    data: {
+                        user_id: input.userId,
+                        status: 'PENDING_PAYMENT',
+                        total_amount: totalAmount,
+                        pickup_code,
+                        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15分钟后过期
+                    },
+                });
+                break; // 成功创建订单，跳出循环
+            } catch (e: any) {
+                // 检查是否为 pickup_code 唯一约束冲突
+                if (e.code === 'P2002' && e.meta?.target?.includes('pickup_code')) {
+                    continue; // 重试生成新的 pickup_code
+                }
+                // 其他错误直接抛出
+                throw e;
+            }
+        }
+        
+        // 如果5次重试后仍无法生成唯一的 pickup_code
+        if (!order) {
+            throw new ApiError(500, '无法生成唯一订单取货码', 'PICKUP_CODE_GEN_FAILED');
+        }
 
-    return order;
-  });
+        // 5. 创建订单项
+        await tx.orderitem.createMany({
+            data: reservedItems.map(item => ({
+                order_id: order.id,
+                inventory_item_id: item.id,
+                price: item.selling_price,
+            })),
+        });
+
+        return order;
+    }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // 使用最高隔离级别保证一致性
+    }));
 }
 
 export async function getOrdersByUserId(userId: number) {
@@ -78,10 +124,10 @@ export async function fulfillOrder(pickupCode: string) {
 
     // 2. Validate
     if (!order) {
-      throw new FulfillmentError(`取货码 "${pickupCode}" 无效。`);
+      throw new ApiError(404, `取货码 "${pickupCode}" 无效`, 'INVALID_PICKUP_CODE');
     }
     if (order.status !== 'PENDING_PICKUP') {
-      throw new FulfillmentError(`此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`);
+      throw new ApiError(409, `此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`, 'ORDER_STATE_INVALID');
     }
 
     // 3. Update the Order status
@@ -104,129 +150,147 @@ export async function fulfillOrder(pickupCode: string) {
   });
 }
 
-// NEW: Generate WeChat Pay payment parameters
-export async function generatePaymentParams(pay: WechatPay, orderId: number, openid: string) {
-  // 1. Fetch the order details
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      orderitem: {
-        include: {
-          inventoryitem: {
-            include: {
-              booksku: {
-                include: {
-                  bookmaster: true
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
+export async function generatePaymentParams(pay: any, orderId: number, userId: number) {
+    return prisma.$transaction(async (tx) => {
+        const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+        if (order.user_id !== userId) throw new ApiError(403, '无权支付此订单', 'FORBIDDEN');
+        if (order.status !== 'PENDING_PAYMENT') throw new ApiError(409, '订单状态不正确', 'ORDER_STATE_INVALID');
 
-  if (!order) {
-    throw new Error('Order not found');
-  }
+        const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { openid: true } });
+        
+        // 创建或查找 PaymentRecord，使用精确的金额计算
+        const amount_total = new Prisma.Decimal(order.total_amount).mul(100).toDecimalPlaces(0).toNumber();
+        const out_trade_no = `BOOKWORM_${order.id}`;
+        
+        const paymentRecord = await tx.paymentRecord.upsert({
+            where: { out_trade_no },
+            create: {
+                out_trade_no,
+                order_id: order.id,
+                status: 'PENDING',
+                amount_total,
+                appid: config.wxAppId,
+                mchid: config.wxPayMchId
+            },
+            update: {}
+        });
+        
+        const orderItems = await tx.orderitem.findMany({ 
+            where: { order_id: orderId },
+            include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } }
+        });
+        const titles = orderItems.map(i => i.inventoryitem.booksku.bookmaster.title);
+        const description = titles.slice(0, 3).join('、') + (titles.length > 3 ? `等${titles.length}本书籍` : '');
 
-  if (order.status !== 'PENDING_PAYMENT') {
-    throw new Error('Order is not in PENDING_PAYMENT status');
-  }
+        const unifiedOrderResult = await pay.transactions_jsapi({
+            appid: config.wxAppId!,
+            mchid: config.wxPayMchId!,
+            description,
+            out_trade_no,
+            notify_url: config.wxPayNotifyUrl!,
+            time_expire: new Date(order.paymentExpiresAt).toISOString(),
+            amount: { total: amount_total, currency: 'CNY' },
+            payer: { openid: user.openid }
+        });
 
+        const { prepay_id } = unifiedOrderResult as any;
+        if (!prepay_id) throw new ApiError(500, '微信下单失败，未返回prepay_id', 'WECHAT_PAY_ERROR');
+        
+        const timeStamp = Math.floor(Date.now() / 1000).toString();
+        const nonceStr = crypto.randomBytes(16).toString('hex');
+        const pkg = `prepay_id=${prepay_id}`;
+        const toSign = `${config.wxAppId}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
 
-  // 3. Generate description from order items
-  const bookTitles = order.orderitem.map(item => 
-    item.inventoryitem.booksku.bookmaster.title
-  ).slice(0, 3); // Limit to first 3 books
-  const description = bookTitles.length > 3 
-    ? `${bookTitles.join('、')}等${order.orderitem.length}本书籍`
-    : bookTitles.join('、');
+        const paySign = pay.sign(toSign);
 
-  // 4. Call WeChat Pay unified order API
-  const unifiedOrderParams = {
-    appid: config.wxAppId,
-    mchid: config.wxPayMchId,
-    description: description,
-    out_trade_no: `BOOKWORM_${order.id}`, // Simple and unique
-    notify_url: config.wxPayNotifyUrl || '',
-    amount: {
-      total: Math.round(Number(order.total_amount) * 100), // Convert to cents
-      currency: 'CNY'
-    },
-    payer: {
-      openid: openid
-    }
-  };
-
-  try {
-    const result = await pay.transactions_jsapi(unifiedOrderParams);
-    
-    // 5. Return the result for mini-program payment
-    return {
-      result,
-      outTradeNo: unifiedOrderParams.out_trade_no
-    };
-  } catch (error) {
-    console.error('WeChat Pay API error:', error);
-    throw new Error('Failed to generate payment parameters');
-  }
+        return { timeStamp, nonceStr, package: pkg, signType: 'RSA', paySign };
+    });
 }
 
-// NEW: Process WeChat Pay payment notification
+// NEW: Process WeChat Pay payment notification with strict idempotency
 export async function processPaymentNotification(notificationData: any) {
   return prisma.$transaction(async (tx) => {
-    const { out_trade_no, transaction_id, trade_state, amount } = notificationData;
+    const { 
+      out_trade_no, 
+      transaction_id, 
+      trade_state, 
+      amount, 
+      payer, 
+      mchid, 
+      appid 
+    } = notificationData;
     
-    // 1. Validate payment success
-    if (trade_state !== 'SUCCESS') {
-      throw new Error(`Payment not successful. Trade state: ${trade_state}`);
-    }
-
-    // 2. Extract order ID from out_trade_no (format: BOOKWORM_{orderId})
-    if (!out_trade_no.startsWith('BOOKWORM_')) {
-      throw new Error(`Invalid out_trade_no format: ${out_trade_no}`);
-    }
-    const orderId = parseInt(out_trade_no.split('_')[1], 10);
-
-    // 3. Find and validate the order
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { orderitem: true }
+    // 1. 幂等性检查 (第一道防线)
+    const paymentRecord = await tx.paymentRecord.findUnique({
+      where: { out_trade_no },
+      include: { Order: true }
     });
-
-    if (!order) {
-      throw new Error(`Order not found: ${orderId}`);
+    
+    if (!paymentRecord || paymentRecord.status === 'SUCCESS') {
+      console.log(`Payment notification for ${out_trade_no} already processed or unknown. Skipping.`);
+      return paymentRecord;
     }
-
-    // 4. Check if already processed (idempotency)
-    if (order.status === 'PENDING_PICKUP') {
-      console.log(`Order ${orderId} already marked as paid. Skipping.`);
-      return order;
+    
+    // 2. 数据校验 (第二道防线)
+    if (mchid && mchid !== config.wxPayMchId) {
+      throw new ApiError(400, `商户号不匹配。期望：${config.wxPayMchId}，实际：${mchid}`, 'MCHID_MISMATCH');
     }
-
-    // 5. Validate order status
-    if (order.status !== 'PENDING_PAYMENT') {
-      throw new Error(`Invalid order status: ${order.status}. Expected: PENDING_PAYMENT`);
+    
+    if (appid && appid !== config.wxAppId) {
+      throw new ApiError(400, `应用ID不匹配。期望：${config.wxAppId}，实际：${appid}`, 'APPID_MISMATCH');
     }
-
-    // 6. Validate amount (convert from cents to yuan)
-    const expectedAmount = Math.round(Number(order.total_amount) * 100);
-    if (amount.total !== expectedAmount) {
-      throw new Error(`Amount mismatch. Expected: ${expectedAmount}, Received: ${amount.total}`);
+    
+    if (amount.total !== paymentRecord.amount_total) {
+      throw new ApiError(400, `金额不匹配。期望：${paymentRecord.amount_total}，实际：${amount.total}`, 'AMOUNT_MISMATCH');
     }
-
-    // 7. Update order status to paid
-    const updatedOrder = await tx.order.update({
-      where: { id: orderId },
+    
+    // 3. 验证支付状态
+    if (trade_state !== 'SUCCESS') {
+      console.log(`Payment for ${out_trade_no} failed with state: ${trade_state}`);
+      // 可以选择更新 PaymentRecord 状态为 FAILED
+      return null;
+    }
+    
+    // 4. 核心状态更新
+    const updatedPaymentRecord = await tx.paymentRecord.update({
+      where: { out_trade_no },
       data: {
-        status: 'PENDING_PICKUP',
-        paid_at: new Date()
+        status: 'SUCCESS',
+        transaction_id,
+        payer_openid: payer?.openid,
+        notified_at: new Date()
       }
     });
-
-    console.log(`Order ${orderId} successfully marked as paid`);
-    return updatedOrder;
+    
+    // 5. 关联订单状态处理
+    const order = paymentRecord.Order;
+    
+    // 处理"迟到支付"
+    if (order.status === 'CANCELLED') {
+      await tx.paymentRecord.update({
+        where: { out_trade_no },
+        data: { status: 'REFUND_REQUIRED' }
+      });
+      console.error(`CRITICAL: Payment succeeded for cancelled order ${order.id}. Marked for refund.`);
+      return updatedPaymentRecord;
+    }
+    
+    // 处理正常支付
+    if (order.status === 'PENDING_PAYMENT') {
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'PENDING_PICKUP',
+          paid_at: new Date()
+        }
+      });
+      console.log(`Order ${order.id} successfully marked as paid`);
+      return updatedPaymentRecord;
+    }
+    
+    // 其他状态的警告处理
+    console.warn(`Payment notification for order ${order.id} with unexpected status: ${order.status}`);
+    return updatedPaymentRecord;
   });
 }
 
@@ -321,5 +385,26 @@ export async function cancelExpiredOrders() {
     
     console.log(`Cancelled ${expiredOrderIds.length} orders and released ${inventoryItemIdsToRelease.length} items back to stock.`);
     return { cancelledCount: expiredOrderIds.length };
+  });
+}
+
+export async function getOrderById(orderId: number) {
+  return prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    include: {
+      orderitem: {
+        include: {
+          inventoryitem: {
+            include: {
+              booksku: {
+                include: {
+                  bookmaster: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   });
 }

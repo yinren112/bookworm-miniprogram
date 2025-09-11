@@ -1,6 +1,6 @@
 // pages/market/index.js
 const auth = require('../../utils/auth');
-const config = require('../../config');
+const { request } = require('../../utils/api');
 
 Page({
   data: {
@@ -16,31 +16,32 @@ Page({
   },
 
   // MODIFIED: fetchAvailableBooks now takes a search term
-  fetchAvailableBooks() {
+  async fetchAvailableBooks() {
     this.setData({ isLoading: true, error: null });
-    let url = `${config.apiBaseUrl}/inventory/available`;
+    let url = `/inventory/available`;
     if (this.data.searchTerm) {
       url += `?search=${encodeURIComponent(this.data.searchTerm)}`;
     }
 
-    wx.request({
-      url: url,
-      method: 'GET',
-      success: (res) => {
-        if (res.statusCode === 200) {
-          this.setData({ bookList: res.data });
-        } else {
-          this.setData({ error: '无法加载书籍列表', bookList: [] });
-        }
-      },
-      fail: (err) => {
-        console.error('API request failed', err);
-        this.setData({ error: '网络请求失败，请检查后端服务是否开启', bookList: [] });
-      },
-      complete: () => {
-        this.setData({ isLoading: false });
-      }
-    })
+    try {
+      const data = await request({
+        url: url,
+        method: 'GET'
+      });
+      this.setData({ bookList: data });
+    } catch (error) {
+      console.error('API request failed', error);
+      this.setData({ 
+        error: error.error || '加载失败', 
+        bookList: [] 
+      });
+      wx.showToast({
+        title: error.error || '加载失败',
+        icon: 'none'
+      });
+    } finally {
+      this.setData({ isLoading: false });
+    }
   },
 
   // NEW: Handle input change
@@ -56,6 +57,9 @@ Page({
     this.fetchAvailableBooks();
   },
 
-  // We are moving the "BuyNow" logic to the detail page,
-  // so the handleBuyNow function is removed from this page.
+  // Pull down refresh
+  async onPullDownRefresh() {
+    await this.fetchAvailableBooks();
+    wx.stopPullDownRefresh();
+  }
 });

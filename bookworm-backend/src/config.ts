@@ -1,6 +1,6 @@
 // src/config.ts
-import dotenv from 'dotenv';
-import fs from 'fs';
+import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 
 dotenv.config();
 
@@ -9,7 +9,7 @@ const config = {
   port: process.env.PORT || 3000,
   
   // JWT config
-  jwtSecret: process.env.JWT_SECRET || 'default-secret-for-dev',
+  jwtSecret: process.env.JWT_SECRET,
 
   // WeChat Mini Program config
   wxAppId: process.env.WX_APP_ID || 'YOUR_APP_ID',
@@ -42,8 +42,11 @@ const config = {
 };
 
 // Validate essential configs
-if (config.jwtSecret === 'default-secret-for-dev') {
-    console.warn('!!! WARNING: Using default JWT_SECRET. Please set it in .env file for production.');
+if (process.env.NODE_ENV === 'production' && !config.jwtSecret) {
+    console.error('!!! FATAL ERROR: JWT_SECRET is required in production. Set it in .env file.');
+    process.exit(1);
+} else if (!config.jwtSecret) {
+    console.warn('!!! WARNING: JWT_SECRET is not configured. Set it in .env file.');
 }
 if (config.wxAppId === 'YOUR_APP_ID' || config.wxAppSecret === 'YOUR_APP_SECRET') {
     console.warn('!!! WARNING: WX_APP_ID or WX_APP_SECRET are not configured in .env file.');

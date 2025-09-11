@@ -3,6 +3,13 @@
 document.addEventListener('DOMContentLoaded', () => {
 
   /**
+   * 从 localStorage 获取员工令牌
+   */
+  function getStaffToken() {
+    return localStorage.getItem('staffToken');
+  }
+
+  /**
    * A reusable utility to show messages in a designated area.
    * @param {HTMLElement} area The message container element.
    * @param {string} text The message to display.
@@ -40,7 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const response = await fetch('/api/inventory/add', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getStaffToken()}`
+          },
           body: JSON.stringify(data),
         });
         const result = await response.json();
@@ -74,7 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const response = await fetch('/api/orders/fulfill', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getStaffToken()}`
+          },
           body: JSON.stringify({ pickupCode }),
         });
         const result = await response.json();
@@ -102,7 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async fetchOrders() {
       try {
-        const response = await fetch('/api/orders/pending-pickup');
+        const response = await fetch('/api/orders/pending-pickup', {
+          headers: {
+            'Authorization': `Bearer ${getStaffToken()}`
+          }
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const orders = await response.json();
         
@@ -113,24 +130,50 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     render(orders) {
+      // 清空容器
+      this.container.innerHTML = '';
+      
       if (orders.length === 0) {
-        this.container.innerHTML = '<p class="empty-state">当前没有待取货的订单。</p>';
+        const emptyMessage = document.createElement('p');
+        emptyMessage.className = 'empty-state';
+        emptyMessage.textContent = '当前没有待取货的订单。';
+        this.container.appendChild(emptyMessage);
         return;
       }
 
-      this.container.innerHTML = orders.map(order => `
-        <div class="order-card">
-          <div class="order-header">
-            <strong>取货码: ${order.pickup_code}</strong>
-            <span>¥${order.total_amount}</span>
-          </div>
-          <ul class="order-item-list">
-            ${order.orderitem.map(item => `
-              <li>${item.inventoryitem.booksku.bookmaster.title} (品相: ${item.inventoryitem.condition})</li>
-            `).join('')}
-          </ul>
-        </div>
-      `).join('');
+      orders.forEach(order => {
+        // 创建订单卡片
+        const orderCard = document.createElement('div');
+        orderCard.className = 'order-card';
+        
+        // 创建订单头部
+        const orderHeader = document.createElement('div');
+        orderHeader.className = 'order-header';
+        
+        const pickupCodeElement = document.createElement('strong');
+        pickupCodeElement.textContent = `取货码: ${order.pickup_code}`;
+        
+        const amountElement = document.createElement('span');
+        amountElement.textContent = `¥${order.total_amount}`;
+        
+        orderHeader.appendChild(pickupCodeElement);
+        orderHeader.appendChild(amountElement);
+        
+        // 创建订单项列表
+        const itemList = document.createElement('ul');
+        itemList.className = 'order-item-list';
+        
+        order.orderitem.forEach(item => {
+          const listItem = document.createElement('li');
+          listItem.textContent = `${item.inventoryitem.booksku.bookmaster.title} (品相: ${item.inventoryitem.condition})`;
+          itemList.appendChild(listItem);
+        });
+        
+        // 组装订单卡片
+        orderCard.appendChild(orderHeader);
+        orderCard.appendChild(itemList);
+        this.container.appendChild(orderCard);
+      });
     }
   };
 
@@ -185,7 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
       BookAdder.coverPreview.classList.remove('visible');
 
       try {
-        const response = await fetch(`/api/books/meta?isbn=${isbn}`);
+        const response = await fetch(`/api/books/meta?isbn=${isbn}`, {
+          headers: {
+            'Authorization': `Bearer ${getStaffToken()}`
+          }
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const meta = await response.json();
         

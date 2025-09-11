@@ -3,43 +3,26 @@
 
 <view class="container">
   <view class="header-title">我的订单</view>
-  
-  <!-- Search Bar (Style will be shared with Market page) -->
-  <view class="search-bar-wrapper">
-    <image class="search-icon" src="/images/icons/search.svg" />
-    <input class="search-input" placeholder="搜索书名、作者或ISBN" />
-  </view>
 
   <view wx:if="{{isLoading}}" class="loading-indicator">加载订单中...</view>
   <view wx:if="{{error}}" class="error-message">{{error}}</view>
   <view wx:if="{{!isLoading && !error && orderList.length === 0}}" class="empty-state">
-    <text>您还没有任何订单。</text>
+    <text>你还没有任何订单</text>
   </view>
 
   <view class="order-list" wx:if="{{orderList.length > 0}}">
-    <view class="order-card card" wx:for="{{orderList}}" wx:key="id">
-      <view class="card-header">
-        <view class="order-info">
-          <text class="order-id">订单 #{{item.pickup_code}}</text>
-          <text class="order-status status-{{item.status}}">{{statusMap[item.status] || '未知状态'}}</text>
-          <text class="order-date">{{tools.formatOrderTime(item.created_at)}}</text>
-        </view>
-        <view class="order-total-header">
-          <text class="total-label">总金额:</text>
-          <text class="total-value">¥{{item.total_amount}}</text>
-        </view>
+    <view class="order-card" wx:for="{{orderList}}" wx:key="id" bind:tap="navigateToDetail" data-order-id="{{item.id}}" hover-class="item-hover">
+      <view class="order-header">
+        <view class="status-tag {{item.status === 'COMPLETED' ? 'success' : item.status === 'PENDING_PAYMENT' ? 'error' : 'warning'}}">{{statusMap[item.status] || '未知状态'}}</view>
+        <view class="order-date">{{tools.formatOrderTime(item.createdAt)}}</view>
       </view>
       
-      <view class="card-body">
-        <view class="book-item" wx:for="{{item.orderitem}}" wx:for-item="orderItem" wx:key="id">
-          <text class="book-title">图书: {{orderItem.inventoryitem.booksku.bookmaster.title}}</text>
+      <view class="order-content">
+        <view class="book-summary">
+          <text class="first-book">{{item.orderitem[0].inventoryitem.booksku.bookmaster.title}}</text>
+          <text wx:if="{{item.orderitem.length > 1}}" class="more-books"> 等{{item.orderitem.length}}件商品</text>
         </view>
-      </view>
-
-      <view class="card-footer">
-        <text class="pickup-label">取货码:</text>
-        <text class="pickup-code">{{item.pickup_code}}</text>
-        <view class="total-footer">总金额: ¥{{item.total_amount}}</view>
+        <view class="order-total">¥{{item.total_amount}}</view>
       </view>
     </view>
   </view>

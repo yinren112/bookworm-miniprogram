@@ -1,67 +1,31 @@
-/* pages/profile/index.wxss - Modern Profile Design 2025 */
+/* pages/profile/index.wxss */
 
-/* Modern Profile Container */
+/* Profile Container */
 .profile-container {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   min-height: 100vh;
-  padding: 0;
 }
 
-/* Enhanced Header Section */
+/* Header Section */
 .header {
-  padding: 60rpx 32rpx 48rpx 32rpx;
+  padding: var(--space-xl) var(--space-l) var(--space-xl) var(--space-l);
   text-align: center;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20rpx);
-  margin: 0 24rpx 32rpx 24rpx;
-  border-radius: 32rpx;
-  box-shadow: 
-    0 8rpx 32rpx rgba(44, 95, 45, 0.08),
-    0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.9);
-  position: relative;
-  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--card-background);
+  margin: 0 var(--space-l) var(--space-l) var(--space-l);
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
 }
 
-.header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4rpx;
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  border-radius: 32rpx 32rpx 0 0;
-}
-
-/* Modern Avatar with Enhanced Styling */
+/* Simple Avatar */
 .avatar-wrapper {
   width: 200rpx;
   height: 200rpx;
   border-radius: 50%;
-  border: 6rpx solid transparent;
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  margin: 0 auto 24rpx auto;
+  margin: 0 auto var(--space-m) auto;
   overflow: hidden;
-  position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 
-    0 12rpx 40rpx rgba(44, 95, 45, 0.15),
-    0 4rpx 12rpx rgba(0, 0, 0, 0.1);
-}
-
-.avatar-wrapper::before {
-  content: '';
-  position: absolute;
-  inset: 6rpx;
-  border-radius: 50%;
-  background: var(--card-background-color);
-  z-index: 1;
+  background: var(--border-color);
 }
 
 .avatar-wrapper open-data {
-  position: relative;
-  z-index: 2;
   border-radius: 50%;
   overflow: hidden;
   width: 100%;
@@ -69,134 +33,80 @@
   display: block;
 }
 
-.avatar-wrapper:active {
-  transform: scale(0.95);
-  box-shadow: 
-    0 8rpx 24rpx rgba(44, 95, 45, 0.1),
-    0 2rpx 6rpx rgba(0, 0, 0, 0.08);
-}
-
-/* Enhanced Typography */
+/* Typography */
 .username {
   display: block;
-  font-size: 44rpx;
-  font-weight: 700;
-  color: var(--text-color-primary);
-  margin-bottom: 8rpx;
-  letter-spacing: -0.5rpx;
-  background: linear-gradient(135deg, var(--text-color-primary), var(--text-color-secondary));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
 }
 
 .nickname {
   display: block;
-  font-size: 30rpx;
-  color: var(--text-color-secondary);
-  font-weight: 500;
-  opacity: 0.8;
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-normal);
 }
 
-/* Modern Menu Card */
+/* Menu Card */
 .menu-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 28rpx;
-  margin: 0 24rpx 32rpx 24rpx;
-  backdrop-filter: blur(20rpx);
-  box-shadow: 
-    0 6rpx 24rpx rgba(44, 95, 45, 0.06),
-    0 2rpx 6rpx rgba(0, 0, 0, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.8);
+  background: var(--card-background);
+  border-radius: 24rpx;
+  margin: 0 var(--space-l) var(--space-l) var(--space-l);
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  animation-delay: 0.2s;
-  animation-fill-mode: both;
 }
 
-/* Enhanced Menu Items */
+/* Simple Menu Items */
 .menu-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 32rpx 32rpx;
-  border-bottom: 1rpx solid rgba(233, 236, 239, 0.5);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  padding: var(--space-l);
+  border-bottom: 1rpx solid var(--border-color);
   background: transparent;
+  border: none;
+  transition: background-color 0.2s;
 }
 
 .menu-item:last-child {
   border-bottom: none;
 }
 
-/* 只对非share-button的menu-item应用这些样式 */
-.menu-item:not(.share-button)::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 0;
-  background: linear-gradient(135deg, rgba(44, 95, 45, 0.05), rgba(85, 128, 86, 0.02));
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 0 28rpx 28rpx 0;
+.menu-item:active {
+  background-color: var(--background-color);
 }
 
-.menu-item:not(.share-button):active::before {
-  width: 8rpx;
-}
-
-.menu-item:not(.share-button):active {
-  background: rgba(44, 95, 45, 0.02);
-  transform: translateX(8rpx);
-}
-
-/* Modern Menu Text */
+/* Menu Text */
 .menu-text {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-color-primary);
-  transition: color 0.2s ease;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
 }
 
-.menu-item:not(.share-button):active .menu-text {
-  color: var(--primary-color);
-}
-
-/* Enhanced Arrow Icon */
+/* Arrow Icon */
 .menu-arrow {
   width: 28rpx;
   height: 28rpx;
-  opacity: 0.6;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  filter: brightness(0) saturate(100%) invert(52%) sepia(0%) saturate(0%) hue-rotate(173deg) brightness(95%) contrast(86%);
+  opacity: 0.5;
 }
 
-.menu-item:not(.share-button):active .menu-arrow {
-  opacity: 1;
-  transform: translateX(4rpx);
-  filter: brightness(0) saturate(100%) invert(23%) sepia(32%) saturate(1837%) hue-rotate(88deg) brightness(94%) contrast(86%);
-}
-
-/* Modern Share Button - 修复对齐问题 */
+/* Share Button - Simple Override */
 .share-button {
   background: transparent !important;
   border: none !important;
   text-align: left !important;
-  padding: 32rpx 32rpx !important;
+  padding: var(--space-l) !important;
   margin: 0 !important;
-  line-height: 1.5;
-  font-size: inherit;
-  width: 100%;
-  color: inherit;
-  font-weight: inherit;
+  font-size: var(--font-size-body) !important;
+  width: 100% !important;
+  color: var(--text-primary) !important;
+  font-weight: var(--font-weight-bold) !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  border-bottom: 1rpx solid rgba(233, 236, 239, 0.5) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  position: relative !important;
+  border-bottom: 1rpx solid var(--border-color) !important;
   border-radius: 0 !important;
 }
 
@@ -205,105 +115,30 @@
   background: none !important;
 }
 
-.share-button::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 0;
-  background: linear-gradient(135deg, rgba(44, 95, 45, 0.05), rgba(85, 128, 86, 0.02));
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 0 28rpx 28rpx 0;
-}
-
-.share-button:active::before {
-  width: 8rpx;
-}
-
 .share-button:active {
-  background: rgba(44, 95, 45, 0.02) !important;
-  transform: translateX(8rpx);
+  background-color: var(--background-color) !important;
 }
 
-.share-button:active .menu-text {
-  color: var(--primary-color);
-}
-
-.share-button:active .menu-arrow {
-  opacity: 1;
-  transform: translateX(4rpx);
-  filter: brightness(0) saturate(100%) invert(23%) sepia(32%) saturate(1837%) hue-rotate(88deg) brightness(94%) contrast(86%);
-}
-
-/* Enhanced Support Info */
+/* Support Info */
 .support-info {
-  margin: 0 24rpx 40rpx 24rpx;
-  padding: 28rpx 32rpx;
-  font-size: 26rpx;
-  color: var(--text-color-secondary);
+  margin: 0 var(--space-l) var(--space-xl) var(--space-l);
+  padding: var(--space-l);
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
   line-height: 1.6;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--card-background);
   border-radius: 24rpx;
-  backdrop-filter: blur(10rpx);
-  border: 1rpx solid rgba(233, 236, 239, 0.6);
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
   text-align: center;
-  animation: fadeInUp 1s cubic-bezier(0.4, 0, 0.2, 1);
-  animation-delay: 0.4s;
-  animation-fill-mode: both;
-  position: relative;
-}
-
-.support-info::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60rpx;
-  height: 3rpx;
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  border-radius: 0 0 6rpx 6rpx;
 }
 
 .support-info text {
   display: block;
-  margin-bottom: 8rpx;
+  margin-bottom: var(--space-xs);
 }
 
 .support-info text:last-child {
   margin-bottom: 0;
-  opacity: 0.8;
-}
-
-/* Modern Animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(40rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 
-      0 12rpx 40rpx rgba(44, 95, 45, 0.15),
-      0 4rpx 12rpx rgba(0, 0, 0, 0.1);
-  }
-  50% {
-    box-shadow: 
-      0 16rpx 50rpx rgba(44, 95, 45, 0.2),
-      0 6rpx 16rpx rgba(0, 0, 0, 0.12);
-  }
-}
-
-/* Hover Effects for Interactive Elements */
-.menu-item {
-  cursor: pointer;
 }
 
 /* Responsive Design */
@@ -314,19 +149,11 @@
   }
   
   .header {
-    padding: 80rpx 48rpx 64rpx 48rpx;
+    padding: var(--space-xl);
   }
   
   .avatar-wrapper {
     width: 240rpx;
     height: 240rpx;
-  }
-  
-  .menu-card {
-    margin: 0 32rpx 40rpx 32rpx;
-  }
-  
-  .support-info {
-    margin: 0 32rpx 48rpx 32rpx;
   }
 }

@@ -1,0 +1,13 @@
+<!--pages/webview/index.wxml-->
+<view class="container">
+  <skeleton wx:if="{{isLoading}}" type="list" count="3" />
+
+  <view wx:elif="{{errorMsg}}" class="error-container">
+    <view class="error-icon">⚠️</view>
+    <text class="error-text">{{errorMsg}}</text>
+  </view>
+
+  <view wx:else class="content-container">
+    <rich-text nodes="{{content.body}}" class="rich-content"></rich-text>
+  </view>
+</view>

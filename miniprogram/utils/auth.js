@@ -1,32 +1,32 @@
 // utils/auth.js
-const config = require('../config');
+const { request } = require('./api');
 const TOKEN_KEY = 'authToken';
 const USER_ID_KEY = 'userId';
 
 const login = () => {
   return new Promise((resolve, reject) => {
     wx.login({
-      success: (res) => {
+      success: async (res) => {
         if (res.code) {
-          wx.request({
-            url: `${config.apiBaseUrl}/auth/login`,
-            method: 'POST',
-            data: {
-              code: res.code
-            },
-            success: (loginRes) => {
-              if (loginRes.statusCode === 200 && loginRes.data.token) {
-                setToken(loginRes.data.token);
-                setUserId(loginRes.data.userId);
-                resolve(loginRes.data);
-              } else {
-                reject(new Error('Login failed on server.'));
+          try {
+            const data = await request({
+              url: '/auth/login',
+              method: 'POST',
+              data: {
+                code: res.code
               }
-            },
-            fail: (err) => {
-              reject(err);
+            });
+            
+            if (data.token) {
+              setToken(data.token);
+              setUserId(data.userId);
+              resolve(data);
+            } else {
+              reject(new Error('Login failed on server.'));
             }
-          });
+          } catch (error) {
+            reject(new Error(error.error || 'Login failed on server.'));
+          }
         } else {
           reject(new Error('wx.login failed, no code returned.'));
         }

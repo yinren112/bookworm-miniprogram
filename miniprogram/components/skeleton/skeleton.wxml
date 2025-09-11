@@ -1,0 +1,26 @@
+<!-- components/skeleton/skeleton.wxml -->
+<view class="skeleton-container" wx:if="{{type === 'grid'}}">
+  <view class="skeleton-grid">
+    <view class="skeleton-item" wx:for="{{count || 4}}" wx:key="*this">
+      <view class="skeleton-image"></view>
+      <view class="skeleton-text"></view>
+      <view class="skeleton-text short"></view>
+    </view>
+  </view>
+</view>
+
+<view class="skeleton-container" wx:elif="{{type === 'detail'}}">
+  <view class="skeleton-image-large"></view>
+  <view class="skeleton-text title"></view>
+  <view class="skeleton-text short"></view>
+  <view class="skeleton-divider"></view>
+  <view class="skeleton-text"></view>
+  <view class="skeleton-text"></view>
+</view>
+
+<view class="skeleton-container" wx:elif="{{type === 'list'}}">
+  <view class="skeleton-list-item" wx:for="{{count || 3}}" wx:key="*this">
+    <view class="skeleton-text"></view>
+    <view class="skeleton-text short"></view>
+  </view>
+</view>

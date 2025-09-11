@@ -7,13 +7,7 @@
   <template is="searchBar" data="{{placeholder: '搜索书名、作者或ISBN', searchTerm: searchTerm}}" />
 
   <!-- Skeleton Loading State -->
-  <view wx:if="{{isLoading}}" class="skeleton-grid">
-    <view class="skeleton-item" wx:for="{{[1,2,3,4]}}" wx:key="*this">
-      <view class="skeleton-image"></view>
-      <view class="skeleton-text"></view>
-      <view class="skeleton-text short"></view>
-    </view>
-  </view>
+  <skeleton wx:if="{{isLoading}}" type="grid" count="4" />
 
   <view wx:if="{{error}}" class="error-message">{{error}}</view>
   <view wx:if="{{!isLoading && !error && bookList.length === 0}}" class="empty-state">
@@ -22,8 +16,8 @@
 
   <!-- Real Content -->
   <view wx:if="{{!isLoading && bookList.length > 0}}" class="book-grid">
-    <navigator wx:for="{{bookList}}" wx:key="id" class="book-card-navigator" url="/pages/book-detail/index?id={{item.id}}">
-      <view class="book-card card">
+    <navigator wx:for="{{bookList}}" wx:key="id" class="book-card-navigator" url="/pages/book-detail/index?id={{item.id}}" hover-class="none">
+      <view class="book-card card" hover-class="item-hover">
         <image class="book-cover" src="{{item.booksku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFill" />
         <view class="book-info">
           <text class="book-title">{{item.booksku.bookmaster.title}}</text>
