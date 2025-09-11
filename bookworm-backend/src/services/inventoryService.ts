@@ -79,8 +79,10 @@ export async function addBookToInventory(input: AddBookInput) {
   });
 }
 
-// MODIFIED: getAvailableBooks now accepts an optional search term
-export async function getAvailableBooks(searchTerm?: string) {
+// MODIFIED: getAvailableBooks now supports pagination and search
+export async function getAvailableBooks(options: { searchTerm?: string; page?: number; limit?: number } = {}) {
+  const { searchTerm, page = 1, limit = 20 } = options;
+  
   const whereCondition: Prisma.inventoryitemWhereInput = {
     status: 'in_stock',
   };
@@ -97,15 +99,39 @@ export async function getAvailableBooks(searchTerm?: string) {
     };
   }
 
-  return prisma.inventoryitem.findMany({
-    where: whereCondition,
-    include: {
-      booksku: {
-        include: {
-          bookmaster: true,
+  // Calculate pagination parameters
+  const take = limit;
+  const skip = (page - 1) * limit;
+
+  return prisma.$transaction(async (tx) => {
+    // First query: Get total count for pagination metadata
+    const totalCount = await tx.inventoryitem.count({
+      where: whereCondition,
+    });
+
+    // Second query: Get current page data
+    const inventoryItems = await tx.inventoryitem.findMany({
+      where: whereCondition,
+      include: {
+        booksku: {
+          include: {
+            bookmaster: true,
+          },
         },
       },
-    },
+      skip,
+      take,
+    });
+
+    return {
+      data: inventoryItems,
+      meta: {
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        currentPage: page,
+        itemsPerPage: limit,
+      },
+    };
   });
 }
 

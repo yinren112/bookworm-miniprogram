@@ -200,8 +200,12 @@ const setupRoutes = () => {
 
     // Inventory routes
     fastify.get('/api/inventory/available', async (request, reply) => {
-        const query = request.query as { search?: string };
-        const books = await getAvailableBooks(query.search);
+        const query = request.query as { search?: string; page?: string; limit?: string };
+        const books = await getAvailableBooks({
+            searchTerm: query.search,
+            page: query.page ? parseInt(query.page, 10) : undefined,
+            limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        });
         reply.send(books);
     });
     
