@@ -8,20 +8,22 @@ datasource db {
 }
 
 model Order {
-  id                Int         @id @default(autoincrement())
-  user_id           Int
-  status            OrderStatus @default(PENDING_PAYMENT)
-  total_amount      Decimal     @db.Decimal(10, 2)
-  pickup_code       String      @unique @db.VarChar(16)
-  createdAt         DateTime    @default(now()) @db.Timestamptz(6)
-  paymentExpiresAt  DateTime    @db.Timestamptz(6)
-  pickupExpiresAt   DateTime?   @db.Timestamptz(6)
-  paid_at           DateTime?   @db.Timestamptz(6)
-  completed_at      DateTime?   @db.Timestamptz(6)
-  cancelled_at      DateTime?   @db.Timestamptz(6)
-  User              User        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
-  orderitem         orderitem[]
-  PaymentRecord     PaymentRecord[]
+  id               Int             @id @default(autoincrement())
+  user_id          Int
+  status           OrderStatus     @default(PENDING_PAYMENT)
+  total_amount     Decimal         @db.Decimal(10, 2)
+  pickup_code      String          @unique @db.VarChar(16)
+  createdAt        DateTime        @default(now()) @db.Timestamptz(6)
+  paymentExpiresAt DateTime        @db.Timestamptz(6)
+  pickupExpiresAt  DateTime?       @db.Timestamptz(6)
+  paid_at          DateTime?       @db.Timestamptz(6)
+  completed_at     DateTime?       @db.Timestamptz(6)
+  cancelled_at     DateTime?       @db.Timestamptz(6)
+  User             User            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
+  orderitem        orderitem[]
+  PaymentRecord    PaymentRecord[]
+
+  ReservedInventory inventoryitem[] @relation("ReservedInventory")
 
   @@index([user_id, status], map: "idx_order_user_id_status")
 }
@@ -74,12 +76,17 @@ model inventoryitem {
   cost          Decimal          @db.Decimal(10, 2)
   selling_price Decimal          @db.Decimal(10, 2)
   status        inventory_status @default(in_stock)
-  created_at    DateTime         @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime         @updatedAt @db.Timestamptz(6)
-  booksku       booksku          @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
-  orderitem     orderitem[]
+
+  reserved_by_order_id Int?
+  ReservedByOrder      Order? @relation("ReservedInventory", fields: [reserved_by_order_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  created_at DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at DateTime    @updatedAt @db.Timestamptz(6)
+  booksku    booksku     @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
+  orderitem  orderitem[]
 
   @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
+  @@index([reserved_by_order_id])
 }
 
 // 注意：`inventory_item_id` 不再是唯一的。
@@ -93,7 +100,7 @@ model orderitem {
   price             Decimal       @db.Decimal(10, 2)
   inventoryitem     inventoryitem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
   Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
-  
+
   @@index([inventory_item_id], map: "idx_orderitem_inventory_item_id")
 }
 
@@ -109,8 +116,8 @@ model Content {
 }
 
 enum book_condition {
-  NEW        // A - 全新或接近全新
-  GOOD       // B - 有轻微使用痕迹，无破损
+  NEW // A - 全新或接近全新
+  GOOD // B - 有轻微使用痕迹，无破损
   ACCEPTABLE // C - 有明显使用痕迹、笔记或轻微破损，但不影响阅读
 }
 
@@ -136,31 +143,31 @@ enum OrderStatus {
 }
 
 model PaymentRecord {
-  id             Int      @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   order_id       Int
-  out_trade_no   String   @unique @db.VarChar(100)
-  transaction_id String?  @unique @db.VarChar(100)
+  out_trade_no   String        @unique @db.VarChar(100)
+  transaction_id String?       @unique @db.VarChar(100)
   status         PaymentStatus @default(PENDING)
-  amount_total   Int      // 微信支付侧的金额，单位：分
-  payer_openid   String?  @db.VarChar(255)
-  appid          String?  @db.VarChar(100)
-  mchid          String?  @db.VarChar(100)
-  
-  createdAt      DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
-  notified_at    DateTime? // 微信通知首次到达时间
-  refunded_at    DateTime? // 退款完成时间
+  amount_total   Int // 微信支付侧的金额，单位：分
+  payer_openid   String?       @db.VarChar(255)
+  appid          String?       @db.VarChar(100)
+  mchid          String?       @db.VarChar(100)
 
-  Order          Order    @relation(fields: [order_id], references: [id])
-  
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  notified_at DateTime? // 微信通知首次到达时间
+  refunded_at DateTime? // 退款完成时间
+
+  Order Order @relation(fields: [order_id], references: [id])
+
   @@index([order_id])
   @@index([status, createdAt])
 }
 
 enum PaymentStatus {
-  PENDING         // 待支付
-  SUCCESS         // 支付成功
+  PENDING // 待支付
+  SUCCESS // 支付成功
   REFUND_REQUIRED // 需退款（如订单已取消但支付成功）
-  REFUNDED        // 已退款
-  FAILED          // 支付失败
+  REFUNDED // 已退款
+  FAILED // 支付失败
 }

@@ -1,5 +1,6 @@
 // src/index.ts
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
+import { Type, Static } from '@sinclair/typebox';
 
 // --- Type Augmentation for Fastify ---
 // This declaration merges with the original Fastify types.
@@ -30,9 +31,11 @@ const WechatPay = require('wechatpay-node-v3');
 import { Prisma } from '@prisma/client';
 import prisma from './db';
 import * as fs from 'fs';
+import { metrics } from './plugins/metrics';
+import * as cron from 'node-cron';
 const fastify = Fastify({
   logger: {
-    level: process.env.LOG_LEVEL || 'info',
+    level: config.LOG_LEVEL,
     redact: ['headers.authorization', 'req.headers.authorization']
   }
 });
@@ -41,19 +44,17 @@ const fastify = Fastify({
 let pay: any | null = null;
 try {
     if (
-        config.wxPayMchId &&
-        config.wxPayPrivateKeyPath && fs.existsSync(config.wxPayPrivateKeyPath) &&
-        config.wxPayPublicKeyPath && fs.existsSync(config.wxPayPublicKeyPath) &&
-        config.wxPayCertSerialNo &&
-        config.wxPayApiV3Key
+        config.WXPAY_MCHID &&
+        config.WXPAY_PRIVATE_KEY_PATH && fs.existsSync(config.WXPAY_PRIVATE_KEY_PATH) &&
+        config.WXPAY_CERT_SERIAL_NO &&
+        config.WXPAY_API_V3_KEY
     ) {
         pay = new WechatPay({
-            appid: config.wxAppId!,
-            mchid: config.wxPayMchId!,
-            privateKey: fs.readFileSync(config.wxPayPrivateKeyPath!),
-            publicKey: fs.readFileSync(config.wxPayPublicKeyPath!), // <-- Added missing public key
-            serial_no: config.wxPayCertSerialNo!,
-            key: config.wxPayApiV3Key!,
+            appid: config.WX_APP_ID,
+            mchid: config.WXPAY_MCHID,
+            privateKey: fs.readFileSync(config.WXPAY_PRIVATE_KEY_PATH),
+            serial_no: config.WXPAY_CERT_SERIAL_NO,
+            key: config.WXPAY_API_V3_KEY,
         });
         console.log("WeChat Pay SDK initialized successfully.");
     } else {
@@ -102,15 +103,15 @@ const validateProductionConfig = () => {
     const criticalMissingConfigs: string[] = [];
 
     // JWT Secret validation
-    if (config.jwtSecret === 'default-secret-for-dev' || !config.jwtSecret) {
+    if (config.JWT_SECRET === 'default-secret-for-dev' || !config.JWT_SECRET) {
         criticalMissingConfigs.push('JWT_SECRET');
     }
 
     // WeChat App validation
-    if (config.wxAppId === 'YOUR_APP_ID' || !config.wxAppId) {
+    if (config.WX_APP_ID === 'YOUR_APP_ID' || !config.WX_APP_ID) {
         criticalMissingConfigs.push('WX_APP_ID');
     }
-    if (config.wxAppSecret === 'YOUR_APP_SECRET' || !config.wxAppSecret) {
+    if (config.WX_APP_SECRET === 'YOUR_APP_SECRET' || !config.WX_APP_SECRET) {
         criticalMissingConfigs.push('WX_APP_SECRET');
     }
 
@@ -187,11 +188,18 @@ const setupRoutes = () => {
     });
 
     // Auth routes
-    fastify.post('/api/auth/login', {
-        config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    const LoginBodySchema = Type.Object({
+        code: Type.String({ minLength: 1 })
+    });
+
+    fastify.post<{ Body: Static<typeof LoginBodySchema> }>('/api/auth/login', {
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+        schema: {
+            body: LoginBodySchema
+        }
     }, async (request, reply) => {
-        const { code } = request.body as { code: string };
-        if (!code) { throw new ApiError(400, 'Code is required.', 'MISSING_CODE'); }
+        // 不需要再手动检查 `code` 是否存在，Fastify 已经保证了
+        const { code } = request.body;
         const { token, user } = await wxLogin(code);
         reply.send({ token, userId: user.id });
     });
@@ -222,10 +230,17 @@ const setupRoutes = () => {
         reply.send(books);
     });
     
-    fastify.get('/api/inventory/item/:id', async (request, reply) => {
-        const params = request.params as { id: string };
-        const id = parseInt(params.id, 10);
-        if (isNaN(id)) { throw new ApiError(400, 'Invalid item ID.', 'INVALID_ITEM_ID'); }
+    const GetItemParamsSchema = Type.Object({
+        id: Type.Number()
+    });
+
+    fastify.get<{ Params: Static<typeof GetItemParamsSchema> }>('/api/inventory/item/:id', {
+        schema: {
+            params: GetItemParamsSchema
+        }
+    }, async (request, reply) => {
+        // 不需要再手动 parseInt 和 isNaN 检查，Fastify 自动处理了
+        const id = request.params.id;
         const book = await getBookById(id);
         if (!book) { throw new ApiError(404, 'Book not found.', 'BOOK_NOT_FOUND'); }
         reply.send(book);
@@ -244,8 +259,24 @@ const setupRoutes = () => {
     });
 
     // Order routes
-    fastify.post('/api/orders/create', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-        const { inventoryItemIds } = request.body as { inventoryItemIds: number[] };
+    const CreateOrderBodySchema = Type.Object({
+        inventoryItemIds: Type.Array(Type.Number(), { minItems: 1 })
+    });
+
+    fastify.post<{ Body: Static<typeof CreateOrderBodySchema> }>('/api/orders/create', { 
+        preHandler: [fastify.authenticate],
+        config: {
+            rateLimit: {
+                max: config.API_RATE_LIMIT_MAX,
+                timeWindow: `${config.API_RATE_LIMIT_WINDOW_MINUTES} minute`,
+                keyGenerator: (req) => req.user?.userId.toString() || req.ip
+            }
+        },
+        schema: {
+            body: CreateOrderBodySchema
+        }
+    }, async (request, reply) => {
+        const { inventoryItemIds } = request.body;
         const order = await createOrder({ userId: request.user!.userId, inventoryItemIds });
         reply.code(201).send(order);
     });
@@ -271,7 +302,11 @@ const setupRoutes = () => {
         reply.send(orders);
     });
 
-    fastify.post('/api/orders/fulfill', {
+    const FulfillOrderBodySchema = Type.Object({
+        pickupCode: Type.String({ minLength: 1 })
+    });
+
+    fastify.post<{ Body: Static<typeof FulfillOrderBodySchema> }>('/api/orders/fulfill', {
         preHandler: [fastify.authenticate, fastify.requireRole('STAFF')],
         config: {
             rateLimit: {
@@ -279,10 +314,13 @@ const setupRoutes = () => {
                 timeWindow: '1 minute',
                 keyGenerator: (req) => req.user?.userId.toString() || req.ip
             }
+        },
+        schema: {
+            body: FulfillOrderBodySchema
         }
     }, async (request, reply) => {
-        const { pickupCode } = request.body as { pickupCode: string };
-        if (!pickupCode) { throw new ApiError(400, 'pickupCode is required.', 'MISSING_PICKUP_CODE'); }
+        // 不需要再手动检查 pickupCode 是否存在
+        const { pickupCode } = request.body;
         const order = await fulfillOrder(pickupCode.toUpperCase());
         reply.send(order);
     });
@@ -330,7 +368,7 @@ const setupRoutes = () => {
                 resource.ciphertext,
                 resource.associated_data,
                 resource.nonce,
-                config.wxPayApiV3Key!
+                config.WXPAY_API_V3_KEY
             );
             
             const notificationData = JSON.parse(decryptedData as string);
@@ -348,14 +386,42 @@ const setupRoutes = () => {
     });
 };
 
+// Export function to build app for testing
+export const buildApp = async () => {
+    await setupPluginsAndRoutes();
+    return fastify;
+};
+
 const start = async () => {
     try {
         validateProductionConfig();
         await setupPluginsAndRoutes();
-        await fastify.listen({ port: config.port as number, host: '0.0.0.0' });
+        await fastify.listen({ port: config.PORT, host: config.HOST });
+        
+        // Schedule a job to update inventory gauge metrics every 5 minutes.
+        cron.schedule('*/5 * * * *', async () => {
+            console.log('Running scheduled job to update inventory metrics...');
+            try {
+                const inventoryCounts = await prisma.inventoryitem.groupBy({
+                    by: ['status'],
+                    _count: {
+                        id: true,
+                    },
+                });
+                inventoryCounts.forEach(item => {
+                    metrics.inventoryStatus.labels(item.status).set(item._count.id);
+                });
+            } catch (error) {
+                console.error('CRITICAL: The "updateInventoryMetrics" job failed:', error);
+            }
+        });
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
     }
 };
-start();// trigger restart
+
+// Only start the server if this file is executed directly (not imported)
+if (require.main === module) {
+    start();
+}

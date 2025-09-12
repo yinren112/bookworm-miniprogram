@@ -8,7 +8,8 @@ Page({
     isLoading: true,
     error: null,
     searchTerm: '',
-    searchPerformed: false // To show different empty state messages
+    searchPerformed: false, // To show different empty state messages
+    pageInfo: null // For pagination metadata
   },
 
   onLoad(options) {
@@ -28,7 +29,7 @@ Page({
         url: url,
         method: 'GET'
       });
-      this.setData({ bookList: data });
+      this.setData({ bookList: data.data, pageInfo: data.meta });
     } catch (error) {
       console.error('API request failed', error);
       this.setData({ 

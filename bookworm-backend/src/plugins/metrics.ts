@@ -1,39 +1,44 @@
+// src/plugins/metrics.ts
+import { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import * as promClient from 'prom-client';
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import client from 'prom-client';
 
-// Create metrics
-const register = promClient.register;
-const httpRequestsTotal = new promClient.Counter({
-    name: 'http_requests_total',
-    help: 'Total HTTP requests',
-    labelNames: ['method', 'status_code', 'route']
-});
-const httpRequestDuration = new promClient.Histogram({
-    name: 'http_request_duration_seconds',
-    help: 'HTTP request duration in seconds',
-    labelNames: ['method', 'status_code', 'route']
-});
+// 启用默认的 Node.js 指标 (CPU, memory, etc.)
+client.collectDefaultMetrics();
 
-// Collect default metrics (memory, CPU, etc.)
-promClient.collectDefaultMetrics({ register });
+// --- 定义我们的核心业务指标 ---
 
-export default fp(async function metricsPlugin(fastify: FastifyInstance) {
-    // Add metrics collection hooks
-    fastify.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
-        (request as any).startTime = Date.now();
-    });
+export const metrics = {
+  ordersCreated: new client.Counter({
+    name: 'bookworm_orders_created_total',
+    help: 'Total number of orders created',
+  }),
+  ordersCompleted: new client.Counter({
+    name: 'bookworm_orders_completed_total',
+    help: 'Total number of orders successfully fulfilled (picked up)',
+  }),
+  paymentsProcessed: new client.Counter({
+    name: 'bookworm_payments_processed_total',
+    help: 'Total number of payment notifications processed',
+    labelNames: ['status'], // 'success', 'refund_required', 'failure'
+  }),
+  dbTransactionRetries: new client.Counter({
+    name: 'bookworm_db_transaction_retries_total',
+    help: 'Total number of database transaction retries due to serialization conflicts',
+  }),
+  inventoryStatus: new client.Gauge({
+    name: 'bookworm_inventory_items_count',
+    help: 'Current number of inventory items by status',
+    labelNames: ['status'], // 'in_stock', 'reserved', 'sold', etc.
+  }),
+};
 
-    fastify.addHook('onResponse', async (request: FastifyRequest, reply: FastifyReply) => {
-        const duration = (Date.now() - (request as any).startTime) / 1000;
-        const route = request.routeOptions?.url || request.url;
-        
-        httpRequestsTotal.labels(request.method, reply.statusCode.toString(), route).inc();
-        httpRequestDuration.labels(request.method, reply.statusCode.toString(), route).observe(duration);
-    });
+async function metricsPlugin(fastify: FastifyInstance) {
+  fastify.get('/metrics', async (request, reply) => {
+    reply.header('Content-Type', client.register.contentType);
+    reply.send(await client.register.metrics());
+  });
+  console.log('Metrics endpoint registered at /metrics');
+}
 
-    // Add metrics endpoint
-    fastify.get('/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
-        reply.type('text/plain').send(await register.metrics());
-    });
-});
+export default fp(metricsPlugin);

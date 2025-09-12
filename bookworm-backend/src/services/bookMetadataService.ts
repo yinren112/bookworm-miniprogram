@@ -40,12 +40,12 @@ interface BookMetadata {
  * @returns Parsed metadata or null if not found or on error.
  */
 export async function getBookMetadata(isbn: string): Promise<BookMetadata | null> {
-  if (!config.tanshuApiKey) {
+  if (!config.TANSHU_API_KEY) {
     console.warn('!!! WARNING: TANSHU_API_KEY is not configured in .env. Book metadata feature is disabled.');
     return null;
   }
 
-  const url = `${TANSHU_BASE_URL}?key=${config.tanshuApiKey}&isbn=${isbn}`;
+  const url = `${TANSHU_BASE_URL}?key=${config.TANSHU_API_KEY}&isbn=${isbn}`;
   
   try {
     const response = await axios.get<TanshuApiResponse>(url, {

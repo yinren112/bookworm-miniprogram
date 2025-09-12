@@ -6,6 +6,7 @@ const WechatPay = require('wechatpay-node-v3');
 import config from '../config';
 import prisma from '../db';
 import { ApiError } from '../errors';
+import { metrics } from '../plugins/metrics';
 
 // 通用的事务重试辅助函数
 async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -15,6 +16,9 @@ async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
     } catch (e: any) {
       // 检查是否为 Prisma 的序列化失败
       if (e.code === 'P2034' || e.message?.includes('could not serialize')) {
+        if (i < 2) { // Only increment on actual retries, not the final failure
+          metrics.dbTransactionRetries.inc();
+        }
         // 指数退避+抖动等待
         await new Promise(r => setTimeout(r, 20 * Math.pow(2, i) + Math.random() * 40));
         continue;
@@ -28,6 +32,18 @@ async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
+    // 前置检查：用户待支付订单数量限制
+    const pendingOrdersCount = await prisma.order.count({
+        where: {
+            user_id: input.userId,
+            status: 'PENDING_PAYMENT'
+        }
+    });
+
+    if (pendingOrdersCount >= config.MAX_PENDING_ORDERS_PER_USER) {
+        throw new ApiError(403, '您有过多未支付订单，请先处理', 'MAX_PENDING_ORDERS_EXCEEDED');
+    }
+
     return withTxRetry(() => prisma.$transaction(async (tx) => {
         const itemIds = Array.from(new Set(input.inventoryItemIds));
         if (itemIds.length === 0) {
@@ -62,7 +78,7 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
         // 4. 创建订单（包含 pickup_code 重试逻辑）
         let order;
         for (let attempt = 0; attempt < 5; attempt++) {
-            const pickup_code = crypto.randomBytes(5).toString('hex').toUpperCase().substring(0, 8);
+            const pickup_code = crypto.randomBytes(config.ORDER_PICKUP_CODE_BYTES).toString('hex').toUpperCase().substring(0, config.ORDER_PICKUP_CODE_LENGTH);
             try {
                 order = await tx.order.create({
                     data: {
@@ -70,7 +86,7 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
                         status: 'PENDING_PAYMENT',
                         total_amount: totalAmount,
                         pickup_code,
-                        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15分钟后过期
+                        paymentExpiresAt: new Date(Date.now() + config.ORDER_PAYMENT_TTL_MINUTES * 60 * 1000),
                     },
                 });
                 break; // 成功创建订单，跳出循环
@@ -89,7 +105,13 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
             throw new ApiError(500, '无法生成唯一订单取货码', 'PICKUP_CODE_GEN_FAILED');
         }
 
-        // 5. 创建订单项
+        // 5. 设置库存项的 reserved_by_order_id 字段
+        await tx.inventoryitem.updateMany({
+            where: { id: { in: itemIds } },
+            data: { reserved_by_order_id: order.id }
+        });
+
+        // 6. 创建订单项
         await tx.orderitem.createMany({
             data: reservedItems.map(item => ({
                 order_id: order.id,
@@ -98,6 +120,7 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
             })),
         });
 
+        metrics.ordersCreated.inc();
         return order;
     }, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // 使用最高隔离级别保证一致性
@@ -171,6 +194,7 @@ export async function fulfillOrder(pickupCode: string) {
       data: { status: 'sold' },
     });
 
+    metrics.ordersCompleted.inc();
     return updatedOrder;
   });
 }
@@ -194,8 +218,8 @@ export async function generatePaymentParams(pay: any, orderId: number, userId: n
                 order_id: order.id,
                 status: 'PENDING',
                 amount_total,
-                appid: config.wxAppId,
-                mchid: config.wxPayMchId
+                appid: config.WX_APP_ID,
+                mchid: config.WXPAY_MCHID
             },
             update: {}
         });
@@ -208,11 +232,11 @@ export async function generatePaymentParams(pay: any, orderId: number, userId: n
         const description = titles.slice(0, 3).join('、') + (titles.length > 3 ? `等${titles.length}本书籍` : '');
 
         const unifiedOrderResult = await pay.transactions_jsapi({
-            appid: config.wxAppId!,
-            mchid: config.wxPayMchId!,
+            appid: config.WX_APP_ID,
+            mchid: config.WXPAY_MCHID,
             description,
             out_trade_no,
-            notify_url: config.wxPayNotifyUrl!,
+            notify_url: config.WXPAY_NOTIFY_URL,
             time_expire: new Date(order.paymentExpiresAt).toISOString(),
             amount: { total: amount_total, currency: 'CNY' },
             payer: { openid: user.openid }
@@ -224,7 +248,7 @@ export async function generatePaymentParams(pay: any, orderId: number, userId: n
         const timeStamp = Math.floor(Date.now() / 1000).toString();
         const nonceStr = crypto.randomBytes(16).toString('hex');
         const pkg = `prepay_id=${prepay_id}`;
-        const toSign = `${config.wxAppId}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
+        const toSign = `${config.WX_APP_ID}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
 
         const paySign = pay.sign(toSign);
 
@@ -257,12 +281,12 @@ export async function processPaymentNotification(notificationData: any) {
     }
     
     // 2. 数据校验 (第二道防线)
-    if (mchid && mchid !== config.wxPayMchId) {
-      throw new ApiError(400, `商户号不匹配。期望：${config.wxPayMchId}，实际：${mchid}`, 'MCHID_MISMATCH');
+    if (mchid && mchid !== config.WXPAY_MCHID) {
+      throw new ApiError(400, `商户号不匹配。期望：${config.WXPAY_MCHID}，实际：${mchid}`, 'MCHID_MISMATCH');
     }
     
-    if (appid && appid !== config.wxAppId) {
-      throw new ApiError(400, `应用ID不匹配。期望：${config.wxAppId}，实际：${appid}`, 'APPID_MISMATCH');
+    if (appid && appid !== config.WX_APP_ID) {
+      throw new ApiError(400, `应用ID不匹配。期望：${config.WX_APP_ID}，实际：${appid}`, 'APPID_MISMATCH');
     }
     
     if (amount.total !== paymentRecord.amount_total) {
@@ -297,6 +321,7 @@ export async function processPaymentNotification(notificationData: any) {
         data: { status: 'REFUND_REQUIRED' }
       });
       console.error(`CRITICAL: Payment succeeded for cancelled order ${order.id}. Marked for refund.`);
+      metrics.paymentsProcessed.labels('refund_required').inc();
       return updatedPaymentRecord;
     }
     
@@ -310,6 +335,7 @@ export async function processPaymentNotification(notificationData: any) {
         }
       });
       console.log(`Order ${order.id} successfully marked as paid`);
+      metrics.paymentsProcessed.labels('success').inc();
       return updatedPaymentRecord;
     }
     

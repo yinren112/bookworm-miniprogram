@@ -1,43 +1,19 @@
 ================================================================================
-BOOKWORM PROJECT - CORE CODE REVIEW
+BOOKWORM PROJECT - ESSENTIAL CODE REVIEW (UNREDACTED)
 ================================================================================
-Generated on: 2025-09-11 16:13:24
-Mode: Core files only. This report contains the architectural backbone of the project.
+Generated on: 2025-09-12 14:49:31
+Mode: Essential files only - Core business logic with original data.
+Total files included: 23 (精简版)
 
 ### 📁 PROJECT FILE TREE ###
 ----------------------------------------
 miniprogram-13/
 ├── CUserswapadilWeChatProjectsminiprogram-13miniprogrampageswebview/
 ├── bookworm-backend/
-│   ├── coverage/
-│   │   ├── prisma/
-│   │   │   ├── index.html
-│   │   │   └── seed.ts.html
-│   │   ├── public/
-│   │   │   ├── index.html
-│   │   │   └── main.js.html
-│   │   ├── src/
-│   │   │   ├── services/
-│   │   │   │   ├── authService.ts.html
-│   │   │   │   ├── bookMetadataService.ts.html
-│   │   │   │   ├── index.html
-│   │   │   │   ├── inventoryService.ts.html
-│   │   │   │   └── orderService.ts.html
-│   │   │   ├── config.ts.html
-│   │   │   ├── db.ts.html
-│   │   │   ├── index.html
-│   │   │   └── index.ts.html
-│   │   ├── base.css
-│   │   ├── block-navigation.js
-│   │   ├── clover.xml
-│   │   ├── coverage-final.json
-│   │   ├── favicon.png
-│   │   ├── index.html
-│   │   ├── prettify.css
-│   │   ├── prettify.js
-│   │   ├── sort-arrow-sprite.png
-│   │   └── sorter.js
 │   ├── prisma/
+│   │   ├── migrations/
+│   │   │   └── 20250911201929_fix_book_condition_enum_values/
+│   │   │       └── migration.sql
 │   │   ├── schema.prisma
 │   │   └── seed.ts
 │   ├── public/
@@ -58,12 +34,13 @@ miniprogram-13/
 │   │   │   ├── inventoryService.ts
 │   │   │   └── orderService.ts
 │   │   ├── tests/
-│   │   │   ├── inventoryService.test.ts
+│   │   │   ├── authService.test.ts
+│   │   │   ├── integration-setup.ts
+│   │   │   ├── inventoryService.integration.test.ts
 │   │   │   ├── orderService.test.ts
 │   │   │   ├── paymentService.test.ts
 │   │   │   └── setup.ts
 │   │   ├── types/
-│   │   │   └── fastify.d.ts
 │   │   ├── config.ts
 │   │   ├── db.ts
 │   │   ├── errors.ts
@@ -73,7 +50,8 @@ miniprogram-13/
 │   ├── Dockerfile
 │   ├── package.json
 │   ├── tsconfig.json
-│   └── vitest.config.ts
+│   ├── vitest.config.ts
+│   └── vitest.integration.config.ts
 ├── miniprogram/
 │   ├── components/
 │   │   └── skeleton/
@@ -169,7 +147,8 @@ miniprogram-13/
 │   │   ├── api.js
 │   │   ├── auth.js
 │   │   ├── constants.js
-│   │   └── formatter.wxs
+│   │   ├── formatter.wxs
+│   │   └── token.js
 │   ├── app.js
 │   ├── app.json
 │   ├── app.wxss
@@ -186,69 +165,14 @@ miniprogram-13/
 └── 审查.py
 
 
-### 📄 CORE SOURCE FILES (Total: 23) ###
+### 📋 INCLUDED FILES SUMMARY ###
 ----------------------------------------
+Root files (1): CLAUDE.md
+Backend files (10): 10 TypeScript/config files
+Frontend files (12): 12 WeChat Mini Program files
 
-================================================================================
-### FILE: .gitignore
-================================================================================
-
-# Node.js dependencies
-/bookworm-backend/node_modules
-/bookworm-backend/dist
-/bookworm-backend/.env
-/bookworm-backend/prisma/dev.db
-/bookworm-backend/prisma/dev.db-journal
-
-# VSCode specific
-.vscode/
-
-# macOS specific
-.DS_Store
-
-# Logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-node_modules/
-
-# Optional npm cache directory
-.npm
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-.env.test
-.env.production
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# WeChat Developer Tools
-project.config.json
-project.private.config.json
-
+### 📄 SOURCE CODE CONTENT ###
+----------------------------------------
 
 ================================================================================
 ### FILE: CLAUDE.md
@@ -506,81 +430,6 @@ PORT=3000
 
 
 ================================================================================
-### FILE: bookworm-backend\.env
-================================================================================
-
-# .env
-DATABASE_URL="postgresql://postgres:mysecretpassword@localhost:5432/bookworm_dev?schema=public"
-
-# JWT Secret
-JWT_SECRET="a-very-secret-and-long-string-for-dev-that-is-secure"
-
-# WeChat App Config
-WX_APP_ID="wx69f426b95a21dd98"
-WX_APP_SECRET="15a45dc6e63e38050f41a08119755a4a"
-
-# WeChat Pay Config
-WXPAY_MCHID="your_merchant_id"
-WXPAY_PRIVATE_KEY_PATH="/path/to/your/apiclient_key.pem"
-WXPAY_PUBLIC_KEY_PATH="/path/to/your/apiclient_cert.pem"
-WXPAY_CERT_SERIAL_NO="your_merchant_cert_serial_no"
-WXPAY_API_V3_KEY="your_api_v3_key"
-WXPAY_NOTIFY_URL="https://your.domain.com/api/payment/notify"
-
-# Tanshu API Key
-TANSHU_API_KEY="9dd563ab0eaed4055cfa0e2301f4f1fb"
-
-
-================================================================================
-### FILE: bookworm-backend\package.json
-================================================================================
-
-{
-  "name": "bookworm-backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "dist/index.js",
-  "scripts": {
-    "dev": "nodemon --watch \"src/**/*.ts\" --exec \"npx ts-node\" src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "vitest run --coverage",
-    "migrate:dev": "npx prisma migrate dev",
-    "seed": "npx ts-node prisma/seed.ts",
-    "job:cancel-orders": "npx ts-node src/jobs/cancelExpiredOrders.ts",
-    "postinstall": "cp node_modules/@zxing/library/umd/index.min.js public/zxing.min.js"
-  },
-  "dependencies": {
-    "@fastify/rate-limit": "^9.1.0",
-    "@fastify/static": "^7.0.4",
-    "@prisma/client": "^5.15.0",
-    "axios": "^1.7.2",
-    "dotenv": "^16.4.5",
-    "fastify": "^4.27.0",
-    "fastify-plugin": "^5.0.1",
-    "fastify-raw-body": "^4.3.0",
-    "jsonwebtoken": "^9.0.2",
-    "prom-client": "^15.1.3",
-    "wechatpay-node-v3": "^2.2.1"
-  },
-  "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/node": "^20.14.2",
-    "@vitest/coverage-v8": "^3.2.4",
-    "@zxing/library": "^0.21.3",
-    "nodemon": "^3.1.2",
-    "prisma": "^5.15.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
-    "vitest": "^3.2.4"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
-}
-
-
-================================================================================
 ### FILE: bookworm-backend\prisma\schema.prisma
 ================================================================================
 
@@ -598,7 +447,7 @@ model Order {
   user_id           Int
   status            OrderStatus @default(PENDING_PAYMENT)
   total_amount      Decimal     @db.Decimal(10, 2)
-  pickup_code       String      @unique @db.VarChar(10)
+  pickup_code       String      @unique @db.VarChar(16)
   createdAt         DateTime    @default(now()) @db.Timestamptz(6)
   paymentExpiresAt  DateTime    @db.Timestamptz(6)
   pickupExpiresAt   DateTime?   @db.Timestamptz(6)
@@ -607,6 +456,7 @@ model Order {
   cancelled_at      DateTime?   @db.Timestamptz(6)
   User              User        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
   orderitem         orderitem[]
+  PaymentRecord     PaymentRecord[]
 
   @@index([user_id, status], map: "idx_order_user_id_status")
 }
@@ -630,7 +480,7 @@ model bookmaster {
   publisher      String?   @db.VarChar(255)
   original_price Decimal?  @db.Decimal(10, 2)
   created_at     DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @updatedAt @db.Timestamptz(6)
   booksku        booksku[]
 
   @@index([isbn13], map: "idx_book_master_isbn13")
@@ -643,13 +493,15 @@ model booksku {
   description     String?
   cover_image_url String?         @db.VarChar(255)
   created_at      DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @updatedAt @db.Timestamptz(6)
   bookmaster      bookmaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
   inventoryitem   inventoryitem[]
 
   @@unique([master_id, edition])
 }
 
+// 注意: Prisma 的 @updatedAt 在 `updateMany` 操作时不会自动触发。
+// 在批量更新 inventoryitem 状态的后台任务中，必须手动设置 `updated_at: new Date()`。
 model inventoryitem {
   id            Int              @id @default(autoincrement())
   sku_id        Int
@@ -658,20 +510,26 @@ model inventoryitem {
   selling_price Decimal          @db.Decimal(10, 2)
   status        inventory_status @default(in_stock)
   created_at    DateTime         @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime         @updatedAt @db.Timestamptz(6)
   booksku       booksku          @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
-  orderitem     orderitem?
+  orderitem     orderitem[]
 
   @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
 }
 
+// 注意：`inventory_item_id` 不再是唯一的。
+// 库存的唯一售出保证，由 `inventoryitem.status` 的状态流转（in_stock -> reserved -> sold）
+// 在 `createOrder` 服务的原子化事务中严格控制。
+// 保留所有 orderitem 记录（包括已取消的）用于数据审计。
 model orderitem {
   id                Int           @id @default(autoincrement())
   order_id          Int
-  inventory_item_id Int           @unique
+  inventory_item_id Int
   price             Decimal       @db.Decimal(10, 2)
   inventoryitem     inventoryitem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
   Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
+  
+  @@index([inventory_item_id], map: "idx_orderitem_inventory_item_id")
 }
 
 model Content {
@@ -686,9 +544,9 @@ model Content {
 }
 
 enum book_condition {
-  A
-  B
-  C
+  NEW        // A - 全新或接近全新
+  GOOD       // B - 有轻微使用痕迹，无破损
+  ACCEPTABLE // C - 有明显使用痕迹、笔记或轻微破损，但不影响阅读
 }
 
 enum inventory_status {
@@ -712,316 +570,35 @@ enum OrderStatus {
   RETURNED
 }
 
+model PaymentRecord {
+  id             Int      @id @default(autoincrement())
+  order_id       Int
+  out_trade_no   String   @unique @db.VarChar(100)
+  transaction_id String?  @unique @db.VarChar(100)
+  status         PaymentStatus @default(PENDING)
+  amount_total   Int      // 微信支付侧的金额，单位：分
+  payer_openid   String?  @db.VarChar(255)
+  appid          String?  @db.VarChar(100)
+  mchid          String?  @db.VarChar(100)
+  
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+  notified_at    DateTime? // 微信通知首次到达时间
+  refunded_at    DateTime? // 退款完成时间
 
-================================================================================
-### FILE: bookworm-backend\public\index.html
-================================================================================
+  Order          Order    @relation(fields: [order_id], references: [id])
+  
+  @@index([order_id])
+  @@index([status, createdAt])
+}
 
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>运营后台</title>
-    <link rel="stylesheet" href="style.css">
-    <script type="text/javascript" src="zxing.min.js" defer></script>
-    <script src="main.js" defer></script>
-</head>
-<body>
-    <div id="scanner-container" class="scanner-overlay">
-        <video id="video"></video>
-        <button id="close-scanner" class="button-danger">关闭</button>
-    </div>
-
-    <main class="main-container">
-        <header class="main-header">
-            <h1>运营后台</h1>
-        </header>
-
-        <section class="module-card">
-            <h2 class="module-title">图书入库</h2>
-            <div class="cover-preview-container">
-                <img id="cover-preview" src="" alt="封面预览">
-            </div>
-            <form id="add-book-form">
-                <div class="form-group">
-                    <label for="isbn13">ISBN-13</label>
-                    <div class="input-group">
-                        <input type="text" id="isbn13" name="isbn13" required>
-                        <button type="button" id="scan-btn" class="button-secondary">扫描</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="title">书名</label>
-                    <input type="text" id="title" name="title" required>
-                </div>
-                <div class="form-group">
-                    <label for="author">作者</label>
-                    <input type="text" id="author" name="author">
-                </div>
-                <div class="form-group">
-                    <label for="edition">版本</label>
-                    <input type="text" id="edition" name="edition">
-                </div>
-                <div class="form-group">
-                    <label for="condition">品相</label>
-                    <select id="condition" name="condition" required>
-                        <option value="A">A (全新)</option>
-                        <option value="B">B (良好)</option>
-                        <option value="C">C (可用)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="cost">成本价 (元)</label>
-                    <input type="number" id="cost" name="cost" step="0.01" required>
-                </div>
-                <div class="form-group">
-                    <label for="selling_price">销售价 (元)</label>
-                    <input type="number" id="selling_price" name="selling_price" step="0.01" required>
-                </div>
-                <button type="submit" class="button-primary">添加入库</button>
-            </form>
-            <div id="add-book-message-area" class="message-area"></div>
-        </section>
-
-        <section class="module-card">
-            <h2 class="module-title">订单核销</h2>
-            <form id="fulfill-order-form">
-                <div class="form-group">
-                    <label for="pickupCode">取货码</label>
-                    <input type="text" id="pickupCode" name="pickupCode" required placeholder="输入6位取货码">
-                </div>
-                <button type="submit" class="button-primary">确认核销</button>
-            </form>
-            <div id="fulfill-order-message-area" class="message-area"></div>
-        </section>
-
-        <section class="module-card">
-            <h2 class="module-title">待取货订单看板</h2>
-            <div id="pending-orders-container">
-                <!-- Orders will be dynamically inserted here -->
-            </div>
-            <div id="pending-orders-message-area" class="message-area"></div>
-        </section>
-    </main>
-</body>
-</html>
-
-
-================================================================================
-### FILE: bookworm-backend\public\main.js
-================================================================================
-
-// public/main.js (Refactored for clarity and maintainability)
-
-document.addEventListener('DOMContentLoaded', () => {
-
-  /**
-   * A reusable utility to show messages in a designated area.
-   * @param {HTMLElement} area The message container element.
-   * @param {string} text The message to display.
-   * @param {'success' | 'error' | 'info'} type The type of the message for styling.
-   */
-  function showMessage(area, text, type) {
-    area.textContent = text;
-    area.className = `message-area visible ${type}`;
-  }
-
-  /**
-   * Manages the book addition module.
-   */
-  const BookAdder = {
-    form: document.getElementById('add-book-form'),
-    messageArea: document.getElementById('add-book-message-area'),
-    isbnInput: document.getElementById('isbn13'),
-    coverPreview: document.getElementById('cover-preview'),
-
-    init() {
-      this.form.addEventListener('submit', this.handleSubmit.bind(this));
-    },
-
-    async handleSubmit(e) {
-      e.preventDefault();
-      showMessage(this.messageArea, '正在提交...', 'info');
-
-      const formData = new FormData(this.form);
-      const data = {
-        ...Object.fromEntries(formData.entries()),
-        cost: parseFloat(formData.get('cost')),
-        selling_price: parseFloat(formData.get('selling_price')),
-      };
-
-      try {
-        const response = await fetch('/api/inventory/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || '未知错误');
-
-        showMessage(this.messageArea, `成功！书籍ID "${result.id}" 已入库。`, 'success');
-        this.form.reset();
-        this.coverPreview.classList.remove('visible');
-      } catch (error) {
-        showMessage(this.messageArea, `错误: ${error.message}`, 'error');
-      }
-    }
-  };
-
-  /**
-   * Manages the order fulfillment module.
-   */
-  const OrderFulfiller = {
-    form: document.getElementById('fulfill-order-form'),
-    messageArea: document.getElementById('fulfill-order-message-area'),
-
-    init() {
-      this.form.addEventListener('submit', this.handleSubmit.bind(this));
-    },
-
-    async handleSubmit(e) {
-      e.preventDefault();
-      showMessage(this.messageArea, '正在核销...', 'info');
-      const pickupCode = new FormData(this.form).get('pickupCode');
-
-      try {
-        const response = await fetch('/api/orders/fulfill', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pickupCode }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || '未知错误');
-
-        showMessage(this.messageArea, `成功！订单 #${result.id} 已核销。`, 'success');
-        this.form.reset();
-      } catch (error) {
-        showMessage(this.messageArea, `错误: ${error.message}`, 'error');
-      }
-    }
-  };
-
-  /**
-   * Manages the pending orders dashboard.
-   */
-  const PendingOrdersDashboard = {
-    container: document.getElementById('pending-orders-container'),
-    messageArea: document.getElementById('pending-orders-message-area'),
-    
-    init() {
-      this.fetchOrders(); // Fetch immediately on load
-      setInterval(this.fetchOrders.bind(this), 10000); // And then every 10 seconds
-    },
-
-    async fetchOrders() {
-      try {
-        const response = await fetch('/api/orders/pending-pickup');
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const orders = await response.json();
-        
-        this.render(orders);
-      } catch (error) {
-        showMessage(this.messageArea, `无法加载订单: ${error.message}`, 'error');
-      }
-    },
-
-    render(orders) {
-      if (orders.length === 0) {
-        this.container.innerHTML = '<p class="empty-state">当前没有待取货的订单。</p>';
-        return;
-      }
-
-      this.container.innerHTML = orders.map(order => `
-        <div class="order-card">
-          <div class="order-header">
-            <strong>取货码: ${order.pickup_code}</strong>
-            <span>¥${order.total_amount}</span>
-          </div>
-          <ul class="order-item-list">
-            ${order.orderitem.map(item => `
-              <li>${item.inventoryitem.booksku.bookmaster.title} (品相: ${item.inventoryitem.condition})</li>
-            `).join('')}
-          </ul>
-        </div>
-      `).join('');
-    }
-  };
-
-  /**
-   * Manages the ISBN scanner functionality.
-   */
-  const Scanner = {
-    reader: new ZXing.BrowserMultiFormatReader(),
-    container: document.getElementById('scanner-container'),
-    videoElement: document.getElementById('video'),
-    scanButton: document.getElementById('scan-btn'),
-    closeButton: document.getElementById('close-scanner'),
-
-    init() {
-      this.scanButton.addEventListener('click', this.start.bind(this));
-      this.closeButton.addEventListener('click', this.stop.bind(this));
-    },
-
-    start() {
-      this.container.classList.add('visible');
-      this.reader.listVideoInputDevices()
-        .then(devices => {
-          const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-          if (!backCamera) throw new Error('No camera found.');
-          
-          this.reader.decodeFromVideoDevice(backCamera.deviceId, this.videoElement, (result, err) => {
-            if (result) {
-              this.stop();
-              this.handleScanSuccess(result.getText());
-            }
-            if (err && !(err instanceof ZXing.NotFoundException)) {
-              console.error(err);
-              showMessage(BookAdder.messageArea, `扫码失败: ${err.message}`, 'error');
-              this.stop();
-            }
-          });
-        })
-        .catch(err => {
-          showMessage(BookAdder.messageArea, `摄像头错误: ${err.message}`, 'error');
-          this.stop();
-        });
-    },
-
-    stop() {
-      this.reader.reset();
-      this.container.classList.remove('visible');
-    },
-
-    async handleScanSuccess(isbn) {
-      BookAdder.isbnInput.value = isbn;
-      showMessage(BookAdder.messageArea, '正在查询图书信息...', 'info');
-      BookAdder.coverPreview.classList.remove('visible');
-
-      try {
-        const response = await fetch(`/api/books/meta?isbn=${isbn}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const meta = await response.json();
-        
-        BookAdder.form.elements.title.value = meta.title || '';
-        BookAdder.form.elements.author.value = meta.author || '';
-        if (meta.cover_image_url) {
-          BookAdder.coverPreview.src = meta.cover_image_url;
-          BookAdder.coverPreview.classList.add('visible');
-        }
-        showMessage(BookAdder.messageArea, '信息已自动填充。', 'success');
-      } catch (error) {
-        showMessage(BookAdder.messageArea, '未找到图书信息，请手动输入。', 'error');
-      }
-    }
-  };
-
-  // Initialize all modules
-  BookAdder.init();
-  OrderFulfiller.init();
-  PendingOrdersDashboard.init();
-  Scanner.init();
-});
+enum PaymentStatus {
+  PENDING         // 待支付
+  SUCCESS         // 支付成功
+  REFUND_REQUIRED // 需退款（如订单已取消但支付成功）
+  REFUNDED        // 已退款
+  FAILED          // 支付失败
+}
 
 
 ================================================================================
@@ -1039,7 +616,7 @@ const config = {
   port: process.env.PORT || 3000,
   
   // JWT config
-  jwtSecret: process.env.JWT_SECRET || 'default-secret-for-dev',
+  jwtSecret: process.env.JWT_SECRET,
 
   // WeChat Mini Program config
   wxAppId: process.env.WX_APP_ID || 'YOUR_APP_ID',
@@ -1072,8 +649,11 @@ const config = {
 };
 
 // Validate essential configs
-if (config.jwtSecret === 'default-secret-for-dev') {
-    console.warn('!!! WARNING: Using default JWT_SECRET. Please set it in .env file for production.');
+if (process.env.NODE_ENV === 'production' && !config.jwtSecret) {
+    console.error('!!! FATAL ERROR: JWT_SECRET is required in production. Set it in .env file.');
+    process.exit(1);
+} else if (!config.jwtSecret) {
+    console.warn('!!! WARNING: JWT_SECRET is not configured. Set it in .env file.');
 }
 if (config.wxAppId === 'YOUR_APP_ID' || config.wxAppSecret === 'YOUR_APP_SECRET') {
     console.warn('!!! WARNING: WX_APP_ID or WX_APP_SECRET are not configured in .env file.');
@@ -1094,16 +674,52 @@ export default config;
 
 // src/db.ts
 import { PrismaClient } from '@prisma/client';
+
 const prisma = new PrismaClient();
+
 export default prisma;
+
+
+================================================================================
+### FILE: bookworm-backend\src\errors.ts
+================================================================================
+
+// src/errors.ts
+
+export class ApiError extends Error {
+  public statusCode: number;
+  public errorCode: string;
+
+  constructor(statusCode: number, message: string, errorCode: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+    
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
 
 
 ================================================================================
 ### FILE: bookworm-backend\src\index.ts
 ================================================================================
 
-// src/index.ts (fully replaced with parser fix)
+// src/index.ts
 import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
+
+// --- Type Augmentation for Fastify ---
+// This declaration merges with the original Fastify types.
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: { userId: number; openid: string };
+  }
+  export interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireRole: (role: 'USER' | 'STAFF') => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+// --- End of Type Augmentation ---
 import * as path from 'path';
 import fastifyStatic from '@fastify/static';
 import config from './config';
@@ -1121,7 +737,12 @@ const WechatPay = require('wechatpay-node-v3');
 import { Prisma } from '@prisma/client';
 import prisma from './db';
 import * as fs from 'fs';
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    redact: ['headers.authorization', 'req.headers.authorization']
+  }
+});
 
 // --- Wechat Pay Setup ---
 let pay: any | null = null;
@@ -1277,7 +898,7 @@ const setupRoutes = () => {
         config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
     }, async (request, reply) => {
         const { code } = request.body as { code: string };
-        if (!code) { return reply.code(400).send({ error: 'Code is required.' }); }
+        if (!code) { throw new ApiError(400, 'Code is required.', 'MISSING_CODE'); }
         const { token, user } = await wxLogin(code);
         reply.send({ token, userId: user.id });
     });
@@ -1286,12 +907,12 @@ const setupRoutes = () => {
     fastify.get('/api/books/meta', async (request, reply) => {
         const query = request.query as { isbn?: string };
         if (!query.isbn) { 
-            return reply.code(400).send({ error: 'ISBN parameter is required.' }); 
+            throw new ApiError(400, 'ISBN parameter is required.', 'MISSING_ISBN'); 
         }
         
         const metadata = await getBookMetadata(query.isbn);
         if (!metadata) { 
-            return reply.code(404).send({ error: 'Book metadata not found.' }); 
+            throw new ApiError(404, 'Book metadata not found.', 'BOOK_METADATA_NOT_FOUND'); 
         }
         
         reply.send(metadata);
@@ -1299,23 +920,25 @@ const setupRoutes = () => {
 
     // Inventory routes
     fastify.get('/api/inventory/available', async (request, reply) => {
-        const query = request.query as { search?: string };
-        const books = await getAvailableBooks(query.search);
+        const query = request.query as { search?: string; page?: string; limit?: string };
+        const books = await getAvailableBooks({
+            searchTerm: query.search,
+            page: query.page ? parseInt(query.page, 10) : undefined,
+            limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        });
         reply.send(books);
     });
     
     fastify.get('/api/inventory/item/:id', async (request, reply) => {
         const params = request.params as { id: string };
         const id = parseInt(params.id, 10);
-        if (isNaN(id)) { return reply.code(400).send({ error: 'Invalid item ID.' }); }
+        if (isNaN(id)) { throw new ApiError(400, 'Invalid item ID.', 'INVALID_ITEM_ID'); }
         const book = await getBookById(id);
-        if (!book) { return reply.code(404).send({ error: 'Book not found.' }); }
+        if (!book) { throw new ApiError(404, 'Book not found.', 'BOOK_NOT_FOUND'); }
         reply.send(book);
     });
     
     fastify.post('/api/inventory/add', { preHandler: [fastify.authenticate, fastify.requireRole('STAFF')] }, async (request, reply) => {
-        console.log('DEBUG: request.body =', request.body);
-        console.log('DEBUG: request.body type =', typeof request.body);
         const newItem = await addBookToInventory(request.body as any);
         reply.code(201).send(newItem);
     });
@@ -1337,11 +960,11 @@ const setupRoutes = () => {
     fastify.get('/api/orders/:id', { preHandler: [fastify.authenticate] }, async (request, reply) => {
         const { id } = request.params as { id: string };
         const orderId = parseInt(id, 10);
-        if (isNaN(orderId)) return reply.code(400).send({ error: 'Invalid order ID' });
+        if (isNaN(orderId)) throw new ApiError(400, 'Invalid order ID', 'INVALID_ORDER_ID');
         const order = await getOrderById(orderId);
         const user = await prisma.user.findUnique({ where: { id: request.user!.userId }, select: { role: true } });
         if (order.user_id !== request.user!.userId && user?.role !== 'STAFF') {
-            return reply.code(403).send({ error: 'Forbidden' });
+            throw new ApiError(403, 'Forbidden', 'ORDER_ACCESS_DENIED');
         }
         reply.send(order);
     });
@@ -1349,7 +972,7 @@ const setupRoutes = () => {
     fastify.get('/api/orders/user/:userId', { preHandler: [fastify.authenticate] }, async (request, reply) => {
         const { userId } = request.params as { userId: string };
         if (parseInt(userId, 10) !== request.user!.userId) {
-            return reply.code(403).send({ error: 'Forbidden' });
+            throw new ApiError(403, 'Forbidden', 'USER_ACCESS_DENIED');
         }
         const orders = await getOrdersByUserId(request.user!.userId);
         reply.send(orders);
@@ -1366,7 +989,7 @@ const setupRoutes = () => {
         }
     }, async (request, reply) => {
         const { pickupCode } = request.body as { pickupCode: string };
-        if (!pickupCode) { return reply.code(400).send({ error: 'pickupCode is required.' }); }
+        if (!pickupCode) { throw new ApiError(400, 'pickupCode is required.', 'MISSING_PICKUP_CODE'); }
         const order = await fulfillOrder(pickupCode.toUpperCase());
         reply.send(order);
     });
@@ -1377,7 +1000,7 @@ const setupRoutes = () => {
     });
 
     fastify.post('/api/orders/:orderId/pay', { preHandler: [fastify.authenticate] }, async (request, reply) => {
-        if (!pay) return reply.code(503).send({ error: 'Payment service is not configured.' });
+        if (!pay) throw new ApiError(503, 'Payment service is not configured.', 'PAYMENT_SERVICE_UNAVAILABLE');
         const { orderId } = request.params as { orderId: string };
         const paymentParams = await generatePaymentParams(pay, parseInt(orderId, 10), request.user!.userId);
         reply.send(paymentParams);
@@ -1387,7 +1010,7 @@ const setupRoutes = () => {
     fastify.post('/api/payment/notify', { config: { rawBody: true } }, async (request, reply) => {
         if (!pay) {
             request.log.error('WeChat Pay is not configured, cannot process notification.');
-            return reply.code(503).send({ error: 'Payment service unavailable.' });
+            throw new ApiError(503, 'Payment service unavailable.', 'PAYMENT_SERVICE_UNAVAILABLE');
         }
 
         try {
@@ -1442,7 +1065,7 @@ const start = async () => {
         process.exit(1);
     }
 };
-start();
+start();// trigger restart
 
 
 ================================================================================
@@ -1508,9 +1131,117 @@ export async function wxLogin(code: string) {
     }
   });
   
-  const token = jwt.sign({ userId: user.id, openid: user.openid }, config.jwtSecret, { expiresIn: '7d' });
+  const token = jwt.sign({ userId: user.id, openid: user.openid }, config.jwtSecret!, { expiresIn: '7d' });
 
   return { token, user };
+}
+
+
+================================================================================
+### FILE: bookworm-backend\src\services\bookMetadataService.ts
+================================================================================
+
+// bookworm-backend/src/services/bookMetadataService.ts
+import axios from 'axios';
+import prisma from '../db';
+import config from '../config'; // 导入config
+
+// 探数 API 配置
+const TANSHU_BASE_URL = 'https://api.tanshuapi.com/api/isbn/v2/index';
+
+interface TanshuBookData {
+  title: string;
+  img: string;
+  author: string;
+  isbn: string;
+  publisher: string;
+  pubdate: string;
+  price: string;
+  summary: string;
+  // ... other fields from Tanshu API
+}
+
+interface TanshuApiResponse {
+  code: number;
+  msg: string;
+  data: TanshuBookData;
+}
+
+interface BookMetadata {
+  isbn13: string;
+  title: string;
+  author: string;
+  publisher: string;
+  summary: string;
+  original_price: number;
+  cover_image_url: string;
+}
+
+/**
+ * Fetches book metadata from Tanshu API using ISBN.
+ * @param isbn The ISBN-13 of the book.
+ * @returns Parsed metadata or null if not found or on error.
+ */
+export async function getBookMetadata(isbn: string): Promise<BookMetadata | null> {
+  if (!config.tanshuApiKey) {
+    console.warn('!!! WARNING: TANSHU_API_KEY is not configured in .env. Book metadata feature is disabled.');
+    return null;
+  }
+
+  const url = `${TANSHU_BASE_URL}?key=${config.tanshuApiKey}&isbn=${isbn}`;
+  
+  try {
+    const response = await axios.get<TanshuApiResponse>(url, {
+      validateStatus: () => true, // 接受所有状态码，自己处理
+    });
+
+    if (response.status !== 200 || response.data.code !== 1) {
+      console.error(`Tanshu API Error for ISBN ${isbn}: Status ${response.status}, code: ${response.data.code}, msg: ${response.data.msg}`);
+      return null;
+    }
+
+    const data = response.data.data;
+
+    let priceValue = 0;
+    if (data.price) {
+        try {
+            const priceMatch = data.price.match(/(\d+\.?\d*)/);
+            if (priceMatch) {
+                priceValue = parseFloat(priceMatch[1]);
+            }
+        } catch (e) {
+            console.warn(`Could not parse price for ${data.title}: ${data.price}`);
+        }
+    }
+
+    return {
+      isbn13: data.isbn,
+      title: data.title || '未知书名',
+      author: data.author || '未知作者',
+      publisher: data.publisher || '未知出版社',
+      summary: data.summary || '暂无简介',
+      original_price: priceValue,
+      cover_image_url: data.img || '',
+    };
+
+  } catch (error) {
+    console.error(`Network error calling Tanshu API for ISBN ${isbn}:`, (error as Error).message);
+    return null;
+  }
+}
+
+
+================================================================================
+### FILE: bookworm-backend\src\services\contentService.ts
+================================================================================
+
+// src/services/contentService.ts
+import prisma from '../db';
+
+export async function getContentBySlug(slug: string) {
+  return await prisma.content.findUniqueOrThrow({
+    where: { slug }
+  });
 }
 
 
@@ -1534,11 +1265,10 @@ interface AddBookInput {
 }
 
 export async function addBookToInventory(input: AddBookInput) {
+  // Fetch external metadata BEFORE the transaction to avoid locking the database
+  const metadata = await getBookMetadata(input.isbn13).catch(() => null);
+  
   return prisma.$transaction(async (tx) => {
-    
-    // NEW: Attempt to fetch external metadata
-    const metadata = await getBookMetadata(input.isbn13);
-    
     // Step 1: Find or create the master book record (based on ISBN).
     // Use metadata if available, otherwise use input data (manual entry)
     const bookMaster = await tx.bookmaster.upsert({
@@ -1600,33 +1330,107 @@ export async function addBookToInventory(input: AddBookInput) {
   });
 }
 
-// MODIFIED: getAvailableBooks now accepts an optional search term
-export async function getAvailableBooks(searchTerm?: string) {
-  const whereCondition: Prisma.inventoryitemWhereInput = {
-    status: 'in_stock',
-  };
-
-  if (searchTerm) {
-    whereCondition.booksku = {
-      bookmaster: {
-        OR: [
-          { title: { contains: searchTerm, mode: 'insensitive' } },
-          { author: { contains: searchTerm, mode: 'insensitive' } },
-          { isbn13: { contains: searchTerm } },
-        ],
-      },
+// OPTIMIZED: getAvailableBooks with pg_trgm-powered search
+export async function getAvailableBooks(options: { searchTerm?: string; page?: number; limit?: number } = {}) {
+  const { searchTerm, page = 1, limit = 20 } = options;
+  
+  // Calculate pagination parameters
+  const take = limit;
+  const skip = (page - 1) * limit;
+  
+  return prisma.$transaction(async (tx) => {
+    let whereCondition: Prisma.inventoryitemWhereInput = {
+      status: 'in_stock',
     };
-  }
+    
+    // Linus式分离：搜索和非搜索是两个完全不同的数据流
+    if (!searchTerm) {
+      // 快路径：无搜索，直接使用高效索引查询
+      const totalCount = await tx.inventoryitem.count({
+        where: whereCondition,
+      });
 
-  return prisma.inventoryitem.findMany({
-    where: whereCondition,
-    include: {
-      booksku: {
+      const inventoryItems = await tx.inventoryitem.findMany({
+        where: whereCondition,
         include: {
-          bookmaster: true,
+          booksku: {
+            include: {
+              bookmaster: true,
+            },
+          },
+        },
+        skip,
+        take,
+      });
+
+      return {
+        data: inventoryItems,
+        meta: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          currentPage: page,
+          itemsPerPage: limit,
+        },
+      };
+    }
+    
+    // 智能路径：使用pg_trgm进行高质量搜索
+    
+    // 第一步：用trigram索引快速找到相关的bookmaster ID
+    // 使用更低的阈值以支持中文搜索 (中文trigram相似度通常较低)
+    const similarBookMasterIds = await tx.$queryRaw<[{ id: number }]>`
+      SELECT id FROM "bookmaster"
+      WHERE similarity((title || ' ' || COALESCE(author, '')), ${searchTerm}) > 0.05
+      ORDER BY similarity((title || ' ' || COALESCE(author, '')), ${searchTerm}) DESC
+      LIMIT 100
+    `;
+    
+    const bookMasterIds = similarBookMasterIds.map(b => b.id);
+    
+    // 如果没找到匹配的书籍，返回空结果
+    if (bookMasterIds.length === 0) {
+      return {
+        data: [],
+        meta: {
+          totalItems: 0,
+          totalPages: 0,
+          currentPage: page,
+          itemsPerPage: limit,
+        },
+      };
+    }
+    
+    // 第二步：基于找到的bookmaster ID进行库存查询
+    whereCondition.booksku = {
+      master_id: { in: bookMasterIds },
+    };
+    
+    const totalCount = await tx.inventoryitem.count({
+      where: whereCondition,
+    });
+
+    const inventoryItems = await tx.inventoryitem.findMany({
+      where: whereCondition,
+      include: {
+        booksku: {
+          include: {
+            bookmaster: true,
+          },
         },
       },
-    },
+      skip,
+      take,
+    });
+
+    return {
+      data: inventoryItems,
+      meta: {
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        currentPage: page,
+        itemsPerPage: limit,
+      },
+    };
   });
 }
 
@@ -1658,8 +1462,28 @@ import config from '../config';
 import prisma from '../db';
 import { ApiError } from '../errors';
 
+// 通用的事务重试辅助函数
+async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      // 检查是否为 Prisma 的序列化失败
+      if (e.code === 'P2034' || e.message?.includes('could not serialize')) {
+        // 指数退避+抖动等待
+        await new Promise(r => setTimeout(r, 20 * Math.pow(2, i) + Math.random() * 40));
+        continue;
+      }
+      // 非可重试错误，立即抛出
+      throw e;
+    }
+  }
+  // 重试3次后仍失败
+  throw new ApiError(409, '系统繁忙，请稍后重试', 'TX_RETRY_EXCEEDED');
+}
+
 export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
-    return prisma.$transaction(async (tx) => {
+    return withTxRetry(() => prisma.$transaction(async (tx) => {
         const itemIds = Array.from(new Set(input.inventoryItemIds));
         if (itemIds.length === 0) {
             throw new ApiError(400, '没有选择任何书籍', 'EMPTY_ITEMS');
@@ -1690,17 +1514,37 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
             new Prisma.Decimal(0)
         );
 
-        // 4. 创建订单和订单项
-        const order = await tx.order.create({
-            data: {
-                user_id: input.userId,
-                status: 'PENDING_PAYMENT',
-                total_amount: totalAmount,
-                pickup_code: crypto.randomBytes(3).toString('hex').toUpperCase(),
-                paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15分钟后过期
-            },
-        });
+        // 4. 创建订单（包含 pickup_code 重试逻辑）
+        let order;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const pickup_code = crypto.randomBytes(5).toString('hex').toUpperCase().substring(0, 8);
+            try {
+                order = await tx.order.create({
+                    data: {
+                        user_id: input.userId,
+                        status: 'PENDING_PAYMENT',
+                        total_amount: totalAmount,
+                        pickup_code,
+                        paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15分钟后过期
+                    },
+                });
+                break; // 成功创建订单，跳出循环
+            } catch (e: any) {
+                // 检查是否为 pickup_code 唯一约束冲突
+                if (e.code === 'P2002' && e.meta?.target?.includes('pickup_code')) {
+                    continue; // 重试生成新的 pickup_code
+                }
+                // 其他错误直接抛出
+                throw e;
+            }
+        }
+        
+        // 如果5次重试后仍无法生成唯一的 pickup_code
+        if (!order) {
+            throw new ApiError(500, '无法生成唯一订单取货码', 'PICKUP_CODE_GEN_FAILED');
+        }
 
+        // 5. 创建订单项
         await tx.orderitem.createMany({
             data: reservedItems.map(item => ({
                 order_id: order.id,
@@ -1712,15 +1556,40 @@ export async function createOrder(input: { userId: number; inventoryItemIds: num
         return order;
     }, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // 使用最高隔离级别保证一致性
-    });
+    }));
 }
 
-export async function getOrdersByUserId(userId: number) {
-  // ... (this function is unchanged)
-  return prisma.order.findMany({
-    where: { user_id: userId },
-    include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
-    orderBy: { createdAt: 'desc' },
+export async function getOrdersByUserId(userId: number, options: { page?: number; limit?: number } = {}) {
+  const { page = 1, limit = 10 } = options;
+
+  // Calculate pagination parameters
+  const take = limit;
+  const skip = (page - 1) * limit;
+
+  return prisma.$transaction(async (tx) => {
+    // First query: Get total count for pagination metadata
+    const totalCount = await tx.order.count({
+      where: { user_id: userId },
+    });
+
+    // Second query: Get current page data
+    const orders = await tx.order.findMany({
+      where: { user_id: userId },
+      include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+    });
+
+    return {
+      data: orders,
+      meta: {
+        totalItems: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        currentPage: page,
+        itemsPerPage: limit,
+      },
+    };
   });
 }
 
@@ -1762,123 +1631,200 @@ export async function fulfillOrder(pickupCode: string) {
 }
 
 export async function generatePaymentParams(pay: any, orderId: number, userId: number) {
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-    if (order.user_id !== userId) throw new ApiError(403, '无权支付此订单', 'FORBIDDEN');
-    if (order.status !== 'PENDING_PAYMENT') throw new ApiError(409, '订单状态不正确', 'ORDER_STATE_INVALID');
+    return prisma.$transaction(async (tx) => {
+        const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+        if (order.user_id !== userId) throw new ApiError(403, '无权支付此订单', 'FORBIDDEN');
+        if (order.status !== 'PENDING_PAYMENT') throw new ApiError(409, '订单状态不正确', 'ORDER_STATE_INVALID');
 
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { openid: true } });
-    
-    const orderItems = await prisma.orderitem.findMany({ 
-        where: { order_id: orderId },
-        include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } }
+        const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { openid: true } });
+        
+        // 创建或查找 PaymentRecord，使用精确的金额计算
+        const amount_total = new Prisma.Decimal(order.total_amount).mul(100).toDecimalPlaces(0).toNumber();
+        const out_trade_no = `BOOKWORM_${order.id}`;
+        
+        const paymentRecord = await tx.paymentRecord.upsert({
+            where: { out_trade_no },
+            create: {
+                out_trade_no,
+                order_id: order.id,
+                status: 'PENDING',
+                amount_total,
+                appid: config.wxAppId,
+                mchid: config.wxPayMchId
+            },
+            update: {}
+        });
+        
+        const orderItems = await tx.orderitem.findMany({ 
+            where: { order_id: orderId },
+            include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } }
+        });
+        const titles = orderItems.map(i => i.inventoryitem.booksku.bookmaster.title);
+        const description = titles.slice(0, 3).join('、') + (titles.length > 3 ? `等${titles.length}本书籍` : '');
+
+        const unifiedOrderResult = await pay.transactions_jsapi({
+            appid: config.wxAppId!,
+            mchid: config.wxPayMchId!,
+            description,
+            out_trade_no,
+            notify_url: config.wxPayNotifyUrl!,
+            time_expire: new Date(order.paymentExpiresAt).toISOString(),
+            amount: { total: amount_total, currency: 'CNY' },
+            payer: { openid: user.openid }
+        });
+
+        const { prepay_id } = unifiedOrderResult as any;
+        if (!prepay_id) throw new ApiError(500, '微信下单失败，未返回prepay_id', 'WECHAT_PAY_ERROR');
+        
+        const timeStamp = Math.floor(Date.now() / 1000).toString();
+        const nonceStr = crypto.randomBytes(16).toString('hex');
+        const pkg = `prepay_id=${prepay_id}`;
+        const toSign = `${config.wxAppId}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
+
+        const paySign = pay.sign(toSign);
+
+        return { timeStamp, nonceStr, package: pkg, signType: 'RSA', paySign };
     });
-    const titles = orderItems.map(i => i.inventoryitem.booksku.bookmaster.title);
-    const description = titles.slice(0, 3).join('、') + (titles.length > 3 ? `等${titles.length}本书籍` : '');
-
-    const unifiedOrderResult = await pay.transactions_jsapi({
-        appid: config.wxAppId!,
-        mchid: config.wxPayMchId!,
-        description,
-        out_trade_no: `BOOKWORM_${order.id}_${Date.now()}`, // 加入时间戳防重试
-        notify_url: config.wxPayNotifyUrl!,
-        amount: { total: Math.round(Number(order.total_amount) * 100), currency: 'CNY' },
-        payer: { openid: user.openid }
-    });
-
-    const { prepay_id } = unifiedOrderResult as any;
-    if (!prepay_id) throw new ApiError(500, '微信下单失败，未返回prepay_id', 'WECHAT_PAY_ERROR');
-    
-    const timeStamp = Math.floor(Date.now() / 1000).toString();
-    const nonceStr = crypto.randomBytes(16).toString('hex');
-    const pkg = `prepay_id=${prepay_id}`;
-    const toSign = `${config.wxAppId}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
-
-    const paySign = pay.sign(toSign);
-
-    return { timeStamp, nonceStr, package: pkg, signType: 'RSA', paySign };
 }
 
-// NEW: Process WeChat Pay payment notification
+// NEW: Process WeChat Pay payment notification with strict idempotency
 export async function processPaymentNotification(notificationData: any) {
   return prisma.$transaction(async (tx) => {
-    const { out_trade_no, transaction_id, trade_state, amount } = notificationData;
+    const { 
+      out_trade_no, 
+      transaction_id, 
+      trade_state, 
+      amount, 
+      payer, 
+      mchid, 
+      appid 
+    } = notificationData;
     
-    // 1. Validate payment success
-    if (trade_state !== 'SUCCESS') {
-      throw new ApiError(400, `支付未成功，状态：${trade_state}`, 'PAYMENT_NOT_SUCCESS');
-    }
-
-    // 2. Extract order ID from out_trade_no (format: BOOKWORM_{orderId})
-    if (!out_trade_no.startsWith('BOOKWORM_')) {
-      throw new ApiError(400, `订单号格式无效：${out_trade_no}`, 'INVALID_TRADE_NO');
-    }
-    const orderId = parseInt(out_trade_no.split('_')[1], 10);
-
-    // 3. Find and validate the order
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { orderitem: true }
+    // 1. 幂等性检查 (第一道防线)
+    const paymentRecord = await tx.paymentRecord.findUnique({
+      where: { out_trade_no },
+      include: { Order: true }
     });
-
-    if (!order) {
-      throw new ApiError(404, `订单不存在：${orderId}`, 'ORDER_NOT_FOUND');
+    
+    if (!paymentRecord || paymentRecord.status === 'SUCCESS') {
+      console.log(`Payment notification for ${out_trade_no} already processed or unknown. Skipping.`);
+      return paymentRecord;
     }
-
-    // 4. Check if already processed (idempotency)
-    if (order.status === 'PENDING_PICKUP') {
-      console.log(`Order ${orderId} already marked as paid. Skipping.`);
-      return order;
+    
+    // 2. 数据校验 (第二道防线)
+    if (mchid && mchid !== config.wxPayMchId) {
+      throw new ApiError(400, `商户号不匹配。期望：${config.wxPayMchId}，实际：${mchid}`, 'MCHID_MISMATCH');
     }
-
-    // 5. Validate order status
-    if (order.status !== 'PENDING_PAYMENT') {
-      throw new ApiError(409, `订单状态无效：${order.status}，期望：PENDING_PAYMENT`, 'ORDER_STATE_INVALID');
+    
+    if (appid && appid !== config.wxAppId) {
+      throw new ApiError(400, `应用ID不匹配。期望：${config.wxAppId}，实际：${appid}`, 'APPID_MISMATCH');
     }
-
-    // 6. Validate amount (convert from cents to yuan)
-    const expectedAmount = Math.round(Number(order.total_amount) * 100);
-    if (amount.total !== expectedAmount) {
-      throw new ApiError(400, `金额不匹配。期望：${expectedAmount}，实际：${amount.total}`, 'AMOUNT_MISMATCH');
+    
+    if (amount.total !== paymentRecord.amount_total) {
+      throw new ApiError(400, `金额不匹配。期望：${paymentRecord.amount_total}，实际：${amount.total}`, 'AMOUNT_MISMATCH');
     }
-
-    // 7. Update order status to paid
-    const updatedOrder = await tx.order.update({
-      where: { id: orderId },
+    
+    // 3. 验证支付状态
+    if (trade_state !== 'SUCCESS') {
+      console.log(`Payment for ${out_trade_no} failed with state: ${trade_state}`);
+      // 可以选择更新 PaymentRecord 状态为 FAILED
+      return null;
+    }
+    
+    // 4. 核心状态更新
+    const updatedPaymentRecord = await tx.paymentRecord.update({
+      where: { out_trade_no },
       data: {
-        status: 'PENDING_PICKUP',
-        paid_at: new Date()
+        status: 'SUCCESS',
+        transaction_id,
+        payer_openid: payer?.openid,
+        notified_at: new Date()
       }
     });
-
-    console.log(`Order ${orderId} successfully marked as paid`);
-    return updatedOrder;
+    
+    // 5. 关联订单状态处理
+    const order = paymentRecord.Order;
+    
+    // 处理"迟到支付"
+    if (order.status === 'CANCELLED') {
+      await tx.paymentRecord.update({
+        where: { out_trade_no },
+        data: { status: 'REFUND_REQUIRED' }
+      });
+      console.error(`CRITICAL: Payment succeeded for cancelled order ${order.id}. Marked for refund.`);
+      return updatedPaymentRecord;
+    }
+    
+    // 处理正常支付
+    if (order.status === 'PENDING_PAYMENT') {
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'PENDING_PICKUP',
+          paid_at: new Date()
+        }
+      });
+      console.log(`Order ${order.id} successfully marked as paid`);
+      return updatedPaymentRecord;
+    }
+    
+    // 其他状态的警告处理
+    console.warn(`Payment notification for order ${order.id} with unexpected status: ${order.status}`);
+    return updatedPaymentRecord;
   });
 }
 
 export async function getPendingPickupOrders() {
-  return prisma.order.findMany({
+  // Linus式方案：分离查询，手动聚合，消除N+1
+  
+  // 1. 获取所有待取货订单及其orderitem（一层include）
+  const ordersWithItems = await prisma.order.findMany({
+    where: { status: 'PENDING_PICKUP' },
+    include: {
+      orderitem: true, // 只include一层，避免深层嵌套
+    },
+    orderBy: { paid_at: 'asc' },
+  });
+
+  // 2. 提取所有inventory_item_id
+  const inventoryItemIds = ordersWithItems.flatMap(o => 
+    o.orderitem.map(item => item.inventory_item_id)
+  );
+
+  // 如果没有订单，直接返回空数组
+  if (inventoryItemIds.length === 0) {
+    return [];
+  }
+
+  // 3. 一次性查询所有相关的inventory数据
+  const inventoryItems = await prisma.inventoryitem.findMany({
     where: {
-      status: 'PENDING_PICKUP',
+      id: { in: inventoryItemIds },
     },
     include: {
-      orderitem: {
+      booksku: {
         include: {
-          inventoryitem: {
-            include: {
-              booksku: {
-                include: {
-                  bookmaster: true,
-                },
-              },
-            },
-          },
+          bookmaster: true,
         },
       },
     },
-    orderBy: {
-      paid_at: 'asc', // 按支付时间升序，先付钱的先备货
-    },
   });
+
+  // 4. 创建inventory数据的快速查找Map
+  const inventoryMap = new Map(
+    inventoryItems.map(item => [item.id, item])
+  );
+
+  // 5. 手动聚合数据：将完整的inventory信息附加到每个orderitem上
+  const enrichedOrders = ordersWithItems.map(order => ({
+    ...order,
+    orderitem: order.orderitem.map(item => ({
+      ...item,
+      inventoryitem: inventoryMap.get(item.inventory_item_id)!,
+    })),
+  }));
+
+  return enrichedOrders;
 }
 
 export async function cancelExpiredOrders() {
@@ -1940,6 +1886,7 @@ export async function cancelExpiredOrders() {
         },
         data: {
           status: 'in_stock',
+          updated_at: new Date(),
         },
       });
     }
@@ -2028,183 +1975,18 @@ App({
 
 
 ================================================================================
-### FILE: miniprogram\app.json
-================================================================================
-
-{
-  "pages": [
-    "pages/market/index",
-    "pages/orders/index",
-    "pages/profile/index",
-    "pages/book-detail/index",
-    "pages/order-confirm/index",
-    "pages/order-detail/index",
-    "pages/webview/index",
-    "pages/customer-service/index"
-  ],
-  "window": {
-    "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#2c5f2d",
-    "navigationBarTitleText": "校园书",
-    "navigationBarTextStyle": "white"
-  },
-  "tabBar": {
-    "color": "#6b6b6b",
-    "selectedColor": "#2c5f2d",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "white",
-    "list": [
-      {
-        "pagePath": "pages/market/index",
-        "text": "市场",
-        "iconPath": "images/tabs/marketplace.png",
-        "selectedIconPath": "images/tabs/marketplace-active.png"
-      },
-      {
-        "pagePath": "pages/orders/index",
-        "text": "订单",
-        "iconPath": "images/tabs/orders.png",
-        "selectedIconPath": "images/tabs/orders-active.png"
-      },
-      {
-        "pagePath": "pages/profile/index",
-        "text": "我的",
-        "iconPath": "images/tabs/profile.png",
-        "selectedIconPath": "images/tabs/profile-active.png"
-      }
-    ]
-  },
-  "style": "v2",
-  "sitemapLocation": "sitemap.json"
-}
-
-
-================================================================================
-### FILE: miniprogram\app.wxss
-================================================================================
-
-/* app.wxss */
-
-/* --- 1. 全局设计语言 (The Law) --- */
-page {
-  /* 色彩 (Color) */
-  --primary-color: #2c5f2d;
-  --text-primary: #1a1a1a;
-  --text-secondary: #6b6b6b;
-  --background-color: #f8f9fa;
-  --card-background: #ffffff;
-  --border-color: #e9ecef;
-  --success-color: #28a745;
-  --error-color: #dc3545;
-  --warning-color: #ffc107;
-
-  /* 排版 (Typography) */
-  --font-size-display: 48rpx;
-  --font-size-title: 36rpx;
-  --font-size-body: 28rpx;
-  --font-size-caption: 24rpx;
-  --font-weight-normal: 400;
-  --font-weight-bold: 600;
-
-  /* 间距 (Spacing) */
-  --space-xs: 8rpx;
-  --space-s: 16rpx;
-  --space-m: 24rpx;
-  --space-l: 32rpx;
-  --space-xl: 48rpx;
-
-  /* 基础样式 */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  background-color: var(--background-color);
-  line-height: 1.6;
-}
-
-/* --- 2. 全局组件 (Components) --- */
-
-/* 容器 */
-.container {
-  padding: var(--space-m) var(--space-l);
-}
-
-/* 卡片 */
-.card {
-  background-color: var(--card-background);
-  border-radius: 24rpx;
-  padding: var(--space-l);
-  margin-bottom: var(--space-m);
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
-}
-
-/* 按钮 */
-.btn {
-  display: inline-block;
-  height: 88rpx;
-  line-height: 88rpx;
-  padding: 0 var(--space-l);
-  border-radius: 16rpx;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
-  text-align: center;
-  vertical-align: middle;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-.btn:active {
-  opacity: 0.8;
-}
-.btn-primary {
-  background-color: var(--primary-color);
-  color: #ffffff;
-}
-.btn-sm {
-  height: 60rpx;
-  line-height: 60rpx;
-  padding: 0 var(--space-s);
-  font-size: var(--font-size-caption);
-  border-radius: 12rpx;
-}
-.btn[disabled] {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* 状态标签 */
-.status-tag {
-  display: inline-block;
-  padding: var(--space-xs) var(--space-s);
-  border-radius: 8rpx;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  color: #ffffff;
-}
-.status-tag.success { background-color: var(--success-color); }
-.status-tag.error { background-color: var(--error-color); }
-.status-tag.warning { background-color: var(--warning-color); }
-
-/* 全局点击反馈 */
-.item-hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-
-================================================================================
 ### FILE: miniprogram\config.js
 ================================================================================
 
 // miniprogram/config.js
 const config = {
+  // 当前网络配置 - WLAN IP: 172.20.10.4
+  // 如果使用模拟器开发，可改为 'http://localhost:3000/api'
+  // 如果使用真机调试，使用当前的内网IP
   apiBaseUrl: 'http://172.20.10.4:3000/api'
 };
 
 module.exports = config;
-
-
-================================================================================
-### FILE NOT FOUND: miniprogram\package.json
-================================================================================
 
 
 ================================================================================
@@ -2260,6 +2042,44 @@ Page({
 
 
 ================================================================================
+### FILE: miniprogram\pages\customer-service\index.js
+================================================================================
+
+Page({
+  data: {
+    customerServiceWechat: 'bookworm_service'
+  },
+
+  onLoad() {
+    wx.setNavigationBarTitle({
+      title: '联系客服与帮助'
+    });
+  },
+
+  // 复制微信号
+  copyWechatId() {
+    wx.setClipboardData({
+      data: this.data.customerServiceWechat,
+      success: () => {
+        wx.showToast({
+          title: '已复制',
+          icon: 'success',
+          duration: 2000
+        });
+      },
+      fail: () => {
+        wx.showToast({
+          title: '复制失败',
+          icon: 'none',
+          duration: 2000
+        });
+      }
+    });
+  }
+});
+
+
+================================================================================
 ### FILE: miniprogram\pages\market\index.js
 ================================================================================
 
@@ -2273,7 +2093,8 @@ Page({
     isLoading: true,
     error: null,
     searchTerm: '',
-    searchPerformed: false // To show different empty state messages
+    searchPerformed: false, // To show different empty state messages
+    pageInfo: null // For pagination metadata
   },
 
   onLoad(options) {
@@ -2293,7 +2114,7 @@ Page({
         url: url,
         method: 'GET'
       });
-      this.setData({ bookList: data });
+      this.setData({ bookList: data.data, pageInfo: data.meta });
     } catch (error) {
       console.error('API request failed', error);
       this.setData({ 
@@ -2438,6 +2259,108 @@ Page({
 
 
 ================================================================================
+### FILE: miniprogram\pages\order-detail\index.js
+================================================================================
+
+// pages/order-detail/index.js
+const { request } = require('../../utils/api');
+
+Page({
+  data: {
+    order: null,
+    isLoading: true,
+    error: null
+  },
+
+  onLoad(options) {
+    if (options.id) {
+      this.fetchOrderDetail(options.id);
+    } else {
+      this.setData({ 
+        isLoading: false, 
+        error: '无效的订单ID' 
+      });
+    }
+  },
+
+  async fetchOrderDetail(orderId) {
+    this.setData({ isLoading: true, error: null });
+
+    try {
+      const data = await request({
+        url: `/orders/${orderId}`,
+        method: 'GET'
+      });
+      this.setData({ 
+        order: data,
+        isLoading: false 
+      });
+    } catch (error) {
+      this.setData({ 
+        error: error.error || '获取订单详情失败',
+        isLoading: false 
+      });
+    }
+  },
+
+  formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  },
+
+  getStatusText(status) {
+    const statusMap = {
+      'PENDING_PAYMENT': '待支付',
+      'PENDING_PICKUP': '待取货', 
+      'COMPLETED': '已完成',
+      'CANCELLED': '已取消',
+      'RETURNED': '已退货'
+    };
+    return statusMap[status] || status;
+  },
+
+  getConditionText(condition) {
+    const conditionMap = {
+      'A': '全新',
+      'B': '八成新',
+      'C': '六成新'
+    };
+    return conditionMap[condition] || condition;
+  },
+
+  onRefresh() {
+    const pages = getCurrentPages();
+    const currentPage = pages[pages.length - 1];
+    const orderId = currentPage.options.id;
+    if (orderId) {
+      this.fetchOrderDetail(orderId);
+    }
+  },
+
+  copyPickupCode(e) {
+    const code = e.target.dataset.code || e.currentTarget.dataset.code;
+    if (code) {
+      wx.setClipboardData({
+        data: code,
+        success: () => {
+          wx.showToast({
+            title: '取货码已复制',
+            icon: 'success'
+          });
+        }
+      });
+    }
+  }
+});
+
+
+================================================================================
 ### FILE: miniprogram\pages\orders\index.js
 ================================================================================
 
@@ -2452,6 +2375,7 @@ Page({
     isLoading: true,
     error: null,
     statusMap: ORDER_STATUS,
+    pageInfo: null // For pagination metadata
   },
   onShow() { this.fetchUserOrders(); },
   navigateToDetail(event) {
@@ -2472,7 +2396,7 @@ Page({
         url: `/orders/user/${userId}`,
         method: 'GET'
       });
-      this.setData({ orderList: data });
+      this.setData({ orderList: data.data, pageInfo: data.meta });
     } catch (error) {
       this.setData({ error: error.error || '加载订单失败。' });
     } finally {
@@ -2489,13 +2413,155 @@ Page({
 
 
 ================================================================================
+### FILE: miniprogram\pages\profile\index.js
+================================================================================
+
+// miniprogram/pages/profile/index.js
+const app = getApp(); // 获取App实例
+
+Page({
+  data: {
+    userInfo: { nickName: '微信用户' },
+    serviceInfo: {
+      wechatId: 'your_service_wechat_id',
+      time: '工作日 9:00 - 18:00'
+    }
+  },
+  copyWechatId() {
+    wx.setClipboardData({
+      data: this.data.serviceInfo.wechatId,
+      success: () => { wx.showToast({ title: '已复制' }); }
+    });
+  },
+
+  showTerms() {
+    wx.navigateTo({
+      url: '/pages/webview/index?slug=terms-of-service'
+    });
+  },
+
+  showPrivacy() {
+    wx.navigateTo({
+      url: '/pages/webview/index?slug=privacy-policy'
+    });
+  },
+
+  goToCustomerService() {
+    wx.navigateTo({
+      url: '/pages/customer-service/index'
+    });
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '超值的二手教材，快来看看吧！',
+      path: '/pages/market/index',
+    }
+  }
+});
+
+
+================================================================================
+### FILE: miniprogram\pages\webview\index.js
+================================================================================
+
+const { request } = require('../../utils/api');
+
+Page({
+  data: {
+    content: null,
+    isLoading: true,
+    errorMsg: ''
+  },
+
+  onLoad(options) {
+    const { slug } = options;
+    if (!slug) {
+      this.setData({
+        isLoading: false,
+        errorMsg: '页面参数错误'
+      });
+      return;
+    }
+
+    this.loadContent(slug);
+  },
+
+  async loadContent(slug) {
+    try {
+      const data = await request({
+        url: `/content/${slug}`,
+        method: 'GET'
+      });
+      const { title, body } = data;
+      wx.setNavigationBarTitle({ title });
+      this.setData({
+        content: { title, body },
+        isLoading: false
+      });
+    } catch (error) {
+      console.error('Content load failed', error);
+      this.setData({
+        isLoading: false,
+        errorMsg: error.error || '内容加载失败'
+      });
+    }
+  }
+});
+
+
+================================================================================
+### FILE: miniprogram\utils\api.js
+================================================================================
+
+// miniprogram/utils/api.js - 统一的API请求工具
+const config = require('../config');
+const tokenUtil = require('./token'); // 依赖新的、无依赖的模块
+
+/**
+ * 统一的API请求函数
+ * @param {Object} options - 请求参数
+ * @param {string} options.url - 请求地址（相对路径，会自动拼接baseURL）
+ * @param {string} options.method - 请求方法（GET, POST等）
+ * @param {Object} options.data - 请求数据
+ * @param {Object} options.header - 请求头
+ * @returns {Promise} - 返回Promise对象
+ */
+const request = ({ url, method = 'GET', data = {} }) => new Promise((resolve, reject) => {
+    const token = tokenUtil.getToken(); // 从新模块获取token
+    wx.request({
+        url: `${config.apiBaseUrl}${url}`,
+        method,
+        data,
+        header: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+        },
+        success: (res) => {
+            if (res.statusCode >= 200 && res.statusCode < 300) return resolve(res.data);
+            if (res.statusCode === 401) {
+                // 简单处理：提示并让用户重启
+                wx.showToast({ title: '登录过期，请重启小程序', icon: 'none' });
+                tokenUtil.clearToken();
+            }
+            return reject(res.data || { error: `Request failed with status ${res.statusCode}` });
+        },
+        fail: (err) => reject({ error: '网络请求失败', errorCode: 'NETWORK_ERROR' })
+    });
+});
+
+module.exports = {
+  request
+};
+
+
+================================================================================
 ### FILE: miniprogram\utils\auth.js
 ================================================================================
 
-// utils/auth.js
+// miniprogram/utils/auth.js
 const { request } = require('./api');
-const TOKEN_KEY = 'authToken';
-const USER_ID_KEY = 'userId';
+const tokenUtil = require('./token'); // 引入新的token模块
 
 const login = () => {
   return new Promise((resolve, reject) => {
@@ -2506,14 +2572,12 @@ const login = () => {
             const data = await request({
               url: '/auth/login',
               method: 'POST',
-              data: {
-                code: res.code
-              }
+              data: { code: res.code }
             });
             
             if (data.token) {
-              setToken(data.token);
-              setUserId(data.userId);
+              tokenUtil.setToken(data.token); // 使用新模块
+              tokenUtil.setUserId(data.userId); // 使用新模块
               resolve(data);
             } else {
               reject(new Error('Login failed on server.'));
@@ -2525,30 +2589,22 @@ const login = () => {
           reject(new Error('wx.login failed, no code returned.'));
         }
       },
-      fail: (err) => {
-        reject(err);
-      }
+      fail: (err) => { reject(err); }
     });
   });
 };
 
-const setToken = (token) => wx.setStorageSync(TOKEN_KEY, token);
-const getToken = () => wx.getStorageSync(TOKEN_KEY);
-const setUserId = (userId) => wx.setStorageSync(USER_ID_KEY, userId);
-const getUserId = () => wx.getStorageSync(USER_ID_KEY);
 const logout = () => {
-  wx.removeStorageSync(TOKEN_KEY);
-  wx.removeStorageSync(USER_ID_KEY);
+  tokenUtil.clearToken(); // 使用新模块
 };
 
 module.exports = {
   login,
-  getToken,
-  getUserId,
+  getUserId: tokenUtil.getUserId, // 直接导出
   logout
 };
 
 
 ================================================================================
-CORE CODE REVIEW REPORT GENERATION COMPLETE.
+ESSENTIAL CODE REVIEW REPORT GENERATION COMPLETE.
 ================================================================================

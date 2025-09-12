@@ -24,16 +24,23 @@ const prismaMock = {
   user: {
     upsert: vi.fn(),
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
   },
   order: {
     create: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     update: vi.fn(),
   },
   orderitem: {
     create: vi.fn(),
     createMany: vi.fn(),
+    findMany: vi.fn(),
+  },
+  paymentRecord: {
+    create: vi.fn(),
+    deleteMany: vi.fn(),
     findMany: vi.fn(),
   },
   $transaction: vi.fn(),

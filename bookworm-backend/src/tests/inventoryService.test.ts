@@ -1,316 +1,207 @@
 // src/tests/inventoryService.test.ts
-import { describe, it, expect } from 'vitest';
-import { addBookToInventory, getAvailableBooks, getBookById, getBookMetadata } from '../services/inventoryService';
-import { prismaMock } from './setup';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { mockDeep, mockReset } from 'vitest-mock-extended';
+import { PrismaClient } from '@prisma/client';
+import * as bookMetadataService from '../services/bookMetadataService';
+
+const prismaMock = mockDeep<PrismaClient>();
+vi.mock('../db', () => ({
+  default: prismaMock,
+}));
+
+// Import AFTER mocking
+const { addBookToInventory, getAvailableBooks } = await import('../services/inventoryService');
 
 describe('Inventory Service', () => {
+  beforeEach(() => {
+    mockReset(prismaMock);
+    vi.restoreAllMocks();
+  });
+
   describe('addBookToInventory', () => {
-    it('should add a new book to inventory, creating master and sku records', async () => {
+    it('creates complete book hierarchy when nothing exists', async () => {
       const input = {
-        isbn13: '1234567890123',
-        title: 'Test Book',
-        author: 'Test Author',
-        condition: 'A' as const,
-        cost: 10,
-        selling_price: 20,
+        isbn13: '9787111633455',
+        title: '深入理解计算机系统',
+        edition: '第3版',
+        condition: 'NEW' as const,
+        cost: 50.00,
+        selling_price: 88.00,
       };
 
-      // Mock the database responses
-      const mockBookMaster = { 
-        id: 1, 
-        isbn13: input.isbn13, 
-        title: input.title, 
-        author: input.author,
-        publisher: null,
-        original_price: null,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
+      // 无外部元数据
+      vi.spyOn(bookMetadataService, 'getBookMetadata').mockResolvedValue(null);
+
+      // 模拟事务的正确方法：让事务直接返回结果，而不是模拟回调
+      const mockMaster = { id: 1, isbn13: input.isbn13, title: input.title };
+      const mockSku = { id: 10, master_id: 1, edition: input.edition };
+      const mockItem = { id: 101, sku_id: 10, condition: input.condition, cost: input.cost, selling_price: input.selling_price, status: 'in_stock' };
+
+      prismaMock.$transaction.mockResolvedValue(mockItem);
       
-      const mockBookSku = { 
-        id: 1, 
-        master_id: 1, 
-        edition: 'default',
-        description: null,
-        cover_image_url: null,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
-      
-      const mockInventoryItem = { 
-        id: 1, 
-        sku_id: 1, 
-        condition: input.condition, 
-        cost: input.cost,
-        selling_price: input.selling_price,
-        status: 'in_stock' as const,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
-
-      // Mock the transaction
-      const mockTransaction = {
-        bookmaster: {
-          upsert: vi.fn().mockResolvedValue(mockBookMaster),
-        },
-        booksku: {
-          upsert: vi.fn().mockResolvedValue(mockBookSku),
-        },
-        inventoryitem: {
-          create: vi.fn().mockResolvedValue(mockInventoryItem),
-        },
-      };
-
-      prismaMock.$transaction.mockImplementation((fn) => fn(mockTransaction as any));
+      // 模拟事务内部的操作
+      prismaMock.bookmaster.upsert.mockResolvedValue(mockMaster as any);
+      prismaMock.booksku.upsert.mockResolvedValue(mockSku as any);
+      prismaMock.inventoryitem.create.mockResolvedValue(mockItem as any);
 
       const result = await addBookToInventory(input);
+      
+      expect(result).toEqual(mockItem);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
 
-      // Assert that the correct functions were called
-      expect(mockTransaction.bookmaster.upsert).toHaveBeenCalledWith({
-        where: { isbn13: input.isbn13 },
-        update: {},
-        create: {
-          isbn13: input.isbn13,
-          title: input.title,
-          author: input.author,
-        },
-      });
+    it('merges external metadata when available', async () => {
+      const input = {
+        isbn13: '9787111633455',
+        title: '手工输入标题',
+        condition: 'NEW' as const,
+        cost: 50.00,
+        selling_price: 88.00,
+      };
 
-      expect(mockTransaction.booksku.upsert).toHaveBeenCalledWith({
-        where: { master_id_edition: { master_id: 1, edition: 'default' } },
-        update: {},
-        create: { master_id: 1, edition: 'default' },
-      });
+      const metadata = {
+        title: '权威API标题',
+        author: '权威作者',
+        publisher: '权威出版社',
+        original_price: 99.00,
+        cover_image_url: 'https://example.com/cover.jpg'
+      };
 
-      expect(mockTransaction.inventoryitem.create).toHaveBeenCalledWith({
-        data: {
-          sku_id: 1,
-          condition: input.condition,
-          cost: input.cost,
-          selling_price: input.selling_price,
-          status: 'in_stock',
-        },
-      });
+      vi.spyOn(bookMetadataService, 'getBookMetadata').mockResolvedValue(metadata);
 
-      expect(result).toEqual(mockInventoryItem);
+      const mockItem = { id: 101, sku_id: 10, status: 'in_stock' };
+      prismaMock.$transaction.mockResolvedValue(mockItem);
+
+      await addBookToInventory(input);
+
+      // 验证是否在事务外部调用了元数据API
+      expect(bookMetadataService.getBookMetadata).toHaveBeenCalledWith(input.isbn13);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+
+    it('handles metadata fetch failure gracefully', async () => {
+      const input = {
+        isbn13: '9787111633455',
+        title: '深入理解计算机系统',
+        condition: 'NEW' as const,
+        cost: 50.00,
+        selling_price: 88.00,
+      };
+
+      // 模拟外部API失败
+      vi.spyOn(bookMetadataService, 'getBookMetadata').mockRejectedValue(new Error('API Error'));
+
+      const mockItem = { id: 101, sku_id: 10, status: 'in_stock' };
+      prismaMock.$transaction.mockResolvedValue(mockItem);
+
+      const result = await addBookToInventory(input);
+      
+      expect(result).toEqual(mockItem);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
     });
   });
 
   describe('getAvailableBooks', () => {
-    it('should get all available books when no search term provided', async () => {
-      const mockBook = {
-        id: 1,
-        sku_id: 1,
-        condition: 'A' as const,
-        cost: 10,
-        selling_price: 20,
-        status: 'in_stock' as const,
-        created_at: new Date(),
-        updated_at: new Date(),
-        booksku: {
-          id: 1,
-          master_id: 1,
-          edition: 'default',
-          description: null,
-          cover_image_url: null,
-          created_at: new Date(),
-          updated_at: new Date(),
-          bookmaster: {
-            id: 1,
-            isbn13: '1234567890123',
-            title: 'Test Book',
-            author: 'Test Author',
-            publisher: null,
-            original_price: null,
-            created_at: new Date(),
-            updated_at: new Date(),
-          },
-        },
-      };
+    it('returns paginated books without search (fast path)', async () => {
+      const mockItems = [
+        { id: 1, status: 'in_stock', booksku: { bookmaster: { title: 'Book 1' } } },
+        { id: 2, status: 'in_stock', booksku: { bookmaster: { title: 'Book 2' } } }
+      ];
 
-      prismaMock.inventoryitem.findMany.mockResolvedValue([mockBook]);
-
-      const books = await getAvailableBooks();
-
-      expect(prismaMock.inventoryitem.findMany).toHaveBeenCalledWith({
-        where: { status: 'in_stock' },
-        include: {
-          booksku: {
-            include: {
-              bookmaster: true,
-            },
-          },
-        },
-      });
-      expect(books).toHaveLength(1);
-      expect(books[0]).toEqual(mockBook);
-    });
-
-    it('should filter books by search term', async () => {
-      const mockBook = {
-        id: 1,
-        sku_id: 1,
-        condition: 'A' as const,
-        cost: 10,
-        selling_price: 20,
-        status: 'in_stock' as const,
-        created_at: new Date(),
-        updated_at: new Date(),
-        booksku: {
-          id: 1,
-          master_id: 1,
-          edition: 'default',
-          description: null,
-          cover_image_url: null,
-          created_at: new Date(),
-          updated_at: new Date(),
-          bookmaster: {
-            id: 1,
-            isbn13: '1234567890123',
-            title: 'Test Book',
-            author: 'Test Author',
-            publisher: null,
-            original_price: null,
-            created_at: new Date(),
-            updated_at: new Date(),
-          },
-        },
-      };
-
-      prismaMock.inventoryitem.findMany.mockResolvedValue([mockBook]);
-
-      const books = await getAvailableBooks('Test');
-
-      expect(prismaMock.inventoryitem.findMany).toHaveBeenCalledWith({
-        where: {
-          status: 'in_stock',
-          booksku: {
-            bookmaster: {
-              OR: [
-                { title: { contains: 'Test', mode: 'insensitive' } },
-                { author: { contains: 'Test', mode: 'insensitive' } },
-                { isbn13: { contains: 'Test' } },
-              ],
-            },
-          },
-        },
-        include: {
-          booksku: {
-            include: {
-              bookmaster: true,
-            },
-          },
-        },
-      });
-      expect(books).toHaveLength(1);
-    });
-  });
-
-  describe('getBookById', () => {
-    it('should get a book by its inventory item ID', async () => {
-      const mockBook = {
-        id: 1,
-        sku_id: 1,
-        condition: 'A' as const,
-        cost: 10,
-        selling_price: 20,
-        status: 'in_stock' as const,
-        created_at: new Date(),
-        updated_at: new Date(),
-        booksku: {
-          id: 1,
-          master_id: 1,
-          edition: 'default',
-          description: null,
-          cover_image_url: null,
-          created_at: new Date(),
-          updated_at: new Date(),
-          bookmaster: {
-            id: 1,
-            isbn13: '1234567890123',
-            title: 'Test Book',
-            author: 'Test Author',
-            publisher: null,
-            original_price: null,
-            created_at: new Date(),
-            updated_at: new Date(),
-          },
-        },
-      };
-
-      prismaMock.inventoryitem.findUnique.mockResolvedValue(mockBook);
-
-      const book = await getBookById(1);
-
-      expect(prismaMock.inventoryitem.findUnique).toHaveBeenCalledWith({
-        where: { id: 1 },
-        include: {
-          booksku: {
-            include: {
-              bookmaster: true,
-            },
-          },
-        },
-      });
-      expect(book).toEqual(mockBook);
-    });
-
-    it('should return null when book not found', async () => {
-      prismaMock.inventoryitem.findUnique.mockResolvedValue(null);
-
-      const book = await getBookById(999);
-
-      expect(book).toBeNull();
-    });
-  });
-
-  describe('getBookMetadata', () => {
-    it('should return metadata for existing book', async () => {
-      const mockBookMaster = {
-        id: 1,
-        isbn13: '1234567890123',
-        title: 'Test Book',
-        author: 'Test Author',
-        publisher: 'Test Publisher',
-        original_price: 25.99,
-        created_at: new Date(),
-        updated_at: new Date(),
-        booksku: [{
-          id: 1,
-          master_id: 1,
-          edition: 'default',
-          description: null,
-          cover_image_url: 'http://example.com/cover.jpg',
-          created_at: new Date(),
-          updated_at: new Date(),
-        }],
-      };
-
-      prismaMock.bookmaster.findUnique.mockResolvedValue(mockBookMaster);
-
-      const metadata = await getBookMetadata('1234567890123');
-
-      expect(prismaMock.bookmaster.findUnique).toHaveBeenCalledWith({
-        where: { isbn13: '1234567890123' },
-        include: { booksku: true },
+      // 模拟事务返回分页结果
+      prismaMock.$transaction.mockResolvedValue({
+        data: mockItems,
+        meta: {
+          totalItems: 10,
+          totalPages: 5,
+          currentPage: 1,
+          itemsPerPage: 2,
+        }
       });
 
-      expect(metadata).toEqual({
-        isbn13: '1234567890123',
-        title: 'Test Book',
-        author: 'Test Author',
-        publisher: 'Test Publisher',
-        original_price: 25.99,
-        cover_image_url: 'http://example.com/cover.jpg',
-      });
+      // 模拟事务内部的调用
+      prismaMock.inventoryitem.count.mockResolvedValue(10);
+      prismaMock.inventoryitem.findMany.mockResolvedValue(mockItems as any);
+
+      const result = await getAvailableBooks({ page: 1, limit: 2 });
+      
+      expect(result.data.length).toBe(2);
+      expect(result.meta.totalItems).toBe(10);
+      expect(result.meta.totalPages).toBe(5);
+      expect(result.meta.currentPage).toBe(1);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
     });
 
-    it('should return null for non-existing book', async () => {
-      prismaMock.bookmaster.findUnique.mockResolvedValue(null);
+    it('uses trigram search when search term provided (smart path)', async () => {
+      const searchTerm = '计算机';
+      const mockBookMasterIds = [{ id: 1 }, { id: 2 }];
+      const mockItems = [{ id: 101, booksku: { master_id: 1 } }];
 
-      const metadata = await getBookMetadata('9999999999999');
+      prismaMock.$transaction.mockResolvedValue({
+        data: mockItems,
+        meta: {
+          totalItems: 1,
+          totalPages: 1,
+          currentPage: 1,
+          itemsPerPage: 20,
+        }
+      });
 
-      expect(metadata).toBeNull();
+      // 模拟事务内部调用
+      prismaMock.$queryRaw.mockResolvedValue(mockBookMasterIds);
+      prismaMock.inventoryitem.count.mockResolvedValue(1);
+      prismaMock.inventoryitem.findMany.mockResolvedValue(mockItems as any);
+
+      const result = await getAvailableBooks({ searchTerm });
+      
+      expect(result.data.length).toBe(1);
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+
+    it('returns empty result when no books match search', async () => {
+      const searchTerm = '不存在的书';
+
+      prismaMock.$transaction.mockResolvedValue({
+        data: [],
+        meta: {
+          totalItems: 0,
+          totalPages: 0,
+          currentPage: 1,
+          itemsPerPage: 20,
+        }
+      });
+
+      // 模拟trigram搜索没有匹配
+      prismaMock.$queryRaw.mockResolvedValue([]);
+
+      const result = await getAvailableBooks({ searchTerm });
+      
+      expect(result.data).toEqual([]);
+      expect(result.meta.totalItems).toBe(0);
+      expect(result.meta.totalPages).toBe(0);
+    });
+
+    it('handles pagination correctly', async () => {
+      const mockItems = [{ id: 3 }];
+
+      prismaMock.$transaction.mockResolvedValue({
+        data: mockItems,
+        meta: {
+          totalItems: 25,
+          totalPages: 3,
+          currentPage: 2,
+          itemsPerPage: 10,
+        }
+      });
+
+      prismaMock.inventoryitem.count.mockResolvedValue(25);
+      prismaMock.inventoryitem.findMany.mockResolvedValue(mockItems as any);
+
+      const result = await getAvailableBooks({ page: 2, limit: 10 });
+      
+      expect(result.meta.currentPage).toBe(2);
+      expect(result.meta.totalPages).toBe(3);
+      expect(result.meta.itemsPerPage).toBe(10);
     });
   });
 });

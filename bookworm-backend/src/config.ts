@@ -1,61 +1,64 @@
 // src/config.ts
-import * as dotenv from 'dotenv';
-import * as fs from 'fs';
+import { envSchema } from 'env-schema';
+import { Static, Type } from '@sinclair/typebox';
 
-dotenv.config();
+const schema = Type.Object({
+    // Server
+    PORT: Type.Number({ default: 3000 }),
+    HOST: Type.String({ default: '0.0.0.0' }),
+    NODE_ENV: Type.String({ enum: ['development', 'production', 'test'], default: 'development' }),
+    LOG_LEVEL: Type.String({ default: 'info' }),
 
-const config = {
-  // Server config
-  port: process.env.PORT || 3000,
-  
-  // JWT config
-  jwtSecret: process.env.JWT_SECRET,
+    // Database
+    DATABASE_URL: Type.String(),
 
-  // WeChat Mini Program config
-  wxAppId: process.env.WX_APP_ID || 'YOUR_APP_ID',
-  wxAppSecret: process.env.WX_APP_SECRET || 'YOUR_APP_SECRET',
+    // JWT
+    JWT_SECRET: Type.String(),
+    JWT_EXPIRES_IN: Type.String({ default: '7d' }),
 
-  // WeChat Pay config
-  wxPayMchId: process.env.WXPAY_MCHID,
-  wxPayPrivateKeyPath: process.env.WXPAY_PRIVATE_KEY_PATH,
-  wxPayPrivateKey: (() => {
-    const keyPath = process.env.WXPAY_PRIVATE_KEY_PATH;
-    if (!keyPath || keyPath === 'C:\\path\\to\\your\\apiclient_key.pem' || keyPath === '/path/to/your/apiclient_key.pem') {
-      return undefined;
+    // WeChat Mini Program
+    WX_APP_ID: Type.String(),
+    WX_APP_SECRET: Type.String(),
+
+    // WeChat Pay (optional, can be empty strings in dev)
+    WXPAY_MCHID: Type.String({ default: '' }),
+    WXPAY_PRIVATE_KEY_PATH: Type.String({ default: '' }),
+    WXPAY_CERT_SERIAL_NO: Type.String({ default: '' }),
+    WXPAY_API_V3_KEY: Type.String({ default: '' }),
+    WXPAY_NOTIFY_URL: Type.String({ default: '' }),
+    
+    // Tanshu API
+    TANSHU_API_KEY: Type.String({ default: '' }),
+
+    // Business Logic Constants ("Magic Numbers")
+    ORDER_PAYMENT_TTL_MINUTES: Type.Number({ default: 15 }),
+    ORDER_PICKUP_CODE_LENGTH: Type.Number({ default: 8 }),
+    ORDER_PICKUP_CODE_BYTES: Type.Number({ default: 5 }),
+    MAX_PENDING_ORDERS_PER_USER: Type.Number({ default: 3 }),
+    MAX_ITEMS_PER_ORDER: Type.Number({ default: 10 }),
+    API_RATE_LIMIT_MAX: Type.Number({ default: 5 }),
+    API_RATE_LIMIT_WINDOW_MINUTES: Type.Number({ default: 1 }),
+});
+
+type Schema = Static<typeof schema>;
+
+// The `dotenv: true` option will automatically load the .env file
+const config = envSchema<Schema>({
+    schema,
+    dotenv: true
+});
+
+// Production validation
+if (config.NODE_ENV === 'production') {
+    if (!config.JWT_SECRET || config.JWT_SECRET === 'default-secret-for-dev') {
+        console.error('FATAL: JWT_SECRET must be set to a strong secret in production.');
+        process.exit(1);
     }
-    try {
-      return fs.readFileSync(keyPath);
-    } catch (error) {
-      console.warn(`!!! WARNING: Cannot read WeChat Pay private key from ${keyPath}:`, (error as Error).message);
-      return undefined;
+    if (!config.DATABASE_URL) {
+        console.error('FATAL: DATABASE_URL must be set in production.');
+        process.exit(1);
     }
-  })(),
-  wxPayPublicKeyPath: process.env.WXPAY_PUBLIC_KEY_PATH,
-  wxPayCertSerialNo: process.env.WXPAY_CERT_SERIAL_NO,
-  wxPayApiV3Key: process.env.WXPAY_API_V3_KEY,
-  wxPayNotifyUrl: process.env.WXPAY_NOTIFY_URL,
-
-  // Tanshu API config
-  tanshuApiKey: process.env.TANSHU_API_KEY,
-
-  // Database URL is read by Prisma from .env directly
-};
-
-// Validate essential configs
-if (process.env.NODE_ENV === 'production' && !config.jwtSecret) {
-    console.error('!!! FATAL ERROR: JWT_SECRET is required in production. Set it in .env file.');
-    process.exit(1);
-} else if (!config.jwtSecret) {
-    console.warn('!!! WARNING: JWT_SECRET is not configured. Set it in .env file.');
-}
-if (config.wxAppId === 'YOUR_APP_ID' || config.wxAppSecret === 'YOUR_APP_SECRET') {
-    console.warn('!!! WARNING: WX_APP_ID or WX_APP_SECRET are not configured in .env file.');
-}
-if (!config.wxPayMchId || !config.wxPayPrivateKey || !config.wxPayCertSerialNo || !config.wxPayApiV3Key) {
-    console.warn('!!! WARNING: WeChat Pay configuration is incomplete. Payment features will not work.');
-}
-if (!config.tanshuApiKey) { 
-    console.warn('!!! WARNING: TANSHU_API_KEY is not configured.'); 
+    // Add other critical production checks here
 }
 
 export default config;

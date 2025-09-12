@@ -1,11 +1,11 @@
 // src/services/authService.ts
 import axios from 'axios';
-import * as jwt from 'jsonwebtoken';
+import { createSigner } from 'fast-jwt';
 import config from '../config'; // <-- Import config
 import prisma from '../db';
 
 export async function wxLogin(code: string) {
-  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${config.wxAppId}&secret=${config.wxAppSecret}&js_code=${code}&grant_type=authorization_code`;
+  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}&js_code=${code}&grant_type=authorization_code`;
   const { data: wxSession } = await axios.get(url);
   
   if (wxSession.errcode) { throw new Error(`WeChat API Error: ${wxSession.errmsg}`); }
@@ -57,7 +57,8 @@ export async function wxLogin(code: string) {
     }
   });
   
-  const token = jwt.sign({ userId: user.id, openid: user.openid }, config.jwtSecret!, { expiresIn: '7d' });
+  const signer = createSigner({ key: config.JWT_SECRET, expiresIn: config.JWT_EXPIRES_IN });
+  const token = await signer({ userId: user.id, openid: user.openid });
 
   return { token, user };
 }

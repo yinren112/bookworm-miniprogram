@@ -9,6 +9,7 @@ Page({
     isLoading: true,
     error: null,
     statusMap: ORDER_STATUS,
+    pageInfo: null // For pagination metadata
   },
   onShow() { this.fetchUserOrders(); },
   navigateToDetail(event) {
@@ -29,7 +30,7 @@ Page({
         url: `/orders/user/${userId}`,
         method: 'GET'
       });
-      this.setData({ orderList: data });
+      this.setData({ orderList: data.data, pageInfo: data.meta });
     } catch (error) {
       this.setData({ error: error.error || '加载订单失败。' });
     } finally {
