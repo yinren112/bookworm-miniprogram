@@ -171,7 +171,6 @@ async function reserveInventoryItems(
       inventory_item_id: itemId,
       order_id: orderId,
     })),
-    skipDuplicates: true,
   });
 }
 
@@ -1066,15 +1065,26 @@ async function updateOrderStatusImpl(
     });
     metrics.ordersCompleted.inc();
   } else if (newStatus === "CANCELLED") {
+    const inventoryItemIds = currentOrder.orderItem.map((item) => item.inventory_item_id);
+
     // Release inventory back to stock
     await dbCtx.inventoryItem.updateMany({
       where: {
         id: {
-          in: currentOrder.orderItem.map((item) => item.inventory_item_id),
+          in: inventoryItemIds,
         },
       },
       data: {
         status: INVENTORY_STATUS.IN_STOCK,
+      },
+    });
+
+    // Delete reservation records
+    await dbCtx.inventoryReservation.deleteMany({
+      where: {
+        inventory_item_id: {
+          in: inventoryItemIds,
+        },
       },
     });
 

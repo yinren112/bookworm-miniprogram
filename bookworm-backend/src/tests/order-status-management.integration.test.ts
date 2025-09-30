@@ -36,13 +36,29 @@ describe("Order Status Management Integration Tests", () => {
   afterEach(async () => {
     // Clean up any pending orders for the test user to prevent constraint violations
     if (testUserId && prisma) {
-      await prisma.order.updateMany({
+      // First delete reservation records to avoid FK constraint violations
+      const pendingOrders = await prisma.order.findMany({
         where: {
           user_id: testUserId,
           status: { in: ["PENDING_PAYMENT", "PENDING_PICKUP"] }
         },
-        data: { status: "CANCELLED" }
+        select: { id: true }
       });
+
+      const orderIds = pendingOrders.map(o => o.id);
+
+      if (orderIds.length > 0) {
+        // Delete reservations first
+        await prisma.inventoryReservation.deleteMany({
+          where: { order_id: { in: orderIds } }
+        });
+
+        // Then update order status
+        await prisma.order.updateMany({
+          where: { id: { in: orderIds } },
+          data: { status: "CANCELLED" }
+        });
+      }
     }
   });
 
@@ -106,8 +122,13 @@ describe("Order Status Management Integration Tests", () => {
 
       inventoryItems.forEach((item) => {
         expect(item.status).toBe("in_stock");
-        expect(item.reserved_by_order_id).toBeNull();
       });
+
+      // Verify reservation records were deleted
+      const reservations = await prisma.inventoryReservation.findMany({
+        where: { inventory_item_id: { in: inventoryItemIds } },
+      });
+      expect(reservations).toHaveLength(0);
     });
 
     it("should allow STAFF to cancel a PENDING_PAYMENT order", async () => {

@@ -15,10 +15,13 @@ let prisma: PrismaClient;
 beforeAll(async () => {
   console.log("Setting up database integration test environment...");
 
-  // Use SQLite in-memory database for testing if PostgreSQL test DB is not available
-  const testDatabaseUrl =
-    process.env.DATABASE_URL ||
-    "file:./test.db?connection_limit=1&pool_timeout=20";
+  // Ensure DATABASE_URL is set by globalSetup (Testcontainers)
+  const testDatabaseUrl = process.env.DATABASE_URL;
+  if (!testDatabaseUrl) {
+    throw new Error(
+      "DATABASE_URL environment variable is not set. Integration tests require PostgreSQL via Testcontainers."
+    );
+  }
 
   // Create a fresh Prisma client for testing
   prisma = new PrismaClient({
@@ -31,16 +34,7 @@ beforeAll(async () => {
 
   // Connect to test database
   await prisma.$connect();
-  console.log(
-    `Connected to test database: ${testDatabaseUrl.includes("file:") ? "SQLite in-memory" : "PostgreSQL"}`,
-  );
-
-  // Run database migrations for SQLite if needed
-  if (testDatabaseUrl.includes("file:")) {
-    console.log(
-      "Using SQLite for testing - schema will be auto-created by Prisma",
-    );
-  }
+  console.log(`Connected to PostgreSQL test database: ${testDatabaseUrl}`);
 
   // Basic connectivity test
   try {

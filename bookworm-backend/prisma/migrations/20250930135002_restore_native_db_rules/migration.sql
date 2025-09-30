@@ -73,6 +73,7 @@ EXECUTE FUNCTION sync_pending_payment_guard();
 -- ----------------------------------------------------------------------------
 -- Trigger 2: inventory_reservation_enforce_cap
 -- Purpose: Enforce MAX_RESERVED_ITEMS_PER_USER business rule (20 items)
+-- Fixed: Removed references to non-existent reserved_by_order_id column
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION check_user_reservation_limit()
 RETURNS TRIGGER AS $$
@@ -81,25 +82,22 @@ DECLARE
     user_id_to_check INTEGER;
     max_limit CONSTANT INTEGER := 20; -- MAX_RESERVED_ITEMS_PER_USER from config
 BEGIN
-    -- Only check when adding/updating to 'reserved' status
-    IF (TG_OP = 'INSERT' AND NEW.status = 'reserved') OR
-       (TG_OP = 'UPDATE' AND NEW.status = 'reserved' AND (OLD.status != 'reserved' OR OLD.reserved_by_order_id != NEW.reserved_by_order_id)) THEN
+    -- Get the user_id from the Order via the new reservation record
+    SELECT o.user_id INTO user_id_to_check
+    FROM "Order" o
+    WHERE o.id = NEW.order_id;
 
-        -- Get the user_id from the Order
-        SELECT o.user_id INTO user_id_to_check
-        FROM "Order" o
-        WHERE o.id = NEW.reserved_by_order_id;
+    IF user_id_to_check IS NOT NULL THEN
+        -- Count current reservations for this user (including this new one)
+        SELECT COUNT(*) INTO reserved_count
+        FROM inventory_reservation ir
+        JOIN "Order" o ON ir.order_id = o.id
+        WHERE o.user_id = user_id_to_check;
 
-        IF user_id_to_check IS NOT NULL THEN
-            -- Count current reservations for this user (including this new one)
-            SELECT COUNT(*) INTO reserved_count
-            FROM inventory_reservation ir
-            WHERE ir.user_id = user_id_to_check;
-
-            IF reserved_count > max_limit THEN
-                RAISE EXCEPTION 'User % has exceeded the reservation limit of % items (currently has %)',
-                    user_id_to_check, max_limit, reserved_count;
-            END IF;
+        IF reserved_count > max_limit THEN
+            RAISE EXCEPTION 'MAX_RESERVED_ITEMS_PER_USER: User % has exceeded the reservation limit of % items (currently has %)',
+                user_id_to_check, max_limit, reserved_count
+            USING ERRCODE = '23514'; -- check_violation
         END IF;
     END IF;
 
@@ -109,48 +107,21 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS inventory_reservation_enforce_cap ON "inventory_reservation";
 CREATE TRIGGER inventory_reservation_enforce_cap
-AFTER INSERT OR UPDATE ON "inventory_reservation"
+AFTER INSERT ON "inventory_reservation"
 FOR EACH ROW
 EXECUTE FUNCTION check_user_reservation_limit();
 
 -- ----------------------------------------------------------------------------
--- Trigger 3: inventoryitem_validate_reservation
--- Purpose: Enforce InventoryItem state machine consistency
--- Rules:
---   - in_stock: reserved_by_order_id must be NULL
---   - reserved: reserved_by_order_id must be NOT NULL
---   - sold/returned/damaged: reserved_by_order_id must be NULL
+-- Trigger 3: REMOVED - inventoryitem_validate_reservation
+-- Original Purpose: Enforce InventoryItem state machine consistency
+-- Reason for Removal: This trigger referenced a non-existent column `reserved_by_order_id`
+--                     The system uses InventoryReservation table instead
+-- Date Removed: 2025-09-30
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION validate_inventory_item_reservation()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Rule 1: in_stock items cannot be reserved by anyone
-    IF NEW.status = 'in_stock' AND NEW.reserved_by_order_id IS NOT NULL THEN
-        RAISE EXCEPTION 'InventoryItem id=% cannot be in_stock with reserved_by_order_id=%',
-            NEW.id, NEW.reserved_by_order_id;
-    END IF;
-
-    -- Rule 2: reserved items MUST have a reservation
-    IF NEW.status = 'reserved' AND NEW.reserved_by_order_id IS NULL THEN
-        RAISE EXCEPTION 'InventoryItem id=% cannot be reserved without reserved_by_order_id',
-            NEW.id;
-    END IF;
-
-    -- Rule 3: sold/returned/damaged items cannot have reservations
-    IF NEW.status IN ('sold', 'returned', 'damaged') AND NEW.reserved_by_order_id IS NOT NULL THEN
-        RAISE EXCEPTION 'InventoryItem id=% in status=% cannot have reserved_by_order_id=%',
-            NEW.id, NEW.status, NEW.reserved_by_order_id;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS inventoryitem_validate_reservation ON "inventoryitem";
-CREATE TRIGGER inventoryitem_validate_reservation
-BEFORE INSERT OR UPDATE ON "inventoryitem"
-FOR EACH ROW
-EXECUTE FUNCTION validate_inventory_item_reservation();
+-- Historical context: This was legacy code from an earlier architecture that stored
+-- reservation info directly in the InventoryItem table. The current architecture uses
+-- a separate InventoryReservation table with inventory_item_id as PRIMARY KEY,
+-- which already enforces uniqueness at the database level.
 
 -- ============================================================================
 -- Verification: Confirm all rules are in place

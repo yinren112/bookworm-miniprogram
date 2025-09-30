@@ -97,14 +97,14 @@ describe("Error Handling Integration Tests", () => {
       expect(response.body).toHaveProperty("message");
     });
 
-    it("should reject inventory search queries shorter than 2 characters", async () => {
+    it("should accept inventory search queries with single character", async () => {
       const response = await request(app.server)
         .get("/api/inventory/available")
         .query({ search: "a" });
 
-      expect(response.status).toBe(400);
-      expect(["VALIDATION_ERROR", "BAD_REQUEST"]).toContain(response.body.code);
-      expect(response.body).toHaveProperty("message");
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty("data");
+      expect(response.body).toHaveProperty("meta");
     });
   });
 

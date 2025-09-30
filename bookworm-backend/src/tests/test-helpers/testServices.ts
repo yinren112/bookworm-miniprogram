@@ -124,7 +124,7 @@ export async function createOrderTest(
         },
       });
 
-      // Now reserve the items with the order ID (satisfies the constraint)
+      // Reserve the items by updating status and creating reservation records
       await tx.inventoryItem.updateMany({
         where: {
           id: { in: itemIds },
@@ -132,8 +132,15 @@ export async function createOrderTest(
         },
         data: {
           status: "reserved",
-          reserved_by_order_id: order.id,
         },
+      });
+
+      // Create reservation records in InventoryReservation table
+      await tx.inventoryReservation.createMany({
+        data: itemIds.map((itemId) => ({
+          inventory_item_id: itemId,
+          order_id: order.id,
+        })),
       });
 
       return order;
@@ -170,14 +177,19 @@ export async function fulfillOrderTest(
         throw new Error("订单不存在或状态错误");
       }
 
-      // Mark inventory as sold and clear reservation
+      // Mark inventory as sold
       const itemIds = order.orderItem.map((item) => item.inventory_item_id);
       await tx.inventoryItem.updateMany({
         where: { id: { in: itemIds } },
         data: {
           status: "sold",
-          reserved_by_order_id: null,
         },
+      });
+
+      // Delete reservation records (CASCADE will handle this automatically when order is updated/deleted,
+      // but we do it explicitly here for clarity in tests)
+      await tx.inventoryReservation.deleteMany({
+        where: { inventory_item_id: { in: itemIds } },
       });
 
       // Complete the order

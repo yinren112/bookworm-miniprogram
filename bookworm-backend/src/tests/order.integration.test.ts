@@ -191,12 +191,12 @@ describe("Order Integration Tests", () => {
       expect(response.statusCode).toBe(200);
       const result = JSON.parse(response.payload);
 
-      // API returns consistent structure { data: orders, meta: { ... } }
+      // API uses cursor-based pagination: { data: orders, meta: { nextCursor } }
       expect(result.data).toBeDefined();
       expect(Array.isArray(result.data)).toBe(true);
       expect(result.data.length).toBe(1); // Exactly 1 order created
       expect(result.meta).toBeDefined();
-      expect(result.meta.totalItems).toBe(1);
+      expect(result.meta).toHaveProperty("nextCursor");
 
       // Verify order ID and user ID match what we created
       expect(result.data[0].id).toBe(createdOrder.id);

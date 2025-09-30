@@ -63,7 +63,12 @@ describe("Order Expiration Integration Tests", () => {
 
     updatedInventoryItems.forEach((item) => {
       expect(item.status).toBe('in_stock');
-      expect(item.reserved_by_order_id).toBeNull();
     });
+
+    // Verify reservation records were deleted
+    const reservations = await prisma.inventoryReservation.findMany({
+      where: { inventory_item_id: { in: inventoryItemIds } },
+    });
+    expect(reservations).toHaveLength(0);
   });
 });

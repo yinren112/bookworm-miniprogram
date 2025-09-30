@@ -16,8 +16,21 @@ import config from "../config";
 import { Prisma } from "@prisma/client";
 import WechatPay from "wechatpay-node-v3";
 
-// Use the manual mock for WeChat Pay SDK
-vi.mock("wechatpay-node-v3");
+// --- Mocks ---
+// Mock WechatPayAdapter to control its behavior during tests
+const mockWechatPayAdapter = {
+  verifySignature: vi.fn(),
+  decryptNotificationData: vi.fn(),
+  queryPaymentStatus: vi.fn(),
+  createPaymentOrder: vi.fn(),
+  sign: vi.fn(),
+  createRefund: vi.fn(),
+};
+
+vi.mock("../adapters/wechatPayAdapter", () => ({
+  WechatPayAdapter: vi.fn(() => mockWechatPayAdapter),
+  createWechatPayAdapter: vi.fn(() => mockWechatPayAdapter),
+}));
 
 // Mock the file system for certificate loading
 vi.mock("fs", async () => {
@@ -68,7 +81,6 @@ vi.mock("../services/orderService", async (importOriginal) => {
 
 describe("Payment Security Integration Tests", () => {
   let app: FastifyInstance;
-  let mockPayInstance: any;
   let prisma: any;
 
   beforeAll(async () => {
@@ -81,15 +93,9 @@ describe("Payment Security Integration Tests", () => {
     process.env.WX_APP_ID = "test-appid";
     process.env.NODE_ENV = "test";
 
-    // Build app with mocked WeChat Pay
+    // Build app with mocked WeChat Pay Adapter
     app = await createTestApp();
     await app.ready();
-
-    // Get our mock instance
-    mockPayInstance = new WechatPay();
-    mockPayInstance.verifySign = vi.fn();
-    mockPayInstance.decipher_gcm = vi.fn();
-    mockPayInstance.transactions_out_trade_no = vi.fn();
   });
 
   afterAll(async () => {
@@ -99,6 +105,9 @@ describe("Payment Security Integration Tests", () => {
   beforeEach(async () => {
     // Reset all mocks for clean test state
     vi.clearAllMocks();
+
+    // Set default mock behaviors
+    mockWechatPayAdapter.verifySignature.mockReturnValue(true);
   });
 
   describe("Payment Callback Security Fortress - HTTP Layer", () => {
@@ -160,7 +169,7 @@ describe("Payment Security Integration Tests", () => {
 
     it("should reject requests with invalid signatures", async () => {
       // Mock verifySign to return false for this test
-      vi.mocked(mockPayInstance.verifySign).mockReturnValue(false);
+      mockWechatPayAdapter.verifySignature.mockReturnValue(false);
 
       const response = await request(app.server)
         .post("/api/payment/notify")
@@ -185,8 +194,8 @@ describe("Payment Security Integration Tests", () => {
 
     it("should accept valid requests with proper timestamp and signature", async () => {
       // Mock successful verification and decryption
-      vi.mocked(mockPayInstance.verifySign).mockReturnValue(true);
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.verifySignature.mockReturnValue(true);
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({
           out_trade_no: "UNKNOWN_PAYMENT", // This will be ignored by our system
         }),
@@ -227,12 +236,12 @@ describe("Payment Security Integration Tests", () => {
 
     beforeEach(() => {
       // Always mock successful verification for business logic tests
-      vi.mocked(mockPayInstance.verifySign).mockReturnValue(true);
+      mockWechatPayAdapter.verifySignature.mockReturnValue(true);
     });
 
     it("should handle successful payment notification", async () => {
       // Mock successful payment decryption
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({
           trade_state: "SUCCESS",
           out_trade_no: "TEST_ORDER_12345",
@@ -254,7 +263,7 @@ describe("Payment Security Integration Tests", () => {
 
     it("should handle failed payment notification", async () => {
       // Mock failed payment decryption
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({
           trade_state: "PAYERROR",
           out_trade_no: "TEST_ORDER_12345",
@@ -305,10 +314,10 @@ describe("Payment Security Integration Tests", () => {
         },
       });
 
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({ out_trade_no: outTradeNo }),
       );
-      vi.mocked(mockPayInstance.transactions_out_trade_no).mockResolvedValue({
+      mockWechatPayAdapter.queryPaymentStatus.mockResolvedValue({
         trade_state: "SUCCESS",
         amount: { total: 8800, currency: "CNY" },
         mchid: config.WXPAY_MCHID!,
@@ -376,10 +385,10 @@ describe("Payment Security Integration Tests", () => {
         },
       });
 
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({ out_trade_no: outTradeNo }),
       );
-      vi.mocked(mockPayInstance.transactions_out_trade_no).mockResolvedValue({
+      mockWechatPayAdapter.queryPaymentStatus.mockResolvedValue({
         trade_state: "CLOSED",
         amount: { total: 6600, currency: "CNY" },
         mchid: config.WXPAY_MCHID!,
@@ -443,10 +452,10 @@ describe("Payment Security Integration Tests", () => {
         },
       });
 
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({ out_trade_no: outTradeNo }),
       );
-      vi.mocked(mockPayInstance.transactions_out_trade_no).mockResolvedValue({
+      mockWechatPayAdapter.queryPaymentStatus.mockResolvedValue({
         trade_state: "PAYERROR",
         amount: { total: 8800, currency: "CNY" },
         mchid: config.WXPAY_MCHID!,
@@ -485,7 +494,7 @@ describe("Payment Security Integration Tests", () => {
 
     it("should handle unknown order notification", async () => {
       // Mock payment for non-existent order
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue(
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
         JSON.stringify({
           trade_state: "SUCCESS",
           out_trade_no: "NONEXISTENT_ORDER_99999",
@@ -507,7 +516,7 @@ describe("Payment Security Integration Tests", () => {
 
     it("should handle malformed decrypted data", async () => {
       // Mock malformed JSON decryption
-      vi.mocked(mockPayInstance.decipher_gcm).mockReturnValue("invalid-json{");
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue("invalid-json{");
 
       const response = await request(app.server)
         .post("/api/payment/notify")
