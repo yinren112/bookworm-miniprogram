@@ -6,6 +6,18 @@ import crypto from "crypto";
 import { BUSINESS_LIMITS } from "../constants";
 
 /**
+ * Derives a single 32-bit integer lock key from a string lock name.
+ * Uses SHA256 hashing to ensure collision resistance.
+ *
+ * @param lockName A unique string identifier for the lock.
+ * @returns A 32-bit signed integer suitable for pg_try_advisory_lock().
+ */
+function deriveLockKey(lockName: string): number {
+  const hash = crypto.createHash("sha256").update(lockName).digest();
+  return hash.readInt32BE(0);
+}
+
+/**
  * Executes a task while holding a PostgreSQL advisory lock.
  * Ensures that only one instance of the application can run the task at the same time.
  *
@@ -17,13 +29,6 @@ import { BUSINESS_LIMITS } from "../constants";
  * @param task The async function to execute if the lock is acquired.
  * @returns The result of the task if the lock was acquired, otherwise null.
  */
-function deriveLockKeys(lockName: string): [number, number] {
-  const digest = crypto.createHash("sha256").update(lockName).digest();
-  const key1 = digest.readInt32BE(0);
-  const key2 = digest.readInt32BE(4);
-  return [key1, key2];
-}
-
 export async function withAdvisoryLock<T>(
   prisma: PrismaClient,
   lockName: string,
@@ -31,12 +36,10 @@ export async function withAdvisoryLock<T>(
 ): Promise<T | null> {
   return prisma.$transaction(
     async (tx) => {
-      const [key1, key2] = deriveLockKeys(lockName);
-      const result = await tx.$queryRaw<{ pg_try_advisory_lock: boolean }[]>(
-        Prisma.sql`SELECT pg_try_advisory_lock(${key1}, ${key2})`,
-      );
+      const lockKey = deriveLockKey(lockName);
+      const result = await tx.$queryRaw<[{ lock_acquired: boolean }]>`SELECT pg_try_advisory_lock(${lockKey}::integer) as lock_acquired`;
 
-      const lockAcquired = result[0]?.pg_try_advisory_lock;
+      const lockAcquired = result[0]?.lock_acquired;
 
       if (!lockAcquired) {
         console.log(
@@ -51,7 +54,7 @@ export async function withAdvisoryLock<T>(
       try {
         return await task();
       } finally {
-        await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_unlock(${key1}, ${key2})`);
+        await tx.$queryRaw`SELECT pg_advisory_unlock(${lockKey}::integer)`;
         console.log(`[AdvisoryLock] Lock released for "${lockName}".`);
       }
     },
