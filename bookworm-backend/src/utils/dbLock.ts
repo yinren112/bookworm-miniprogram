@@ -32,7 +32,7 @@ export async function withAdvisoryLock<T>(
   return prisma.$transaction(
     async (tx) => {
       const [key1, key2] = deriveLockKeys(lockName);
-      const result = await tx.$queryRaw<{ pg_try_advisory_lock: boolean }>(
+      const result = await tx.$queryRaw<{ pg_try_advisory_lock: boolean }[]>(
         Prisma.sql`SELECT pg_try_advisory_lock(${key1}, ${key2})`,
       );
 

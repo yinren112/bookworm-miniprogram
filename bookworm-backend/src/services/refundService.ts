@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
 import * as crypto from "crypto";
 import { BUSINESS_LIMITS } from "../constants";

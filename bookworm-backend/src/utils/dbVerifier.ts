@@ -28,8 +28,9 @@ const CRITICAL_CONSTRAINTS: CriticalConstraint[] = [
       const result = await db.$queryRaw<[{ exists: boolean }]>`
         SELECT EXISTS (
           SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'uniq_order_pending_per_user'
+          FROM pg_indexes
+          WHERE indexname = 'uniq_order_pending_per_user'
+            AND indexdef LIKE '%UNIQUE%'
         );
       `;
       return result[0]?.exists === true;
@@ -43,7 +44,7 @@ const CRITICAL_CONSTRAINTS: CriticalConstraint[] = [
         SELECT EXISTS (
           SELECT 1 FROM pg_trigger
           WHERE tgname = 'order_sync_pending_payment_insert'
-            AND tgrelid = 'Order'::regclass
+            AND tgrelid = '"Order"'::regclass
         );
       `;
       return result[0]?.exists === true;
