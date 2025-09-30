@@ -180,9 +180,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **Bookworm** is a campus second-hand textbook marketplace consisting of:
-- **Frontend**: WeChat Mini Program (`miniprogram/`) 
+- **Frontend**: WeChat Mini Program (`miniprogram/`)
 - **Backend**: Fastify + TypeScript API server (`bookworm-backend/`)
 - **Database**: PostgreSQL with Prisma ORM
+- **Repository**: https://github.com/yinren112/bookworm-miniprogram (Private)
 
 The system follows a strict "books as atomic inventory items" model where each individual physical book is tracked separately.
 
