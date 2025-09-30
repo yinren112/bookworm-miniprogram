@@ -1,0 +1,21 @@
+# docker-compose.monitoring.yml
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: bookworm_prometheus
+    volumes:
+      - ./bookworm-backend/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:10.2.2
+    container_name: bookworm_grafana
+    ports:
+      - "4000:3000" # 将Grafana的3000端口映射到宿主机的4000，避免和应用冲突
+    restart: unless-stopped

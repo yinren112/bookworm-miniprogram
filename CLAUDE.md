@@ -32,6 +32,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - C是斯巴达式语言，命名也应如此
    - 复杂性是万恶之源
 
+## 报告规则 (Reporting Protocol)
+
+你的报告必须是高信噪比的、基于事实的、零废话的。禁止使用任何带有感情色彩的词语（如"成功"、"胜利"、"完美"）、百分比改善或表情符号。如果根据我的指令遇到了意外问题也说明你怎么解决的
+
+在完成任何一项指令后，你的报告**必须**严格遵循以下结构（注意是完成指令后再发送报告）：
+
+### 【执行结果】
+- 这是报告的第一行，永远是第一行。
+- 格式：`✓ [X] passed, ❌ [Y] failed, ⏭️ [Z] total`
+- 如果 `Y > 0`，这就是一份**失败报告**。句号。不允许任何正面修饰。
+
+### 【变更摘要】
+- 一个简短的、事实驱动的列表，说明你**做了什么**。
+- 使用主动动词。
+- 示例：
+  - `- 重构了 5 个服务函数以接受 `dbCtx` 作为参数。`
+  - `- 为 `/api/inventory/add` 路由添加了 TypeBox 验证 schema。`
+  - `- 删除了 `cleanupDatabase` 函数。`
+
+### 【失败根因分析】 (如果 `failed > 0`，此项必须存在)
+- 对每一个（或每一类）失败的测试进行根本原因分析。
+- **必须**具体。不要说"有些测试出错了"。
+- **好的分析**:
+  - `- 授权测试失败：API 在需要权限时返回了 `400 Bad Request`，而测试期望的是 `403 Forbidden`。`
+  - `- 库存服务测试失败：测试创建的 `ISBN` 字符串与数据库 `CHECK` 约束冲突。`
+- **垃圾分析 (禁止)**:
+  - `- 测试出了一些问题。`
+  - `- 好像是 API 响应和预期的不一样。`
+
+### 【阻塞点】 (如果任务无法继续，此项必须存在)
+- 如果你因为缺少信息,我给的指令和实际情况有区别(比如我判断有误)或遇到无法解决的问题,暂时停止任务，**必须**在这里明确说明。
+- 格式：`[BLOCKER] 我无法 [做什么]，因为缺少关于 [什么] 的信息。`
+- 示例：`[BLOCKER] 我无法修复支付测试，因为缺少关于微信支付退款API的模拟响应应该是什么样的具体规范。`
+
+**最终原则：零废话，零情绪，零借口。只有信号，没有噪音。**
+
 ## 沟通原则
 
 **基础交流规范:**
@@ -118,6 +154,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - "这10行可以变成3行"
 - "数据结构错了，应该是..."
 
+## 本项目核心法则 (Bookworm Core Principles)
+
+除了我的通用哲学之外，在这个项目中，我们已经用血泪建立了一些不可动摇的原则。你在提供任何代码或建议时，都必须严格遵守它们：
+
+1.  **数据库即法律 (The Database is Law)**
+    *   **事实**: 系统的核心业务规则通过多种数据库原生约束来强制执行，包括：
+        1.  **部分唯一索引**: 保证一个用户只能有一个待支付订单 (`uniq_order_pending_per_user`)。
+        2.  **CHECK 约束**: 保证库存状态 (`status`) 与其预留订单ID (`reserved_by_order_id`) 的逻辑一致性。
+        3.  **咨询锁**: 在 `createOrder` 事务中通过 `pg_advisory_xact_lock` 串行化同一用户的下单操作，防止聚合计算的竞态条件。
+    *   **指令**: 永远不要在应用层编写脆弱的"先检查后写入"的并发控制逻辑。信任数据库。你的代码应该优雅地处理数据库因违反约束而抛出的错误（如 Prisma 的 `P2002`），而不是试图阻止它们发生。
+
+2.  **信任墙外的一切都是愚蠢的 (Zero Trust)**
+    *   **事实**: 支付回调逻辑 (`processPaymentNotification`) 严格遵循"主动查单"模式。它会忽略通知内容，主动向微信的权威API查询真实支付状态，并内置了时间戳和签名验证以防止重放攻击。
+    *   **指令**: 任何处理外部输入的代码，都必须遵循"验证，而不是信任"的原则。对于外部 API 的调用，必须包含带指数退避的重试逻辑。
+
+3.  **测试是唯一的真相 (Tests as the Single Source of Truth)**
+    *   **事实**: 项目拥有健壮的集成测试套件 (`npm run test:integration`)，该套件通过 **Testcontainers** 在完全隔离的、并行的 PostgreSQL 容器中运行，确保了测试的可靠性和无污染。
+    *   **指令**: 任何代码变更都必须有对应的测试来验证。所有测试必须 100% 通过才能被认为是"完成"。
+
+4.  **基础设施即代码 (Infrastructure as Code)**
+    *   **事实**: 本地开发和测试环境由 `docker-compose.yml` 和 **Testcontainers** 严格定义，实现了开发环境的一致性和可重复性。数据库连接池通过 `globalThis` 单例和优雅关闭钩子进行管理，杜绝了资源泄漏。
+    *   **指令**: 不要提出任何需要手动配置本地环境的解决方案。所有环境依赖必须在代码中声明。
+
 ## Project Overview
 
 **Bookworm** is a campus second-hand textbook marketplace consisting of:
@@ -135,12 +194,19 @@ The system follows a strict "books as atomic inventory items" model where each i
 - `src/services/inventoryService.ts` - Book inventory management
 - `src/services/orderService.ts` - Order processing with inventory reservation
 - `src/services/authService.ts` - WeChat OAuth integration
+- `src/services/bookMetadataService.ts` - Book metadata fetching from external APIs
+- `src/services/contentService.ts` - Static content management
+- `src/services/refundService.ts` - Processes payments marked for refund
 
 **Key Architectural Decisions:**
 - **Monolithic Design**: Single Fastify server handling all APIs
 - **Inventory-First**: Every book is an `InventoryItem` with atomic state (`in_stock` → `reserved` → `sold`)
-- **Transaction Safety**: Order creation atomically reserves inventory before payment
+- **Transaction Safety**: All multi-step database writes are wrapped in transactions at the route level, with services accepting the transaction context via dependency injection
 - **Static File Separation**: Admin UI served at `/admin/` to avoid conflicts with WeChat Mini Program
+- **Plugin Architecture**: Auth, Metrics, and Rate Limiting as Fastify plugins
+- **Background Jobs**: Cron-based scheduled tasks for order cleanup and metrics
+- **Monitoring**: Prometheus metrics exposed at `/metrics` endpoint
+- **Robust Connection Pooling**: Database client is a true singleton using `globalThis` and handles graceful shutdown to prevent connection leaks
 
 ### Frontend Structure (`miniprogram/`)
 
@@ -155,6 +221,12 @@ The system follows a strict "books as atomic inventory items" model where each i
 - Global CSS variables in `app.wxss` (V10 design system)
 - Shared search component in `templates/search-bar.*`
 - Brand colors: Primary green `#2c5f2d`, secondary `#558056`
+
+**Module Architecture:**
+- **Dependency Chain**: Frontend utilities follow a strict linear dependency chain (`auth.js` → `api.js` → `token.js`) to prevent circular dependencies.
+- `token.js`: Manages user token and ID in local storage. Zero dependencies.
+- `api.js`: Handles all API requests, depends on `token.js`.
+- `auth.js`: Manages login/logout flow, depends on `api.js` and `token.js`.
 
 ## Development Commands
 
@@ -171,9 +243,23 @@ npm run build
 # Production start
 npm run start
 
+# Testing
+npm test                    # Unit tests with coverage
+npm run test:integration    # Integration tests
+
+# Database operations
+npm run migrate:dev         # Run development migrations
+npm run db:migrate:test     # Setup test database
+npm run db:migrate:test:reset # Reset test database
+npm run seed               # Seed database with test data
+
+# Jobs
+npm run job:cancel-orders  # Manually run order cleanup job
+
 # Database setup (requires Prisma CLI)
 npx prisma generate
 npx prisma db push
+npx prisma migrate dev
 ```
 
 ### WeChat Mini Program
@@ -208,30 +294,109 @@ The system uses PostgreSQL with these core entities:
 
 ## Key Files to Understand
 
-- `schema.sql` - Complete database schema with enums and constraints
+**Backend Core:**
 - `bookworm-backend/src/index.ts` - Main API server with global error handling
+- `bookworm-backend/src/config.ts` - Environment configuration with validation
+- `bookworm-backend/prisma/schema.prisma` - Complete database schema with enums and constraints
+- `bookworm-backend/Dockerfile` - Multi-stage Docker build for production
+
+**Plugins & Middleware:**
+- `bookworm-backend/src/plugins/auth.ts` - JWT authentication plugin
+- `bookworm-backend/src/plugins/metrics.ts` - Prometheus metrics plugin
+
+**Background Jobs:**
+- `bookworm-backend/src/jobs/cancelExpiredOrders.ts` - Order expiration cleanup
+- `src/jobs/refundProcessor.ts` - Scans for and processes required refunds
+
+**Testing:**
+- `bookworm-backend/vitest.config.ts` - Unit test configuration
+- `bookworm-backend/vitest.integration.config.ts` - Integration test configuration
+- `bookworm-backend/vitest.database-integration.config.ts` - Database integration test config
+
+**Frontend:**
 - `miniprogram/app.wxss` - Global design system and CSS variables
 - `miniprogram/app.json` - Mini program configuration and navigation
+- `miniprogram/config.js` - API endpoint configuration
 
 ## Environment Configuration
 
 Backend requires `.env` file in `bookworm-backend/`:
-```
-DATABASE_URL=postgresql://...
-WECHAT_APP_ID=wx...
-WECHAT_APP_SECRET=...
-JWT_SECRET=...
+```bash
+# Server Configuration
 PORT=3000
+HOST=0.0.0.0
+NODE_ENV=development
+LOG_LEVEL=info
+
+# Database
+DATABASE_URL=postgresql://postgres:password@localhost:5432/bookworm?connection_limit=10&pool_timeout=30
+
+# JWT Configuration
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRES_IN=7d
+
+# WeChat Mini Program
+WX_APP_ID=wx...
+WX_APP_SECRET=...
+
+# WeChat Pay (optional for development)
+WXPAY_MCHID=
+WXPAY_PRIVATE_KEY_PATH=
+WXPAY_CERT_SERIAL_NO=
+WXPAY_API_V3_KEY=
+WXPAY_NOTIFY_URL=
+
+# External APIs
+TANSHU_API_KEY=
+
+# Business Logic Configuration (optional, has defaults)
+ORDER_PAYMENT_TTL_MINUTES=15
+MAX_ITEMS_PER_ORDER=10
+API_RATE_LIMIT_MAX=5
+
+# Scheduled Jobs (cron expressions)
+CRON_ORDER_CLEANUP=*/1 * * * *
+CRON_INVENTORY_METRICS=*/5 * * * *
+CRON_WECHAT_CERT_REFRESH=0 */10 * * *
+```
+
+**Database Connection Pooling:**
+The `?connection_limit=50&pool_timeout=10` parameters have been added to the DATABASE_URL.
+- `connection_limit`: Sets the maximum number of database connections in the pool. This prevents the application from overwhelming the database under high load. (Default: 50 for dev, 5 for test)
+- `pool_timeout`: Sets the time in seconds that a request will wait for a connection to become available before timing out. (Default: 10s for dev, 15s for test)
+
+These values should be tuned for production environments based on expected concurrent load and database server capacity.
+
+**Test Environment:**
+Create `.env.test` for testing:
+```bash
+DATABASE_URL=postgresql://postgres:password@localhost:5432/bookworm_test?connection_limit=5&pool_timeout=15
+NODE_ENV=test
+JWT_SECRET=test-secret
+WX_APP_ID=test-app-id
+WX_APP_SECRET=test-app-secret
 ```
 
 ## API Endpoints
 
 **Core APIs** (all prefixed with `/api`):
-- `GET /inventory/available` - List available books
+- `GET /health` - Health check endpoint
+- `POST /auth/login` - WeChat Mini Program authentication
+- `GET /books/meta?isbn=` - Book metadata lookup
+- `GET /inventory/available` - List available books with search & pagination
 - `GET /inventory/item/:id` - Book details
+- `POST /inventory/add` - Add book to inventory (staff only)
+- `GET /content/:slug` - Static content retrieval
 - `POST /orders/create` - Create new order (reserves inventory)
+- `GET /orders/:id` - Get specific order details
 - `GET /orders/user/:userId` - User order history
-- `POST /orders/fulfill` - Fulfill order with pickup code
+- `POST /orders/fulfill` - Fulfill order with pickup code (staff only)
+- `GET /orders/pending-pickup` - List pending pickup orders (staff only)
+- `POST /orders/:orderId/pay` - Generate WeChat payment parameters
+- `POST /payment/notify` - WeChat Pay callback webhook
+
+**System APIs:**
+- `GET /metrics` - Prometheus metrics for monitoring
 
 ## WeChat Integration
 
@@ -242,8 +407,114 @@ PORT=3000
 
 ## Important Development Notes
 
+**Architecture:**
 - Backend serves admin UI at `/admin/` (not `/`) to avoid WeChat Mini Program conflicts
 - All inventory state changes must be wrapped in database transactions
+- Plugin-based architecture for auth, metrics, and rate limiting
+- Comprehensive error handling with business-specific error types
+
+**Performance & Reliability:**
+- Database transaction retries for handling serialization conflicts
+- N+1 query prevention with proper Prisma includes
+- Pagination support on inventory API
+- Rate limiting on critical endpoints
+- Order expiration cleanup via scheduled jobs
+- Full text search using PostgreSQL pg_trgm extension
+
+**Testing:**
+- Comprehensive unit test suite using Vitest
+- Integration tests with real database
+- Separate test database configuration
+- Code coverage reporting
+
+**Deployment:**
+- Multi-stage Dockerfile for optimized production builds
+- Health check endpoint for load balancers
+- Prometheus metrics for monitoring
+- Environment-specific configuration validation
+
+**WeChat Integration:**
 - WeChat Mini Program TabBar only supports PNG icons, not SVG
+- Dynamic WeChat Pay certificate management with auto-refresh
+- Payment notification webhook with timestamp validation
+
+**Business Rules:**
 - The system strictly follows "V1 books only" - no AI learning materials or complex features
-- Error handling uses global Fastify error handler with business-specific error types
+- Order payment timeout (15 minutes default)
+- Maximum items per order and total reserved items per user are enforced. A user can only have one pending payment order at a time.
+
+## Testing Strategy
+
+**Unit Tests:** Use Vitest for service layer testing
+```bash
+npm test                    # Run all unit tests with coverage
+```
+
+**Integration Tests:** Test API endpoints with real database
+```bash
+npm run test:integration    # Run integration tests
+```
+
+**Database Integration:** Comprehensive order flow and payment testing
+```bash
+npx vitest run --config vitest.database-integration.config.ts
+```
+
+**Test Database:** Separate SQLite database for testing to avoid conflicts
+- Unit tests: In-memory SQLite
+- Integration tests: File-based SQLite with real PostgreSQL schema
+
+## Monitoring & Observability
+
+**Health Checks:**
+- `GET /api/health` - Database connectivity and system status
+
+**Metrics (Prometheus):**
+- `GET /metrics` - Business and system metrics
+- Order creation/completion/cancellation counters
+- Payment processing metrics
+- Inventory status gauges
+- Database retry counters
+
+**Logging:**
+- Structured JSON logging via Fastify
+- Request/response logging with redacted auth headers
+- Error tracking with stack traces
+
+## Background Jobs & Scheduled Tasks
+
+**Order Cleanup:** Automatically cancel expired orders
+- Runs every minute in development (configurable)
+- Releases reserved inventory back to available pool
+- Updates metrics counters
+
+**Inventory Metrics:** Update Prometheus gauges
+- Runs every 5 minutes
+- Tracks inventory by status (in_stock, reserved, sold)
+
+**WeChat Pay Certificates:** Auto-refresh platform certificates
+- Runs every 10 hours
+- Critical for payment verification
+- Graceful fallback and error handling
+
+## Deployment
+
+**Docker Support:**
+```bash
+# Build production image
+docker build -t bookworm-backend .
+
+# Run container
+docker run -p 3000:3000 --env-file .env bookworm-backend
+```
+
+**Multi-stage Build:**
+- Stage 1: Build TypeScript and generate Prisma client
+- Stage 2: Lightweight runtime with only production dependencies
+
+**Production Checklist:**
+- Set strong `JWT_SECRET`
+- Configure proper `DATABASE_URL`
+- Set up WeChat app credentials
+- Configure monitoring endpoints
+- Set appropriate cron schedules

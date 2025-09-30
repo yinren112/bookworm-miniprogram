@@ -1,44 +1,64 @@
-// miniprogram/utils/auth.js
-const { request } = require('./api');
-const tokenUtil = require('./token'); // 引入新的token模块
+const config = require('../config');
+const tokenUtil = require('./token');
+const ui = require('./ui');
 
-const login = () => {
+function callWxLogin() {
   return new Promise((resolve, reject) => {
     wx.login({
-      success: async (res) => {
-        if (res.code) {
-          try {
-            const data = await request({
-              url: '/auth/login',
-              method: 'POST',
-              data: { code: res.code }
-            });
-            
-            if (data.token) {
-              tokenUtil.setToken(data.token); // 使用新模块
-              tokenUtil.setUserId(data.userId); // 使用新模块
-              resolve(data);
-            } else {
-              reject(new Error('Login failed on server.'));
-            }
-          } catch (error) {
-            reject(new Error(error.error || 'Login failed on server.'));
-          }
-        } else {
-          reject(new Error('wx.login failed, no code returned.'));
-        }
+      success: (res) => {
+        if (res.code) resolve(res.code);
+        else reject(new Error('wx.login 未返回 code'));
       },
-      fail: (err) => { reject(err); }
+      fail: reject,
     });
   });
-};
+}
 
-const logout = () => {
-  tokenUtil.clearToken(); // 使用新模块
-};
+function exchangeCodeForToken(code) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: config.apiBaseUrl + '/auth/login',
+      method: 'POST',
+      data: { code },
+      header: {
+        'Content-Type': 'application/json',
+      },
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.data && res.data.token) {
+          resolve(res.data);
+        } else {
+          reject(new Error((res.data && res.data.message) || '登录失败'));
+        }
+      },
+      fail: () => reject(new Error('登录请求失败')),
+    });
+  });
+}
+
+async function login() {
+  const code = await callWxLogin();
+  const data = await exchangeCodeForToken(code);
+  tokenUtil.setToken(data.token);
+  if (data.userId) {
+    tokenUtil.setUserId(data.userId);
+  }
+  return data;
+}
+
+async function ensureLoggedIn() {
+  const token = tokenUtil.getToken();
+  if (token) {
+    return { token, userId: tokenUtil.getUserId() };
+  }
+  try {
+    return await login();
+  } catch (error) {
+    ui.showError(error.message || '登录失败');
+    throw error;
+  }
+}
 
 module.exports = {
   login,
-  getUserId: tokenUtil.getUserId, // 直接导出
-  logout
+  ensureLoggedIn,
 };

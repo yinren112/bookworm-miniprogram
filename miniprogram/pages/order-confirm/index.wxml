@@ -4,8 +4,8 @@
     <view class="card-title">商品信息</view>
     <view class="book-item">
       <view class="book-info">
-        <text class="book-title">{{book.booksku.bookmaster.title}}</text>
-        <text class="book-author">作者: {{book.booksku.bookmaster.author || '未知'}}</text>
+        <text class="book-title">{{book.bookSku.bookMaster.title}}</text>
+        <text class="book-author">作者: {{book.bookSku.bookMaster.author || '未知'}}</text>
         <text class="book-condition">品相: {{book.condition}}</text>
       </view>
       <text class="book-price">¥{{book.selling_price}}</text>
@@ -29,7 +29,7 @@
       <text>合计: </text>
       <text class="total-price">¥{{book.selling_price}}</text>
     </view>
-    <button class="pay-button" bindtap="handlePayment" disabled="{{isSubmitting}}">
+    <button class="btn btn-primary" bindtap="handlePayment" disabled="{{isSubmitting}}">
       {{isSubmitting ? '处理中...' : '去支付'}}
     </button>
   </view>

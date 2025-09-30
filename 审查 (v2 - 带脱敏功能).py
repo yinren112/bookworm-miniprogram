@@ -29,15 +29,24 @@ CORE_EXTENSIONS = {
 ESSENTIAL_PATTERNS = [
     'CLAUDE.md',
     'bookworm-backend/src/index.ts',
-    'bookworm-backend/src/config.ts', 
+    'bookworm-backend/src/config.ts',
     'bookworm-backend/src/db.ts',
     'bookworm-backend/src/errors.ts',
     'bookworm-backend/src/services/*.ts',
     'bookworm-backend/prisma/schema.prisma',
     'bookworm-backend/.env*',
     'bookworm-backend/package.json',
+    'bookworm-backend/src/jobs/*.ts',
+    'bookworm-backend/src/plugins/*.ts',
+    # Re-include the most critical integration test as a representative sample
+    'bookworm-backend/src/tests/order.integration.test.ts',
+    'bookworm-backend/src/tests/concurrent-order-control.integration.test.ts',
+    'bookworm-backend/src/tests/paymentSecurity.integration.test.ts',
+    # Also include the setup files, they provide critical context on HOW tests are run
+    'bookworm-backend/src/tests/database-integration-setup.ts',
+    'bookworm-backend/src/tests/globalSetup.ts',
     'miniprogram/app.js',
-    'miniprogram/app.json', 
+    'miniprogram/app.json',
     'miniprogram/config.js',
     'miniprogram/utils/api.js',
     'miniprogram/utils/auth.js',
@@ -52,12 +61,10 @@ EXCLUDE_EXTENSIONS = {
 # 排除特定文件
 EXCLUDE_SPECIFIC = {
     'miniprogram/sitemap.json',
-    'project.config.json', 
+    'project.config.json',
     '.eslintrc.js',
     'bookworm-backend/public/*',
-    'bookworm-backend/src/tests/*',
-    'bookworm-backend/src/jobs/*',
-    'bookworm-backend/src/plugins/*'
+    'bookworm-backend/src/tests/*'
 }
 
 # 排除目录和文件模式 (真正无用的文件)

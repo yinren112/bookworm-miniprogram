@@ -125,8 +125,9 @@
   margin-top: var(--space-xs);
 }
 
-/* Pay Button - Uses Global Button Class */
-.pay-button {
+/* Button styles now handled by global .btn .btn-primary classes */
+/* Custom width for order confirm button in footer layout */
+.footer-bar .btn {
   width: 280rpx;
 }
 

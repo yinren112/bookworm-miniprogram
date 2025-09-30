@@ -17,63 +17,76 @@ import datetime
 import fnmatch
 
 # ==============================================================================
-# 智能文件包含规则 - 基于扩展名和路径模式
+# 智能文件包含规则 (v4 - 健壮版)
+# 哲学: 广泛包含所有潜在的源代码和配置文件，然后精确排除已知的噪音。
+# 这比维护一个脆弱的"必要文件"白名单要健壮得多。
 # ==============================================================================
 
-# 核心业务文件扩展名 (精简版)
-CORE_EXTENSIONS = {
-    '.ts', '.js', '.prisma', '.md', '.env'
+# 1. 定义什么是源代码/配置文件 (通过扩展名)
+#    这些是我们关心的东西。
+SOURCE_CODE_EXTENSIONS = {
+    '.ts', '.js', '.prisma', '.md', '.sql',  # Code & Schema
+    '.json', '.env', '.toml', '.yml', '.yaml', # Configs
+    '.py' # Include the script itself for context
 }
 
-# 关键业务文件路径 (只包含核心逻辑)
-ESSENTIAL_PATTERNS = [
-    'CLAUDE.md',
-    'bookworm-backend/src/index.ts',
-    'bookworm-backend/src/config.ts', 
-    'bookworm-backend/src/db.ts',
-    'bookworm-backend/src/errors.ts',
-    'bookworm-backend/src/services/*.ts',
-    'bookworm-backend/prisma/schema.prisma',
-    'bookworm-backend/.env*',
-    'bookworm-backend/package.json',
-    'miniprogram/app.js',
-    'miniprogram/app.json', 
-    'miniprogram/config.js',
-    'miniprogram/utils/api.js',
-    'miniprogram/utils/auth.js',
-    'miniprogram/pages/*/index.js'
+# 2. 定义什么是绝对的噪音 (通过路径和文件名模式)
+#    这些东西永远不应该出现在审查报告里。
+EXCLUDE_PATTERNS = [
+    # 目录
+    '**/node_modules/**',
+    '**/.git/**',
+    '**/dist/**',
+    '**/build/**',
+    '**/coverage/**',
+    '**/.nyc_output/**',
+    '**/miniprogram_npm/**',
+    '**/.vscode/**',
+    '**/.idea/**',
+    '**/__pycache__/**',
+
+    # 锁文件和私有配置
+    '**/package-lock.json',
+    '**/yarn.lock',
+    '**/project.private.config.json',
+
+    # 编译输出或缓存
+    '**/*.log',
+    '**/*.tmp',
+    '**/*.cache',
+    '**/.DS_Store',
+
+    # 明确不关心的前端资源和配置文件
+    'miniprogram/images/**',
+    'miniprogram/**/*.wxml',
+    'miniprogram/**/*.wxss',
+    'miniprogram/sitemap.json',
+    'project.config.json',
+    '.eslintrc.js',
+    'bookworm-backend/public/**',
+
+    # 我们只关心集成测试，单元测试噪音太大
+    'bookworm-backend/src/tests/*.test.ts',
+    'bookworm-backend/src/tests/__mocks__/**',
+    'bookworm-backend/vitest.config.ts',
+    'bookworm-backend/vitest.integration.config.ts',
+    'bookworm-backend/vitest.database-integration.config.ts'
 ]
 
-# 明确排除的文件类型 (减少噪音)
-EXCLUDE_EXTENSIONS = {
-    '.wxml', '.wxss', '.json', '.css', '.html', '.sql'
-}
-
-# 排除特定文件
-EXCLUDE_SPECIFIC = {
-    'miniprogram/sitemap.json',
-    'project.config.json', 
-    '.eslintrc.js',
-    'bookworm-backend/public/*',
-    'bookworm-backend/src/tests/*',
-    'bookworm-backend/src/jobs/*',
-    'bookworm-backend/src/plugins/*'
-}
-
-# 排除目录和文件模式 (真正无用的文件)
-EXCLUDE_DIRS = {
-    'node_modules', '.git', '__pycache__', 'dist', 'build', '.idea', 
-    '.vscode', 'miniprogram_npm', '.nyc_output', 'coverage'
-}
-
-EXCLUDE_FILES = {
-    'package-lock.json', 'yarn.lock', '.DS_Store', 'Thumbs.db',
-    'project.private.config.json', '*.log', '*.tmp', '*.cache'
+# 3. 定义敏感文件 (内容需要脱敏)
+#    这个版本我们先不脱敏，但保留列表以便切换。
+SENSITIVE_FILES = {
+    # 'bookworm-backend/.env' # 暂时注释掉，以便你看到完整内容
 }
 
 def should_include_dir(dir_path):
+    """A robust check to prevent descending into known garbage directories."""
     dir_name = os.path.basename(dir_path)
-    return dir_name not in EXCLUDE_DIRS and not dir_name.startswith('.')
+    # These are the top-level directories we ALWAYS want to skip.
+    garbage_dirs = {'node_modules', '.git', 'dist', 'build', 'coverage', '.nyc_output', 'miniprogram_npm', '.vscode', '.idea', '__pycache__'}
+    if dir_name in garbage_dirs:
+        return False
+    return True
 
 def matches_any_pattern(file_path, patterns):
     """检查文件路径是否匹配任何一个glob模式"""
@@ -83,35 +96,25 @@ def matches_any_pattern(file_path, patterns):
     return False
 
 def should_include_file(file_path, project_root):
-    """精简判断文件是否应该包含在审查中 - 只要核心业务逻辑"""
+    """v4健壮版本：先包含所有源代码，然后排除噪音"""
     # 转换为相对路径
     try:
         rel_path = os.path.relpath(file_path, project_root).replace(os.sep, '/')
     except ValueError:
         return False
-    
-    # 排除明确不需要的文件
-    for exclude_pattern in EXCLUDE_SPECIFIC:
+
+    # 第一步：检查是否是我们关心的源代码文件类型
+    _, ext = os.path.splitext(file_path)
+    if ext.lower() not in SOURCE_CODE_EXTENSIONS:
+        return False
+
+    # 第二步：检查是否匹配任何排除模式
+    for exclude_pattern in EXCLUDE_PATTERNS:
         if fnmatch.fnmatch(rel_path, exclude_pattern):
             return False
-    
-    # 排除特定扩展名
-    _, ext = os.path.splitext(file_path)
-    if ext.lower() in EXCLUDE_EXTENSIONS:
-        return False
-    
-    # 检查是否在排除文件列表中
-    filename = os.path.basename(file_path)
-    for exclude_pattern in EXCLUDE_FILES:
-        if fnmatch.fnmatch(filename, exclude_pattern):
-            return False
-    
-    # 只包含核心扩展名的文件
-    if ext.lower() in CORE_EXTENSIONS:
-        # 但必须匹配关键路径模式
-        return matches_any_pattern(rel_path, ESSENTIAL_PATTERNS)
-    
-    return False
+
+    # 如果既是源代码文件，又不匹配排除模式，就包含它
+    return True
 
 def collect_files_to_review(project_root):
     """收集所有需要审查的文件"""
@@ -178,11 +181,11 @@ def generate_core_review_file(project_root):
         f.write(f"Mode: Essential files only - Core business logic with original data.\n")
         f.write(f"Total files included: {len(files_to_review)} (精简版)\n\n")
 
-        f.write("### 📁 PROJECT FILE TREE ###\n" + "-" * 40 + "\n")
-        f.write(f"{os.path.basename(project_root)}/\n")
-        for item in get_file_tree(project_root):
-            f.write(item + "\n")
-        f.write("\n\n")
+        # f.write("### 📁 PROJECT FILE TREE ###\n" + "-" * 40 + "\n")
+        # f.write(f"{os.path.basename(project_root)}/\n")
+        # for item in get_file_tree(project_root):
+        #     f.write(item + "\n")
+        # f.write("\n\n")
         
         # 按类型分组显示文件列表
         backend_files = [f for f in files_to_review if f.startswith('bookworm-backend')]

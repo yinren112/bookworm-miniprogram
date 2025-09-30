@@ -1,24 +1,45 @@
 // pages/market/index.js
-const auth = require('../../utils/auth');
 const { request } = require('../../utils/api');
+const ui = require('../../utils/ui');
+const { extractErrorMessage } = require('../../utils/error');
 
 Page({
   data: {
-    bookList: [],
-    isLoading: true,
-    error: null,
+    state: {
+      status: 'loading', // 'loading', 'success', 'error'
+      data: [],
+      error: null
+    },
     searchTerm: '',
     searchPerformed: false, // To show different empty state messages
     pageInfo: null // For pagination metadata
   },
 
-  onLoad(options) {
-    this.fetchAvailableBooks();
+  onLoad() {
+    this.hasShownOnce = false;
   },
 
-  // MODIFIED: fetchAvailableBooks now takes a search term
-  async fetchAvailableBooks() {
-    this.setData({ isLoading: true, error: null });
+  onShow() {
+    if (this.hasShownOnce) {
+      this.fetchAvailableBooks({ preserveData: true });
+    } else {
+      this.hasShownOnce = true;
+      this.fetchAvailableBooks();
+    }
+  },
+
+  async fetchAvailableBooks({ preserveData = false } = {}) {
+    if (!preserveData) {
+      this.setData({
+        state: {
+          status: 'loading',
+          data: [],
+          error: null,
+        },
+      });
+    } else {
+      this.setData({ 'state.error': null });
+    }
     let url = `/inventory/available`;
     if (this.data.searchTerm) {
       url += `?search=${encodeURIComponent(this.data.searchTerm)}`;
@@ -29,19 +50,25 @@ Page({
         url: url,
         method: 'GET'
       });
-      this.setData({ bookList: data.data, pageInfo: data.meta });
+      this.setData({
+        state: {
+          status: 'success',
+          data: data.data,
+          error: null
+        },
+        pageInfo: data.meta
+      });
     } catch (error) {
       console.error('API request failed', error);
-      this.setData({ 
-        error: error.error || '加载失败', 
-        bookList: [] 
+      const errorMsg = extractErrorMessage(error, '加载失败');
+      this.setData({
+        state: {
+          status: 'error',
+          data: [],
+          error: errorMsg
+        }
       });
-      wx.showToast({
-        title: error.error || '加载失败',
-        icon: 'none'
-      });
-    } finally {
-      this.setData({ isLoading: false });
+      ui.showError(errorMsg);
     }
   },
 
@@ -60,7 +87,7 @@ Page({
 
   // Pull down refresh
   async onPullDownRefresh() {
-    await this.fetchAvailableBooks();
+    await this.fetchAvailableBooks({ preserveData: true });
     wx.stopPullDownRefresh();
   }
 });

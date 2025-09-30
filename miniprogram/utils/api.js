@@ -1,6 +1,7 @@
 // miniprogram/utils/api.js - 统一的API请求工具
 const config = require('../config');
-const tokenUtil = require('./token'); // 依赖新的、无依赖的模块
+const tokenUtil = require('./token');
+const auth = require('./auth');
 
 /**
  * 统一的API请求函数
@@ -11,27 +12,48 @@ const tokenUtil = require('./token'); // 依赖新的、无依赖的模块
  * @param {Object} options.header - 请求头
  * @returns {Promise} - 返回Promise对象
  */
-const request = ({ url, method = 'GET', data = {} }) => new Promise((resolve, reject) => {
-    const token = tokenUtil.getToken(); // 从新模块获取token
-    wx.request({
-        url: `${config.apiBaseUrl}${url}`,
-        method,
-        data,
-        header: {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-        },
-        success: (res) => {
-            if (res.statusCode >= 200 && res.statusCode < 300) return resolve(res.data);
-            if (res.statusCode === 401) {
-                // 简单处理：提示并让用户重启
-                wx.showToast({ title: '登录过期，请重启小程序', icon: 'none' });
-                tokenUtil.clearToken();
-            }
-            return reject(res.data || { error: `Request failed with status ${res.statusCode}` });
-        },
-        fail: (err) => reject({ error: '网络请求失败', errorCode: 'NETWORK_ERROR' })
-    });
+let ongoingLoginPromise = null;
+
+const request = ({ url, method = 'GET', data = {}, retry = true }) => new Promise((resolve, reject) => {
+  const token = tokenUtil.getToken();
+  wx.request({
+    url: `${config.apiBaseUrl}${url}`,
+    method,
+    data,
+    timeout: 10000,
+    header: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    success: async (res) => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return resolve(res.data);
+      }
+
+      if (res.statusCode === 401 && retry) {
+        tokenUtil.clearToken();
+        try {
+          if (!ongoingLoginPromise) {
+            ongoingLoginPromise = auth
+              .ensureLoggedIn()
+              .finally(() => {
+                ongoingLoginPromise = null;
+              });
+          }
+          await ongoingLoginPromise;
+          const retryResult = await request({ url, method, data, retry: false });
+          return resolve(retryResult);
+        } catch (loginError) {
+          ongoingLoginPromise = null;
+          return reject(loginError);
+        }
+      }
+
+      const errorPayload = res.data && typeof res.data === 'object' ? res.data : { message: `Request failed with status ${res.statusCode}` };
+      return reject(errorPayload);
+    },
+    fail: () => reject({ message: '网络请求失败', errorCode: 'NETWORK_ERROR' }),
+  });
 });
 
 module.exports = {

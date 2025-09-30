@@ -8,38 +8,53 @@ datasource db {
 }
 
 model Order {
-  id               Int             @id @default(autoincrement())
+  id               Int                    @id @default(autoincrement())
   user_id          Int
-  status           OrderStatus     @default(PENDING_PAYMENT)
-  total_amount     Decimal         @db.Decimal(10, 2)
-  pickup_code      String          @unique @db.VarChar(16)
-  createdAt        DateTime        @default(now()) @db.Timestamptz(6)
-  paymentExpiresAt DateTime        @db.Timestamptz(6)
-  pickupExpiresAt  DateTime?       @db.Timestamptz(6)
-  paid_at          DateTime?       @db.Timestamptz(6)
-  completed_at     DateTime?       @db.Timestamptz(6)
-  cancelled_at     DateTime?       @db.Timestamptz(6)
-  User             User            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
-  orderitem        orderitem[]
+  status           OrderStatus            @default(PENDING_PAYMENT)
+  total_amount     Decimal                @db.Decimal(10, 2)
+  pickup_code      String                 @unique @db.VarChar(16)
+  createdAt        DateTime               @default(now()) @db.Timestamptz(6)
+  paymentExpiresAt DateTime               @db.Timestamptz(6)
+  pickupExpiresAt  DateTime?              @db.Timestamptz(6)
+  paid_at          DateTime?              @db.Timestamptz(6)
+  completed_at     DateTime?              @db.Timestamptz(6)
+  cancelled_at     DateTime?              @db.Timestamptz(6)
+  User             User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
+  orderItem        OrderItem[]
   PaymentRecord    PaymentRecord[]
-
-  ReservedInventory inventoryitem[] @relation("ReservedInventory")
+  reservations     InventoryReservation[]
+  pendingGuard     PendingPaymentOrder?
 
   @@index([user_id, status], map: "idx_order_user_id_status")
+  @@index([createdAt], map: "idx_order_created_at")
+  @@index([user_id, createdAt, id], map: "idx_order_user_created_at_id")
+}
+
+model PendingPaymentOrder {
+  order_id   Int      @id
+  user_id    Int
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  Order Order @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pending_order")
+  User  User  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pending_user")
+
+  @@unique([user_id], map: "uniq_order_pending_per_user")
+  @@map("pending_payment_order")
 }
 
 model User {
-  id         Int      @id @default(autoincrement())
-  openid     String   @unique @db.VarChar(255)
-  unionid    String?  @unique @db.VarChar(255)
-  nickname   String?  @db.VarChar(255)
-  avatar_url String?  @db.VarChar(255)
-  role       Role     @default(USER)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  Order      Order[]
+  id            Int                   @id @default(autoincrement())
+  openid        String                @unique @db.VarChar(255)
+  unionid       String?               @unique @db.VarChar(255)
+  nickname      String?               @db.VarChar(255)
+  avatar_url    String?               @db.VarChar(255)
+  role          Role                  @default(USER)
+  created_at    DateTime              @default(now()) @db.Timestamptz(6)
+  Order         Order[]
+  pendingOrders PendingPaymentOrder[]
 }
 
-model bookmaster {
+model BookMaster {
   id             Int       @id @default(autoincrement())
   isbn13         String    @unique @db.VarChar(13)
   title          String    @db.VarChar(255)
@@ -48,12 +63,15 @@ model bookmaster {
   original_price Decimal?  @db.Decimal(10, 2)
   created_at     DateTime  @default(now()) @db.Timestamptz(6)
   updated_at     DateTime  @updatedAt @db.Timestamptz(6)
-  booksku        booksku[]
+  bookSku        BookSku[]
 
   @@index([isbn13], map: "idx_book_master_isbn13")
+  @@index([author(ops: raw("gin_trgm_ops"))], map: "idx_bookmaster_author_gin_trgm", type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "idx_bookmaster_title_gin_trgm", type: Gin)
+  @@map("bookmaster")
 }
 
-model booksku {
+model BookSku {
   id              Int             @id @default(autoincrement())
   master_id       Int
   edition         String?         @db.VarChar(50)
@@ -61,47 +79,53 @@ model booksku {
   cover_image_url String?         @db.VarChar(255)
   created_at      DateTime        @default(now()) @db.Timestamptz(6)
   updated_at      DateTime        @updatedAt @db.Timestamptz(6)
-  bookmaster      bookmaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
-  inventoryitem   inventoryitem[]
+  bookMaster      BookMaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
+  inventoryItems  InventoryItem[]
 
   @@unique([master_id, edition])
+  @@map("booksku")
 }
 
-// 注意: Prisma 的 @updatedAt 在 `updateMany` 操作时不会自动触发。
-// 在批量更新 inventoryitem 状态的后台任务中，必须手动设置 `updated_at: new Date()`。
-model inventoryitem {
-  id            Int              @id @default(autoincrement())
+model InventoryItem {
+  id            Int                   @id @default(autoincrement())
   sku_id        Int
   condition     book_condition
-  cost          Decimal          @db.Decimal(10, 2)
-  selling_price Decimal          @db.Decimal(10, 2)
-  status        inventory_status @default(in_stock)
-
-  reserved_by_order_id Int?
-  ReservedByOrder      Order? @relation("ReservedInventory", fields: [reserved_by_order_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
-
-  created_at DateTime    @default(now()) @db.Timestamptz(6)
-  updated_at DateTime    @updatedAt @db.Timestamptz(6)
-  booksku    booksku     @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
-  orderitem  orderitem[]
+  cost          Decimal               @db.Decimal(10, 2)
+  selling_price Decimal               @db.Decimal(10, 2)
+  status        inventory_status      @default(in_stock)
+  created_at    DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime              @updatedAt @db.Timestamptz(6)
+  bookSku       BookSku               @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
+  orderItem     OrderItem[]
+  reservation   InventoryReservation?
 
   @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
-  @@index([reserved_by_order_id])
+  @@map("inventoryitem")
 }
 
-// 注意：`inventory_item_id` 不再是唯一的。
-// 库存的唯一售出保证，由 `inventoryitem.status` 的状态流转（in_stock -> reserved -> sold）
-// 在 `createOrder` 服务的原子化事务中严格控制。
-// 保留所有 orderitem 记录（包括已取消的）用于数据审计。
-model orderitem {
+model InventoryReservation {
+  inventory_item_id Int      @id
+  order_id          Int
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  inventoryItem InventoryItem @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reservation_item")
+  order         Order         @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_reservation_order")
+
+  @@index([order_id], map: "idx_inventory_reservation_order_id")
+  @@map("inventory_reservation")
+}
+
+model OrderItem {
   id                Int           @id @default(autoincrement())
   order_id          Int
   inventory_item_id Int
   price             Decimal       @db.Decimal(10, 2)
-  inventoryitem     inventoryitem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
+  inventoryItem     InventoryItem @relation(fields: [inventory_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_inventory_item")
   Order             Order         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order")
 
+  @@unique([order_id, inventory_item_id], map: "uniq_orderitem_order_inventory")
   @@index([inventory_item_id], map: "idx_orderitem_inventory_item_id")
+  @@map("orderitem")
 }
 
 model Content {
@@ -115,10 +139,32 @@ model Content {
   @@index([slug], map: "idx_content_slug")
 }
 
+model PaymentRecord {
+  id              Int           @id @default(autoincrement())
+  order_id        Int
+  out_trade_no    String        @unique @db.VarChar(100)
+  transaction_id  String?       @unique @db.VarChar(100)
+  status          PaymentStatus @default(PENDING)
+  amount_total    Int
+  payer_openid    String?       @db.VarChar(255)
+  appid           String?       @db.VarChar(100)
+  mchid           String?       @db.VarChar(100)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(6)
+  notified_at     DateTime?
+  refunded_at     DateTime?
+  refund_id       String?       @unique @db.VarChar(100)
+  refund_attempts Int           @default(0)
+  Order           Order         @relation(fields: [order_id], references: [id])
+
+  @@index([order_id])
+  @@index([status, createdAt])
+}
+
 enum book_condition {
-  NEW // A - 全新或接近全新
-  GOOD // B - 有轻微使用痕迹，无破损
-  ACCEPTABLE // C - 有明显使用痕迹、笔记或轻微破损，但不影响阅读
+  NEW
+  GOOD
+  ACCEPTABLE
 }
 
 enum inventory_status {
@@ -142,32 +188,11 @@ enum OrderStatus {
   RETURNED
 }
 
-model PaymentRecord {
-  id             Int           @id @default(autoincrement())
-  order_id       Int
-  out_trade_no   String        @unique @db.VarChar(100)
-  transaction_id String?       @unique @db.VarChar(100)
-  status         PaymentStatus @default(PENDING)
-  amount_total   Int // 微信支付侧的金额，单位：分
-  payer_openid   String?       @db.VarChar(255)
-  appid          String?       @db.VarChar(100)
-  mchid          String?       @db.VarChar(100)
-
-  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
-  notified_at DateTime? // 微信通知首次到达时间
-  refunded_at DateTime? // 退款完成时间
-
-  Order Order @relation(fields: [order_id], references: [id])
-
-  @@index([order_id])
-  @@index([status, createdAt])
-}
-
 enum PaymentStatus {
-  PENDING // 待支付
-  SUCCESS // 支付成功
-  REFUND_REQUIRED // 需退款（如订单已取消但支付成功）
-  REFUNDED // 已退款
-  FAILED // 支付失败
+  PENDING
+  SUCCESS
+  REFUND_REQUIRED
+  REFUNDED
+  FAILED
+  REFUND_PROCESSING
 }

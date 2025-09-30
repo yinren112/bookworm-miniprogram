@@ -5,21 +5,21 @@
 
   <!-- Real Content -->
   <view wx:if="{{!isLoading && bookDetail}}" class="detail-container animated">
-    <image class="cover-image" src="{{bookDetail.booksku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFit" />
+    <image class="cover-image" src="{{bookDetail.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFit" />
 
     <view class="info-section">
-      <text class="title">{{bookDetail.booksku.bookmaster.title}}</text>
-      <text class="author">{{bookDetail.booksku.bookmaster.author}}</text>
+      <text class="title">{{bookDetail.bookSku.bookMaster.title}}</text>
+      <text class="author">{{bookDetail.bookSku.bookMaster.author}}</text>
       
       <view class="price-section">
         <text class="selling-price">¥{{bookDetail.selling_price}}</text>
-        <text class="original-price" wx:if="{{bookDetail.booksku.bookmaster.original_price}}">¥{{bookDetail.booksku.bookmaster.original_price}}</text>
+        <text class="original-price" wx:if="{{bookDetail.bookSku.bookMaster.original_price}}">¥{{bookDetail.bookSku.bookMaster.original_price}}</text>
       </view>
 
       <view class="specs-card card">
         <view class="spec-item">
           <text class="spec-label">版本</text>
-          <text class="spec-value">{{bookDetail.booksku.edition || '暂无'}}</text>
+          <text class="spec-value">{{bookDetail.bookSku.edition || '暂无'}}</text>
         </view>
         <view class="spec-item">
           <text class="spec-label">品相</text>
@@ -27,10 +27,15 @@
         </view>
         <view class="spec-item">
           <text class="spec-label">ISBN</text>
-          <text class="spec-value">{{bookDetail.booksku.bookmaster.isbn13}}</text>
+          <text class="spec-value">{{bookDetail.bookSku.bookMaster.isbn13}}</text>
         </view>
       </view>
     </view>
+  </view>
+
+  <!-- Empty State -->
+  <view wx:if="{{!isLoading && !bookDetail && !error}}" class="error-container">
+    <text>书籍信息不存在</text>
   </view>
 
   <!-- Error State -->
@@ -39,6 +44,8 @@
   </view>
 
   <view class="footer-bar" wx:if="{{bookDetail}}">
-    <button class="buy-button" bindtap="handleBuyNow">立即购买</button>
+    <button class="btn btn-primary" bindtap="handleBuyNow" disabled="{{isSubmitting}}">
+      {{isSubmitting ? '处理中...' : '立即购买'}}
+    </button>
   </view>
 </view>

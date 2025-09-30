@@ -1,5 +1,6 @@
 // pages/order-detail/index.js
 const { request } = require('../../utils/api');
+const { extractErrorMessage } = require('../../utils/error');
 
 Page({
   data: {
@@ -9,7 +10,9 @@ Page({
   },
 
   onLoad(options) {
+    this.hasShownOnce = false;
     if (options.id) {
+      this.currentId = options.id;
       this.fetchOrderDetail(options.id);
     } else {
       this.setData({ 
@@ -19,8 +22,23 @@ Page({
     }
   },
 
-  async fetchOrderDetail(orderId) {
-    this.setData({ isLoading: true, error: null });
+  onShow() {
+    if (!this.currentId) {
+      return;
+    }
+    if (this.hasShownOnce) {
+      this.fetchOrderDetail(this.currentId, { preserveData: true });
+    } else {
+      this.hasShownOnce = true;
+    }
+  },
+
+  async fetchOrderDetail(orderId, { preserveData = false } = {}) {
+    if (!preserveData) {
+      this.setData({ isLoading: true, error: null });
+    } else {
+      this.setData({ error: null });
+    }
 
     try {
       const data = await request({
@@ -32,8 +50,9 @@ Page({
         isLoading: false 
       });
     } catch (error) {
+      const errorMsg = extractErrorMessage(error, '获取订单详情失败');
       this.setData({ 
-        error: error.error || '获取订单详情失败',
+        error: errorMsg,
         isLoading: false 
       });
     }
@@ -55,17 +74,16 @@ Page({
       'PENDING_PAYMENT': '待支付',
       'PENDING_PICKUP': '待取货', 
       'COMPLETED': '已完成',
-      'CANCELLED': '已取消',
-      'RETURNED': '已退货'
+      'CANCELLED': '已取消'
     };
     return statusMap[status] || status;
   },
 
   getConditionText(condition) {
     const conditionMap = {
-      'A': '全新',
-      'B': '八成新',
-      'C': '六成新'
+      'NEW': '全新',
+      'GOOD': '良好',
+      'ACCEPTABLE': '可用'
     };
     return conditionMap[condition] || condition;
   },
@@ -75,7 +93,7 @@ Page({
     const currentPage = pages[pages.length - 1];
     const orderId = currentPage.options.id;
     if (orderId) {
-      this.fetchOrderDetail(orderId);
+      this.fetchOrderDetail(orderId, { preserveData: true });
     }
   },
 

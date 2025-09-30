@@ -1,16 +1,8 @@
 // pages/order-confirm/index.js
-const auth = require('../../utils/auth');
 const api = require('../../utils/api');
-
-function promisifiedPayment(options) {
-  return new Promise((resolve, reject) => {
-    wx.requestPayment({
-      ...options,
-      success: resolve,
-      fail: reject
-    });
-  });
-}
+const ui = require('../../utils/ui');
+const { safeCreateOrderAndPay } = require('../../utils/payment');
+const { extractErrorMessage } = require('../../utils/error');
 
 Page({
   data: {
@@ -21,16 +13,33 @@ Page({
   },
   
   onLoad(options) {
+    this.hasShownOnce = false;
     if (options.id) {
+      this.currentId = options.id;
       this.fetchBookDetails(options.id);
     } else {
       this.setData({ isLoading: false, error: '无效的商品ID' });
     }
   },
 
-  async fetchBookDetails(id) {
-    this.setData({ isLoading: true, error: null });
-    
+  onShow() {
+    if (!this.currentId) {
+      return;
+    }
+    if (this.hasShownOnce) {
+      this.fetchBookDetails(this.currentId, { preserveData: true });
+    } else {
+      this.hasShownOnce = true;
+    }
+  },
+
+  async fetchBookDetails(id, { preserveData = false } = {}) {
+    if (!preserveData) {
+      this.setData({ isLoading: true, error: null });
+    } else {
+      this.setData({ error: null });
+    }
+
     try {
       const data = await api.request({
         url: `/inventory/item/${id}`,
@@ -43,59 +52,43 @@ Page({
         this.setData({ error: '该书籍已售出或不可用' });
       }
     } catch (error) {
-      this.setData({ error: error.error || '网络请求失败，无法获取书籍信息' });
+      const errorMsg = extractErrorMessage(error, '网络请求失败，无法获取书籍信息');
+      this.setData({ error: errorMsg });
+      ui.showError(errorMsg);
     } finally {
       this.setData({ isLoading: false });
     }
   },
   
   async handlePayment() {
-    if (this.data.isSubmitting || !this.data.book) return;
-    this.setData({ isSubmitting: true });
+    // 在函数开始时获取本地常量，确保数据访问的稳定性
+    const { book } = this.data;
+    if (this.data.isSubmitting || !book) return;
 
-    const userId = auth.getUserId();
-    const inventoryItemId = this.data.book.id;
+    // 显示支付确认对话框
+    const confirmResult = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认支付',
+        content: `确定要购买《${book.bookSku.bookMaster.title}》吗？\n支付金额：¥${book.selling_price}`,
+        confirmText: '确认支付',
+        cancelText: '再想想',
+        success: (res) => resolve(res.confirm),
+        fail: () => resolve(false)
+      });
+    });
 
-    if (!userId) {
-      wx.showToast({ title: '登录信息失效，请重启小程序', icon: 'none' });
-      this.setData({ isSubmitting: false });
-      return;
+    if (!confirmResult) {
+      return; // 用户取消支付
     }
 
-    try {
-      wx.showLoading({ title: '正在创建订单...' });
+    this.setData({ isSubmitting: true });
+    const result = await safeCreateOrderAndPay([book.id]);
+    this.setData({ isSubmitting: false });
 
-      const createData = await api.request({
-        url: '/orders/create',
-        method: 'POST',
-        data: { inventoryItemIds: [inventoryItemId] }
-      });
-
-      const orderId = createData.id;
-      wx.showLoading({ title: '获取支付参数...' });
-
-      const payParams = await api.request({
-        url: `/orders/${orderId}/pay`,
-        method: 'POST' // body为空，所有信息都在JWT里
-      });
-
-      wx.hideLoading();
-
-      try {
-        await promisifiedPayment(payParams); // 直接使用后端返回的签名参数
-        wx.showToast({ title: '支付成功', icon: 'success' });
-        setTimeout(() => {
-          wx.switchTab({ url: '/pages/orders/index' });
-        }, 1500);
-      } catch (paymentError) {
-        wx.showToast({ title: '支付已取消', icon: 'none' });
-        this.setData({ isSubmitting: false });
-      }
-
-    } catch (error) {
-      wx.hideLoading();
-      wx.showToast({ title: error.error || '网络请求失败', icon: 'error' });
-      this.setData({ isSubmitting: false });
+    if (result.success) {
+      setTimeout(() => {
+        wx.switchTab({ url: '/pages/orders/index' });
+      }, 1500);
     }
   }
 });

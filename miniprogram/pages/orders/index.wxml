@@ -4,14 +4,14 @@
 <view class="container">
   <view class="header-title">我的订单</view>
 
-  <view wx:if="{{isLoading}}" class="loading-indicator">加载订单中...</view>
-  <view wx:if="{{error}}" class="error-message">{{error}}</view>
-  <view wx:if="{{!isLoading && !error && orderList.length === 0}}" class="empty-state">
+  <skeleton wx:if="{{state.status === 'loading'}}" type="list" count="3" />
+  <view wx:if="{{state.status === 'error'}}" class="error-message">{{state.error}}</view>
+  <view wx:if="{{state.status === 'success' && state.data.length === 0}}" class="empty-state">
     <text>你还没有任何订单</text>
   </view>
 
-  <view class="order-list" wx:if="{{orderList.length > 0}}">
-    <view class="order-card" wx:for="{{orderList}}" wx:key="id" bind:tap="navigateToDetail" data-order-id="{{item.id}}" hover-class="item-hover">
+  <view class="order-list" wx:if="{{state.status === 'success' && state.data.length > 0}}">
+    <view class="order-card" wx:for="{{state.data}}" wx:key="id" bind:tap="navigateToDetail" data-order-id="{{item.id}}" hover-class="item-hover">
       <view class="order-header">
         <view class="status-tag {{item.status === 'COMPLETED' ? 'success' : item.status === 'PENDING_PAYMENT' ? 'error' : 'warning'}}">{{statusMap[item.status] || '未知状态'}}</view>
         <view class="order-date">{{tools.formatOrderTime(item.createdAt)}}</view>
@@ -19,8 +19,8 @@
       
       <view class="order-content">
         <view class="book-summary">
-          <text class="first-book">{{item.orderitem[0].inventoryitem.booksku.bookmaster.title}}</text>
-          <text wx:if="{{item.orderitem.length > 1}}" class="more-books"> 等{{item.orderitem.length}}件商品</text>
+          <text class="first-book">{{item.orderItem[0].inventoryItem.bookSku.bookMaster.title}}</text>
+          <text wx:if="{{item.orderItem.length > 1}}" class="more-books"> 等{{item.orderItem.length}}件商品</text>
         </view>
         <view class="order-total">¥{{item.total_amount}}</view>
       </view>

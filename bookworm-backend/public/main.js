@@ -163,9 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemList = document.createElement('ul');
         itemList.className = 'order-item-list';
         
-        order.orderitem.forEach(item => {
+        order.orderItem.forEach(item => {
           const listItem = document.createElement('li');
-          listItem.textContent = `${item.inventoryitem.booksku.bookmaster.title} (品相: ${item.inventoryitem.condition})`;
+          listItem.textContent = `${item.inventoryItem.bookSku.bookMaster.title} (品相: ${item.inventoryItem.condition})`;
           itemList.appendChild(listItem);
         });
         

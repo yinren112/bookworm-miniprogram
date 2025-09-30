@@ -1,102 +1,207 @@
-// src/tests/orderService.integration.test.ts
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { buildApp } from '../index';
-import prisma from '../db';
-import { User, bookmaster, booksku, inventoryitem } from '@prisma/client';
-import { createSigner } from 'fast-jwt';
-import config from '../config';
-import { FastifyInstance } from 'fastify';
+// src/tests/order.integration.test.ts
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { User } from "@prisma/client";
+import { createSigner } from "fast-jwt";
+import config from "../config";
+import { getPrismaClientForWorker, createTestUser, createTestInventoryItems } from './globalSetup';
+import { createTestApp } from "../app-factory";
+import { FastifyInstance } from "fastify";
 
-describe('POST /api/orders/create - Integration Test', () => {
+describe("Order Integration Tests", () => {
+  let prisma: any;
   let app: FastifyInstance;
-  let user: User;
-  let bookItem: inventoryitem;
-  let token: string;
 
   beforeAll(async () => {
-    // Build the Fastify app
-    app = await buildApp();
-
-    // 1. Seed the database with necessary data - use upsert to handle existing users
-    user = await prisma.user.upsert({
-      where: { openid: 'integration-test-user' },
-      create: { openid: 'integration-test-user' },
-      update: {},
-    });
-    
-    const master = await prisma.bookmaster.upsert({
-      where: { isbn13: '999-INT-TEST' },
-      create: { isbn13: '999-INT-TEST', title: 'Integration Test Book' },
-      update: {},
-    });
-    const sku = await prisma.booksku.upsert({
-      where: { 
-        master_id_edition: {
-          master_id: master.id,
-          edition: '1st'
-        }
-      },
-      create: { master_id: master.id, edition: '1st' },
-      update: {},
-    });
-    
-    // For inventory item, we want a fresh one for each test run
-    // First clean up any existing items for this SKU
-    await prisma.inventoryitem.deleteMany({
-      where: { sku_id: sku.id }
-    });
-    
-    bookItem = await prisma.inventoryitem.create({
-      data: {
-        sku_id: sku.id,
-        condition: 'NEW',
-        cost: 10,
-        selling_price: 20,
-        status: 'in_stock',
-      },
-    });
-
-    // 2. Generate a valid token for the user
-    const signer = createSigner({ key: config.JWT_SECRET! });
-    token = await signer({ userId: user.id, openid: user.openid });
+    prisma = getPrismaClientForWorker();
+    app = await createTestApp();
+    await app.ready();
   });
 
-  afterEach(async () => {
-    // Clean up created records to keep tests isolated
-    await prisma.orderitem.deleteMany({});
-    await prisma.order.deleteMany({});
-    // Reset inventory item status
-    await prisma.inventoryitem.update({
-      where: { id: bookItem.id },
-      data: { status: 'in_stock', reserved_by_order_id: null },
+  afterAll(async () => {
+    await app.close();
+  });
+
+  describe("POST /api/orders/create", () => {
+    it("should successfully create an order and reserve inventory", async () => {
+      // Setup test data
+      const { userId } = await createTestUser("USER");
+      const itemIds = await createTestInventoryItems(1);
+
+      const signer = createSigner({ key: config.JWT_SECRET! });
+      const token = await signer({ userId, openid: "order-create-test" });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/orders/create",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+        payload: {
+          inventoryItemIds: itemIds,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const order = JSON.parse(response.payload);
+      expect(order.user_id).toBe(userId);
+      expect(order.status).toBe("PENDING_PAYMENT");
+      expect(order.total_amount).toBe("80"); // From createTestInventoryItems selling_price
+    });
+
+    it("should fail with invalid inventory item IDs", async () => {
+      const { userId } = await createTestUser("USER");
+
+      const signer = createSigner({ key: config.JWT_SECRET! });
+      const token = await signer({ userId, openid: "order-invalid-test" });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/orders/create",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+        payload: {
+          inventoryItemIds: [99999], // Non-existent ID
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      const error = JSON.parse(response.payload);
+      expect(error.code).toBe("INSUFFICIENT_INVENTORY_PRECHECK");
     });
   });
 
-  it('should successfully create an order and reserve the inventory item', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/orders/create',
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-      payload: {
-        inventoryItemIds: [bookItem.id],
-      },
+  describe("GET /api/orders/:id - Authorization", () => {
+    it("should prevent unauthorized access", async () => {
+      // Create UserA and their order
+      const { userId: userAId } = await createTestUser("USER");
+      const { userId: userBId } = await createTestUser("USER");
+      const itemIds = await createTestInventoryItems(1);
+
+      const signer = createSigner({ key: config.JWT_SECRET! });
+      const tokenA = await signer({
+        userId: userAId,
+        openid: "user-a-auth-test",
+      });
+      const tokenB = await signer({
+        userId: userBId,
+        openid: "user-b-auth-test",
+      });
+
+      // UserA creates an order
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/api/orders/create",
+        headers: {
+          authorization: `Bearer ${tokenA}`,
+        },
+        payload: {
+          inventoryItemIds: itemIds,
+        },
+      });
+
+      expect(createResponse.statusCode).toBe(201);
+      const order = JSON.parse(createResponse.payload);
+
+      // UserB tries to access UserA's order
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/orders/${order.id}`,
+        headers: {
+          authorization: `Bearer ${tokenB}`,
+        },
+      });
+
+      // Must return 404, not 403, to avoid information disclosure
+      expect(response.statusCode).toBe(404);
+      const error = JSON.parse(response.payload);
+      expect(error.code).toBe("ORDER_NOT_FOUND");
     });
 
-    expect(response.statusCode).toBe(201);
-    const order = JSON.parse(response.payload);
-    expect(order.user_id).toBe(user.id);
-    expect(order.total_amount).toBe('20');
+    it("should allow authorized access to own order", async () => {
+      const { userId } = await createTestUser("USER");
+      const itemIds = await createTestInventoryItems(1);
 
-    // VERIFY THE DATABASE STATE
-    const dbItem = await prisma.inventoryitem.findUnique({ where: { id: bookItem.id } });
-    const dbOrder = await prisma.order.findUnique({ where: { id: order.id } });
-    
-    expect(dbItem).toBeDefined();
-    expect(dbItem?.status).toBe('reserved');
-    expect(dbItem?.reserved_by_order_id).toBe(order.id);
-    expect(dbOrder).toBeDefined();
-    expect(dbOrder?.status).toBe('PENDING_PAYMENT');
+      const signer = createSigner({ key: config.JWT_SECRET! });
+      const token = await signer({ userId, openid: "user-own-order-test" });
+
+      // Create order
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/api/orders/create",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+        payload: {
+          inventoryItemIds: itemIds,
+        },
+      });
+
+      expect(createResponse.statusCode).toBe(201);
+      const order = JSON.parse(createResponse.payload);
+
+      // Access own order
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/orders/${order.id}`,
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const retrievedOrder = JSON.parse(response.payload);
+      expect(retrievedOrder.id).toBe(order.id);
+      expect(retrievedOrder.user_id).toBe(userId);
+    });
+  });
+
+  describe("GET /api/orders/user/:userId", () => {
+    it("should return user order history", async () => {
+      const { userId } = await createTestUser("USER");
+      const itemIds = await createTestInventoryItems(1);
+
+      const signer = createSigner({ key: config.JWT_SECRET! });
+      const token = await signer({ userId, openid: "user-history-test" });
+
+      // Create one order
+      const orderResponse = await app.inject({
+        method: "POST",
+        url: "/api/orders/create",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+        payload: {
+          inventoryItemIds: itemIds,
+        },
+      });
+
+      expect(orderResponse.statusCode).toBe(201);
+      const createdOrder = JSON.parse(orderResponse.payload);
+
+      // Get order history
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/orders/user/${userId}`,
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const result = JSON.parse(response.payload);
+
+      // API returns consistent structure { data: orders, meta: { ... } }
+      expect(result.data).toBeDefined();
+      expect(Array.isArray(result.data)).toBe(true);
+      expect(result.data.length).toBe(1); // Exactly 1 order created
+      expect(result.meta).toBeDefined();
+      expect(result.meta.totalItems).toBe(1);
+
+      // Verify order ID and user ID match what we created
+      expect(result.data[0].id).toBe(createdOrder.id);
+      expect(result.data[0].user_id).toBe(userId);
+      expect(result.data[0].status).toBe("PENDING_PAYMENT");
+    });
   });
 });

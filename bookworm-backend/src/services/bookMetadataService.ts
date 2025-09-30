@@ -1,10 +1,9 @@
 // bookworm-backend/src/services/bookMetadataService.ts
-import axios from 'axios';
-import prisma from '../db';
-import config from '../config'; // 导入config
+import axios from "axios";
 
-// 探数 API 配置
-const TANSHU_BASE_URL = 'https://api.tanshuapi.com/api/isbn/v2/index';
+import config from "../config";
+import { ApiError } from "../errors";
+import { API_CONSTANTS, DEFAULT_VALUES } from "../constants";
 
 interface TanshuBookData {
   title: string;
@@ -37,23 +36,30 @@ interface BookMetadata {
 /**
  * Fetches book metadata from Tanshu API using ISBN.
  * @param isbn The ISBN-13 of the book.
- * @returns Parsed metadata or null if not found or on error.
+ * @returns Parsed metadata or null if not found or service unavailable.
+ * @throws ApiError with code METADATA_SERVICE_UNAVAILABLE on network errors.
  */
-export async function getBookMetadata(isbn: string): Promise<BookMetadata | null> {
+export async function getBookMetadata(
+  isbn: string,
+): Promise<BookMetadata | null> {
   if (!config.TANSHU_API_KEY) {
-    console.warn('!!! WARNING: TANSHU_API_KEY is not configured in .env. Book metadata feature is disabled.');
+    console.warn(
+      "!!! WARNING: TANSHU_API_KEY is not configured in .env. Book metadata feature is disabled.",
+    );
     return null;
   }
 
-  const url = `${TANSHU_BASE_URL}?key=${config.TANSHU_API_KEY}&isbn=${isbn}`;
-  
+  const url = `${API_CONSTANTS.TANSHU_BASE_URL}?key=${config.TANSHU_API_KEY}&isbn=${isbn}`;
+
   try {
     const response = await axios.get<TanshuApiResponse>(url, {
       validateStatus: () => true, // 接受所有状态码，自己处理
     });
 
     if (response.status !== 200 || response.data.code !== 1) {
-      console.error(`Tanshu API Error for ISBN ${isbn}: Status ${response.status}, code: ${response.data.code}, msg: ${response.data.msg}`);
+      console.error(
+        `Tanshu API Error for ISBN ${isbn}: Status ${response.status}, code: ${response.data.code}, msg: ${response.data.msg}`,
+      );
       return null;
     }
 
@@ -61,28 +67,35 @@ export async function getBookMetadata(isbn: string): Promise<BookMetadata | null
 
     let priceValue = 0;
     if (data.price) {
-        try {
-            const priceMatch = data.price.match(/(\d+\.?\d*)/);
-            if (priceMatch) {
-                priceValue = parseFloat(priceMatch[1]);
-            }
-        } catch (e) {
-            console.warn(`Could not parse price for ${data.title}: ${data.price}`);
+      try {
+        const priceMatch = data.price.match(/(\d+\.?\d*)/);
+        if (priceMatch) {
+          priceValue = parseFloat(priceMatch[1]);
         }
+      } catch (error) {
+        console.warn(`Could not parse price for ${data.title}: ${data.price}`, error);
+      }
     }
 
     return {
       isbn13: data.isbn,
-      title: data.title || '未知书名',
-      author: data.author || '未知作者',
-      publisher: data.publisher || '未知出版社',
-      summary: data.summary || '暂无简介',
+      title: data.title || DEFAULT_VALUES.UNKNOWN_TITLE,
+      author: data.author || DEFAULT_VALUES.UNKNOWN_AUTHOR,
+      publisher: data.publisher || DEFAULT_VALUES.UNKNOWN_PUBLISHER,
+      summary: data.summary || DEFAULT_VALUES.NO_SUMMARY,
       original_price: priceValue,
-      cover_image_url: data.img || '',
+      cover_image_url: data.img || "",
     };
-
   } catch (error) {
-    console.error(`Network error calling Tanshu API for ISBN ${isbn}:`, (error as Error).message);
-    return null;
+    const errorMessage = (error as Error).message;
+    console.error(
+      `Network error calling Tanshu API for ISBN ${isbn}:`,
+      errorMessage,
+    );
+    throw new ApiError(
+      503,
+      `Metadata service unavailable: ${errorMessage}`,
+      "METADATA_SERVICE_UNAVAILABLE"
+    );
   }
 }

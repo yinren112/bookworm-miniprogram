@@ -1,365 +1,808 @@
 // src/services/orderService.ts (fully replaced)
-import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
-import * as crypto from 'crypto';
-const WechatPay = require('wechatpay-node-v3');
-import config from '../config';
-import prisma from '../db';
-import { ApiError } from '../errors';
-import { metrics } from '../plugins/metrics';
+import { Prisma, PrismaClient } from "@prisma/client";
+
+import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
+
+import * as crypto from "crypto";
+import config from "../config";
+import { ApiError, WechatPayError, PaymentQueryError } from "../errors";
+import { metrics } from "../plugins/metrics";
+import { retryAsync } from "../utils/retry";
+import {
+  isPrismaSerializationError,
+  isPrismaKnownError,
+  isPickupCodeConstraintError
+} from "../utils/typeGuards";
+import {
+  ORDER_STATUS,
+  INVENTORY_STATUS,
+  ERROR_CODES,
+  ERROR_MESSAGES,
+  DEFAULT_VALUES,
+  BUSINESS_LIMITS,
+  WECHAT_CONSTANTS
+} from "../constants";
 
 // 通用的事务重试辅助函数
 async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < config.DB_TRANSACTION_RETRY_COUNT; i++) {
     try {
       return await fn();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // 检查是否为 Prisma 的序列化失败
-      if (e.code === 'P2034' || e.message?.includes('could not serialize')) {
-        if (i < 2) { // Only increment on actual retries, not the final failure
+      if (isPrismaSerializationError(e)) {
+        if (i < config.DB_TRANSACTION_RETRY_COUNT - 1) {
+          // Only increment on actual retries, not the final failure
           metrics.dbTransactionRetries.inc();
         }
         // 指数退避+抖动等待
-        await new Promise(r => setTimeout(r, 20 * Math.pow(2, i) + Math.random() * 40));
+        await new Promise((r) =>
+          setTimeout(
+            r,
+            config.DB_TRANSACTION_RETRY_BASE_DELAY_MS * Math.pow(2, i) +
+              Math.random() * config.DB_TRANSACTION_RETRY_JITTER_MS,
+          ),
+        );
         continue;
       }
       // 非可重试错误，立即抛出
       throw e;
     }
   }
-  // 重试3次后仍失败
-  throw new ApiError(409, '系统繁忙，请稍后重试', 'TX_RETRY_EXCEEDED');
+  // 重试后仍失败
+  throw new ApiError(409, "系统繁忙，请稍后重试", "TX_RETRY_EXCEEDED");
 }
 
-export async function createOrder(input: { userId: number; inventoryItemIds: number[] }) {
-    // 前置检查：用户待支付订单数量限制
-    const pendingOrdersCount = await prisma.order.count({
-        where: {
-            user_id: input.userId,
-            status: 'PENDING_PAYMENT'
-        }
+// Helper functions for createOrderImpl - each with single responsibility
+
+async function validateOrderInput(input: { userId: number; inventoryItemIds: number[] }) {
+  const itemIds = Array.from(new Set(input.inventoryItemIds));
+  if (itemIds.length === 0) {
+    throw new ApiError(400, "没有选择任何书籍", "EMPTY_ITEMS");
+  }
+  if (itemIds.length > config.MAX_ITEMS_PER_ORDER) {
+    throw new ApiError(400, `单笔订单最多 ${config.MAX_ITEMS_PER_ORDER} 件`, "ORDER_SIZE_EXCEEDED");
+  }
+  return itemIds;
+}
+
+async function acquireOrderLocks(tx: Prisma.TransactionClient, userId: number, itemIds: number[]) {
+  // Step 1: User-level lock first (consistent ordering to prevent deadlocks)
+  await tx.$executeRawUnsafe(
+    'SELECT pg_advisory_xact_lock($1::int4, $2::int4)',
+    1,
+    userId,
+  );
+
+  // Step 2: Acquire item-level advisory locks to prevent concurrent reservation
+  // This prevents race conditions when multiple users try to purchase the same book
+  // Lock items in sorted order to prevent deadlocks
+  const sortedItemIds = [...itemIds].sort((a, b) => a - b);
+  for (const itemId of sortedItemIds) {
+    await tx.$executeRawUnsafe(
+      'SELECT pg_advisory_xact_lock($1::int4, $2::int4)',
+      2,
+      itemId,
+    );
+  }
+}
+
+async function validateInventoryAndReservations(tx: Prisma.TransactionClient, userId: number, itemIds: number[]) {
+  // Check for total reserved items (now safe from race conditions)
+  const existingReservedItems = await tx.order.findMany({
+    where: { user_id: userId, status: "PENDING_PAYMENT" },
+    include: { _count: { select: { orderItem: true } } },
+  });
+  const totalReservedCount = existingReservedItems.reduce(
+    (sum, order) => sum + order._count.orderItem, 0,
+  );
+  if (totalReservedCount + itemIds.length > config.MAX_RESERVED_ITEMS_PER_USER) {
+    throw new ApiError(403, `您预留的商品总数已达上限(${config.MAX_RESERVED_ITEMS_PER_USER}件)，请先完成或取消部分订单`, "MAX_RESERVED_ITEMS_EXCEEDED");
+  }
+
+  // Verify items are still available (with locks held)
+  const itemsToReserve = await tx.inventoryItem.findMany({
+    where: { id: { in: itemIds }, status: INVENTORY_STATUS.IN_STOCK },
+  });
+
+  if (itemsToReserve.length !== itemIds.length) {
+    throw new ApiError(409, "部分书籍已不可用，请刷新后重试", "INSUFFICIENT_INVENTORY_PRECHECK");
+  }
+
+  const totalAmount = itemsToReserve.reduce(
+    (sum, item) => sum.add(item.selling_price), new Prisma.Decimal(0),
+  );
+
+  return { itemsToReserve, totalAmount };
+}
+
+async function generateUniquePickupCode() {
+  return crypto
+    .randomBytes(config.ORDER_PICKUP_CODE_BYTES)
+    .toString("hex")
+    .toUpperCase()
+    .substring(0, config.ORDER_PICKUP_CODE_LENGTH);
+}
+
+async function createOrderRecord(tx: Prisma.TransactionClient, userId: number, totalAmount: Prisma.Decimal) {
+  // Create order with pickup_code retry logic
+  for (let attempt = 0; attempt < config.PICKUP_CODE_RETRY_COUNT; attempt++) {
+    const pickup_code = await generateUniquePickupCode();
+
+    try {
+      return await tx.order.create({
+        data: {
+          user_id: userId,
+          status: "PENDING_PAYMENT",
+          total_amount: totalAmount,
+          pickup_code,
+          paymentExpiresAt: new Date(
+            Date.now() + config.ORDER_PAYMENT_TTL_MINUTES * 60 * 1000,
+          ),
+        },
+      });
+    } catch (e: unknown) {
+      if (isPickupCodeConstraintError(e)) {
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  throw new ApiError(500, "无法生成唯一订单取货码", "PICKUP_CODE_GEN_FAILED");
+}
+
+async function reserveInventoryItems(
+  tx: Prisma.TransactionClient,
+  orderId: number,
+  itemIds: number[],
+) {
+  const updateResult = await tx.inventoryItem.updateMany({
+    where: { id: { in: itemIds }, status: INVENTORY_STATUS.IN_STOCK },
+    data: { status: INVENTORY_STATUS.RESERVED },
+  });
+
+  if (updateResult.count !== itemIds.length) {
+    throw new ApiError(409, "部分书籍已经被其他订单锁定，请刷新后重试", "INVENTORY_RACE_CONDITION");
+  }
+
+  await tx.inventoryReservation.createMany({
+    data: itemIds.map((itemId) => ({
+      inventory_item_id: itemId,
+      order_id: orderId,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+async function createOrderItems(
+  tx: Prisma.TransactionClient,
+  orderId: number,
+  items: Array<{ id: number; selling_price: Prisma.Decimal }>,
+) {
+  await tx.orderItem.createMany({
+    data: items.map((item) => ({
+      order_id: orderId,
+      inventory_item_id: item.id,
+      price: item.selling_price,
+    })),
+  });
+}
+
+async function createOrderImpl(tx: Prisma.TransactionClient, input: {
+  userId: number;
+  inventoryItemIds: number[];
+}) {
+  // Step 1: Validate input and normalize item IDs
+  const itemIds = await validateOrderInput(input);
+
+  // Step 2: Acquire all necessary locks
+  await acquireOrderLocks(tx, input.userId, itemIds);
+
+  // Step 3: Validate inventory availability and user reservations
+  const { itemsToReserve, totalAmount } = await validateInventoryAndReservations(tx, input.userId, itemIds);
+
+  // Step 4: Create order record with unique pickup code
+  const order = await createOrderRecord(tx, input.userId, totalAmount);
+
+  // Step 5: Reserve inventory and create order items
+  await reserveInventoryItems(tx, order.id, itemIds);
+  await createOrderItems(tx, order.id, itemsToReserve);
+
+  // Step 6: Update metrics and return
+  metrics.ordersCreated.inc();
+  return order;
+}
+
+export async function createOrder(dbCtx: PrismaClient | Prisma.TransactionClient, input: {
+  userId: number;
+  inventoryItemIds: number[];
+}) {
+  try {
+    // Check if dbCtx is PrismaClient by checking for $connect method (TransactionClient doesn't have this)
+    if ('$connect' in dbCtx) {
+      // dbCtx is PrismaClient, create a new transaction with retry logic
+      return await withTxRetry(async () => {
+        return await (dbCtx as PrismaClient).$transaction(async (tx) => {
+          return createOrderImpl(tx, input);
+        }, {
+          timeout: 15000
+        });
+      });
+    } else {
+      // dbCtx is already a TransactionClient, use it directly
+      return await createOrderImpl(dbCtx as Prisma.TransactionClient, input);
+    }
+  } catch (e: unknown) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      if (e.code === "P2002") {
+        throw new ApiError(409, "您有一个正在付款的订单，请先完成付款或等待订单过期", "CONCURRENT_PENDING_ORDER");
+      }
+      if (e.code === "P2010" && typeof e.meta?.message === "string" && e.meta.message.includes("MAX_RESERVED_ITEMS_PER_USER")) {
+        throw new ApiError(403, `您预留的商品总数已达上限(${config.MAX_RESERVED_ITEMS_PER_USER}件)，请先完成或取消部分订单`, "MAX_RESERVED_ITEMS_EXCEEDED");
+      }
+      if (typeof e.message === "string" && e.message.includes("MAX_RESERVED_ITEMS_PER_USER")) {
+        throw new ApiError(403, `您预留的商品总数已达上限(${config.MAX_RESERVED_ITEMS_PER_USER}件)，请先完成或取消部分订单`, "MAX_RESERVED_ITEMS_EXCEEDED");
+      }
+    }
+    throw e;
+  }
+}
+
+export async function getOrdersByUserId(
+  dbCtx: PrismaClient | Prisma.TransactionClient,
+  userId: number,
+  options: { limit?: number; cursor?: string } = {},
+) {
+  const { limit = 10, cursor } = options;
+  const rawLimit = typeof limit === "number" ? limit : Number(limit);
+  const parsedLimit = Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 10;
+  const normalizedLimit = Math.max(1, Math.min(parsedLimit, 50));
+
+  let cursorDate: Date | null = null;
+  let cursorId: number | null = null;
+
+  if (cursor) {
+    const [cursorDatePart, cursorIdPart] = cursor.split("_");
+    if (cursorDatePart && cursorIdPart) {
+      const parsedDate = new Date(cursorDatePart);
+      const parsedId = Number(cursorIdPart);
+
+      if (!Number.isNaN(parsedDate.getTime()) && Number.isInteger(parsedId) && parsedId > 0) {
+        cursorDate = parsedDate;
+        cursorId = parsedId;
+      }
+    }
+  }
+
+  const where: Prisma.OrderWhereInput = {
+    user_id: userId,
+  };
+
+  if (cursorDate && cursorId !== null) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      {
+        createdAt: cursorDate,
+        id: { lt: cursorId },
+      },
+    ];
+  }
+
+  const orders = await dbCtx.order.findMany({
+    where,
+    select: {
+      id: true,
+      user_id: true,
+      status: true,
+      total_amount: true,
+      pickup_code: true,
+      paymentExpiresAt: true,
+      paid_at: true,
+      cancelled_at: true,
+      createdAt: true,
+      orderItem: {
+        select: {
+          id: true,
+          order_id: true,
+          inventory_item_id: true,
+          inventoryItem: {
+            select: {
+              id: true,
+              condition: true,
+              selling_price: true,
+              bookSku: {
+                select: {
+                  id: true,
+                  edition: true,
+                  cover_image_url: true,
+                  bookMaster: {
+                    select: {
+                      id: true,
+                      isbn13: true,
+                      title: true,
+                      author: true,
+                      publisher: true,
+                      original_price: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { createdAt: "desc" },
+      { id: "desc" },
+    ],
+    take: normalizedLimit + 1,
+  });
+
+  const hasMore = orders.length > normalizedLimit;
+  const pageData = hasMore ? orders.slice(0, normalizedLimit) : orders;
+  const nextCursor = hasMore && pageData.length > 0
+    ? `${pageData[pageData.length - 1].createdAt.toISOString()}_${pageData[pageData.length - 1].id}`
+    : null;
+
+  return {
+    data: pageData,
+    nextCursor,
+  };
+}
+
+// NEW: Function to fulfill an order
+async function fulfillOrderImpl(dbCtx: Prisma.TransactionClient, pickupCode: string) {
+  // ATOMIC CONDITIONAL UPDATE: Only proceed if order exists and is in PENDING_PICKUP state
+  const updatedOrder = await dbCtx.order.updateMany({
+    where: {
+      pickup_code: pickupCode,
+      status: "PENDING_PICKUP"
+    },
+    data: {
+      status: "COMPLETED",
+      completed_at: new Date(),
+    },
+  });
+
+  // Check if the atomic update was successful
+  if (updatedOrder.count !== 1) {
+    // Either order doesn't exist or is not in PENDING_PICKUP state
+    const order = await dbCtx.order.findUnique({
+      where: { pickup_code: pickupCode },
+      select: { id: true, status: true },
     });
 
-    if (pendingOrdersCount >= config.MAX_PENDING_ORDERS_PER_USER) {
-        throw new ApiError(403, '您有过多未支付订单，请先处理', 'MAX_PENDING_ORDERS_EXCEEDED');
+    if (!order) {
+      throw new ApiError(
+        404,
+        `取货码 "${pickupCode}" 无效`,
+        "INVALID_PICKUP_CODE",
+      );
+    } else {
+      throw new ApiError(
+        409,
+        `此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`,
+        "ORDER_STATE_INVALID",
+      );
+    }
+  }
+
+  // Get order items for inventory update
+  const orderItems = await dbCtx.orderItem.findMany({
+    where: {
+      Order: { pickup_code: pickupCode }
+    },
+    select: { inventory_item_id: true },
+  });
+
+  const inventoryItemIds = orderItems.map(item => item.inventory_item_id);
+
+  // Update inventory items to sold status and clear reservation pointer
+  await dbCtx.inventoryItem.updateMany({
+    where: { id: { in: inventoryItemIds } },
+    data: {
+      status: INVENTORY_STATUS.SOLD,
+    },
+  });
+
+  // Only increment metrics after successful atomic update
+  metrics.ordersCompleted.inc();
+
+  // Return the updated order data
+  const completedOrder = await dbCtx.order.findUnique({
+    where: { pickup_code: pickupCode },
+    include: { orderItem: true },
+  });
+
+  // Track fulfillment duration if both timestamps exist
+  if (completedOrder && completedOrder.paid_at && completedOrder.completed_at) {
+    const fulfillmentDurationSeconds =
+      (completedOrder.completed_at.getTime() - completedOrder.paid_at.getTime()) / 1000;
+    metrics.orderFulfillmentDurationSeconds.observe(fulfillmentDurationSeconds);
+  }
+
+  return completedOrder!;
+}
+
+export async function fulfillOrder(dbCtx: PrismaClient | Prisma.TransactionClient, pickupCode: string) {
+  if ("$connect" in dbCtx) {
+    return (dbCtx as PrismaClient).$transaction((tx) => fulfillOrderImpl(tx, pickupCode));
+  }
+
+  return fulfillOrderImpl(dbCtx as Prisma.TransactionClient, pickupCode);
+}
+
+export interface PaymentIntentContext {
+  outTradeNo: string;
+  amountTotal: number;
+  description: string;
+  timeExpireIso: string;
+  openid: string;
+}
+
+export async function preparePaymentIntent(
+  prisma: PrismaClient,
+  orderId: number,
+  userId: number,
+): Promise<PaymentIntentContext> {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+    if (order.user_id !== userId) {
+      throw new ApiError(403, "无权支付此订单", "FORBIDDEN");
+    }
+    if (order.status !== "PENDING_PAYMENT") {
+      throw new ApiError(409, "订单状态不正确", "ORDER_STATE_INVALID");
     }
 
-    return withTxRetry(() => prisma.$transaction(async (tx) => {
-        const itemIds = Array.from(new Set(input.inventoryItemIds));
-        if (itemIds.length === 0) {
-            throw new ApiError(400, '没有选择任何书籍', 'EMPTY_ITEMS');
-        }
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { openid: true },
+    });
 
-        // 1. 原子抢占：尝试将 'in_stock' 状态更新为 'reserved'
-        const updateResult = await tx.inventoryitem.updateMany({
-            where: {
-                id: { in: itemIds },
-                status: 'in_stock'
+    const orderItems = await tx.orderItem.findMany({
+      where: { order_id: orderId },
+      select: {
+        price: true,
+        inventoryItem: {
+          select: {
+            bookSku: {
+              select: {
+                bookMaster: {
+                  select: {
+                    title: true,
+                  },
+                },
+              },
             },
-            data: { status: 'reserved' }
-        });
-
-        // 2. 检查结果：如果更新的行数不等于请求的物品数量，说明有物品被别人抢先了
-        if (updateResult.count !== itemIds.length) {
-            // 事务会自动回滚所有更改，所以我们只需要抛出错误
-            throw new ApiError(409, '部分书籍已被抢购，请重新下单', 'INSUFFICIENT_INVENTORY');
-        }
-
-        // 3. 读取已成功抢占的物品信息，用于计算总价
-        const reservedItems = await tx.inventoryitem.findMany({
-            where: { id: { in: itemIds } }
-        });
-
-        const totalAmount = reservedItems.reduce(
-            (sum, item) => sum.add(new Prisma.Decimal(item.selling_price)),
-            new Prisma.Decimal(0)
-        );
-
-        // 4. 创建订单（包含 pickup_code 重试逻辑）
-        let order;
-        for (let attempt = 0; attempt < 5; attempt++) {
-            const pickup_code = crypto.randomBytes(config.ORDER_PICKUP_CODE_BYTES).toString('hex').toUpperCase().substring(0, config.ORDER_PICKUP_CODE_LENGTH);
-            try {
-                order = await tx.order.create({
-                    data: {
-                        user_id: input.userId,
-                        status: 'PENDING_PAYMENT',
-                        total_amount: totalAmount,
-                        pickup_code,
-                        paymentExpiresAt: new Date(Date.now() + config.ORDER_PAYMENT_TTL_MINUTES * 60 * 1000),
-                    },
-                });
-                break; // 成功创建订单，跳出循环
-            } catch (e: any) {
-                // 检查是否为 pickup_code 唯一约束冲突
-                if (e.code === 'P2002' && e.meta?.target?.includes('pickup_code')) {
-                    continue; // 重试生成新的 pickup_code
-                }
-                // 其他错误直接抛出
-                throw e;
-            }
-        }
-        
-        // 如果5次重试后仍无法生成唯一的 pickup_code
-        if (!order) {
-            throw new ApiError(500, '无法生成唯一订单取货码', 'PICKUP_CODE_GEN_FAILED');
-        }
-
-        // 5. 设置库存项的 reserved_by_order_id 字段
-        await tx.inventoryitem.updateMany({
-            where: { id: { in: itemIds } },
-            data: { reserved_by_order_id: order.id }
-        });
-
-        // 6. 创建订单项
-        await tx.orderitem.createMany({
-            data: reservedItems.map(item => ({
-                order_id: order.id,
-                inventory_item_id: item.id,
-                price: item.selling_price,
-            })),
-        });
-
-        metrics.ordersCreated.inc();
-        return order;
-    }, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // 使用最高隔离级别保证一致性
-    }));
-}
-
-export async function getOrdersByUserId(userId: number, options: { page?: number; limit?: number } = {}) {
-  const { page = 1, limit = 10 } = options;
-
-  // Calculate pagination parameters
-  const take = limit;
-  const skip = (page - 1) * limit;
-
-  return prisma.$transaction(async (tx) => {
-    // First query: Get total count for pagination metadata
-    const totalCount = await tx.order.count({
-      where: { user_id: userId },
+          },
+        },
+      },
     });
 
-    // Second query: Get current page data
-    const orders = await tx.order.findMany({
-      where: { user_id: userId },
-      include: { orderitem: { include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } } } },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
+    const calculatedTotal = orderItems.reduce(
+      (sum, item) => sum.add(item.price),
+      new Prisma.Decimal(0),
+    );
+
+    if (calculatedTotal.comparedTo(order.total_amount) !== 0) {
+      console.error(`CRITICAL: Amount mismatch for order ${orderId}. Stored: ${order.total_amount}, Calculated: ${calculatedTotal}`);
+      throw new ApiError(400, "订单金额异常，请联系客服", "AMOUNT_MISMATCH");
+    }
+
+    const amountTotal = Math.round(parseFloat(order.total_amount.toString()) * 100);
+    if (amountTotal <= 0 || amountTotal > 100000000) {
+      throw new ApiError(400, "订单金额异常", "INVALID_AMOUNT");
+    }
+
+    const outTradeNo = `BOOKWORM_${order.id}`;
+
+    await tx.paymentRecord.upsert({
+      where: { out_trade_no: outTradeNo },
+      create: {
+        out_trade_no: outTradeNo,
+        order_id: order.id,
+        status: "PENDING",
+        amount_total: amountTotal,
+        appid: config.WX_APP_ID,
+        mchid: config.WXPAY_MCHID,
+      },
+      update: {
+        amount_total: amountTotal,
+      },
     });
+
+    const titles = orderItems.map((i) => i.inventoryItem.bookSku.bookMaster.title);
+    const description =
+      titles.slice(0, 3).join("、") +
+      (titles.length > 3 ? `等${titles.length}本书籍` : "");
 
     return {
-      data: orders,
-      meta: {
-        totalItems: totalCount,
-        totalPages: Math.ceil(totalCount / limit),
-        currentPage: page,
-        itemsPerPage: limit,
-      },
+      outTradeNo,
+      amountTotal,
+      description,
+      timeExpireIso: new Date(order.paymentExpiresAt).toISOString(),
+      openid: user.openid,
     };
   });
 }
 
-// NEW: Function to fulfill an order
-export async function fulfillOrder(pickupCode: string) {
-  return prisma.$transaction(async (tx) => {
-    // 1. Find the order by its unique pickup code.
-    const order = await tx.order.findUnique({
-      where: { pickup_code: pickupCode },
-      include: { orderitem: true }, // Include items to update their status
-    });
+export function buildWechatPaymentRequest(intent: PaymentIntentContext) {
+  return {
+    appid: config.WX_APP_ID,
+    mchid: config.WXPAY_MCHID,
+    description: intent.description,
+    out_trade_no: intent.outTradeNo,
+    notify_url: config.WXPAY_NOTIFY_URL,
+    time_expire: intent.timeExpireIso,
+    amount: { total: intent.amountTotal, currency: "CNY" as const },
+    payer: { openid: intent.openid },
+  };
+}
 
-    // 2. Validate
-    if (!order) {
-      throw new ApiError(404, `取货码 "${pickupCode}" 无效`, 'INVALID_PICKUP_CODE');
-    }
-    if (order.status !== 'PENDING_PICKUP') {
-      throw new ApiError(409, `此订单状态为 "${order.status}"，无法核销。订单必须已支付才能核销。`, 'ORDER_STATE_INVALID');
+export function buildClientPaymentSignature(
+  intent: PaymentIntentContext,
+  prepayId: string,
+  wechatPayAdapter: WechatPayAdapter,
+) {
+  const timeStamp = Math.floor(Date.now() / 1000).toString();
+  const nonceStr = crypto.randomBytes(16).toString("hex");
+  const pkg = `prepay_id=${prepayId}`;
+  const toSign = `${config.WX_APP_ID}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
+
+  const paySign = wechatPayAdapter.generateSignature({ message: toSign });
+
+  return { timeStamp, nonceStr, package: pkg, signType: "RSA" as const, paySign };
+}
+
+export async function generatePaymentParams(
+  prisma: PrismaClient,
+  wechatPayAdapter: WechatPayAdapter,
+  orderId: number,
+  userId: number,
+) {
+  const intent = await preparePaymentIntent(prisma, orderId, userId);
+  const { prepay_id } = await wechatPayAdapter.createPaymentOrder(
+    buildWechatPaymentRequest(intent),
+  );
+
+  return buildClientPaymentSignature(intent, prepay_id, wechatPayAdapter);
+}
+
+// Payment notification data with security validation requirements
+interface PaymentNotificationData {
+  timestamp: string;    // WeChat timestamp for replay protection
+  nonce: string;        // Random string for replay protection
+  signature: string;    // WeChat signature for authenticity
+  serial: string;       // Certificate serial number
+  body: string;         // Original notification body
+  out_trade_no: string; // Business order number
+}
+
+export async function processPaymentNotification(
+  dbCtx: PrismaClient | Prisma.TransactionClient,
+  wechatPayAdapter: WechatPayAdapter,
+  notificationData: PaymentNotificationData,
+) {
+  const { out_trade_no, timestamp, nonce, signature, serial, body } = notificationData;
+
+  // === Phase 0: Security Validation (Zero Trust) ===
+
+  // 1. Timestamp validation to prevent replay attacks
+  const notificationTimestamp = parseInt(timestamp, 10);
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+
+  // 拒绝未来时间戳，但允许合理的时钟偏差
+  const CLOCK_SKEW_TOLERANCE = 60; // 允许60秒时钟偏差
+  if (notificationTimestamp > currentTimestamp + CLOCK_SKEW_TOLERANCE) {
+    console.warn(`Payment notification with future timestamp rejected for ${out_trade_no}. Notification: ${notificationTimestamp}, Current: ${currentTimestamp}, Tolerance: ${CLOCK_SKEW_TOLERANCE}s`);
+    throw new ApiError(400, "Invalid future timestamp", "TIMESTAMP_INVALID");
+  }
+
+  // 检查过期（只允许合理的过去时间）
+  if (currentTimestamp - notificationTimestamp > config.PAYMENT_TIMESTAMP_TOLERANCE_SECONDS) {
+    console.warn(`Payment notification timestamp validation failed for ${out_trade_no}. Age: ${currentTimestamp - notificationTimestamp}s`);
+    throw new ApiError(400, "Payment notification expired", "TIMESTAMP_EXPIRED");
+  }
+
+  // 2. Signature validation to ensure authenticity
+  const isSignatureValid = wechatPayAdapter.verifySignature({
+    timestamp,
+    nonce,
+    body,
+    signature,
+    serial,
+  });
+
+  if (!isSignatureValid) {
+    console.error(`Payment notification signature validation failed for ${out_trade_no}`);
+    throw new ApiError(400, "Invalid payment notification signature", "SIGNATURE_INVALID");
+  }
+
+  // === Phase 1: Pre-checks and Network I/O (Outside Transaction) ===
+
+  // 1. Idempotency Check: See if we've already processed this.
+  const initialPaymentRecord = await dbCtx.paymentRecord.findUnique({
+    where: { out_trade_no },
+  });
+
+  if (!initialPaymentRecord) {
+    console.warn(`Payment notification for unknown out_trade_no ${out_trade_no} received. Ignoring.`);
+    return;
+  }
+
+  if (initialPaymentRecord.status !== 'PENDING') {
+    console.log(`Payment notification for ${out_trade_no} already processed (status: ${initialPaymentRecord.status}). Skipping.`);
+    return;
+  }
+
+  const executeInTransaction = async (fn: (tx: Prisma.TransactionClient) => Promise<void>) => {
+    if ("$transaction" in dbCtx) {
+      return await (dbCtx as PrismaClient).$transaction(fn);
     }
 
-    // 3. Update the Order status
-    const updatedOrder = await tx.order.update({
-      where: { id: order.id },
+    return await fn(dbCtx as Prisma.TransactionClient);
+  };
+
+  const markPaymentAsFailed = async (
+    updateData: Prisma.PaymentRecordUpdateManyMutationInput = {},
+    logMessage?: string,
+  ) => {
+    const failed = await dbCtx.paymentRecord.updateMany({
+      where: {
+        out_trade_no,
+        status: "PENDING",
+      },
       data: {
-        status: 'COMPLETED',
-        completed_at: new Date(),
+        status: "FAILED",
+        notified_at: new Date(),
+        ...updateData,
       },
     });
 
-    // 4. Update the InventoryItem statuses
-    const inventoryItemIds = order.orderitem.map(item => item.inventory_item_id);
-    await tx.inventoryitem.updateMany({
-      where: { id: { in: inventoryItemIds } },
-      data: { status: 'sold' },
+    if (failed.count > 0) {
+      if (logMessage) {
+        console.warn(logMessage);
+      }
+      metrics.paymentsProcessed.labels({ status: "failed" }).inc();
+    } else if (logMessage) {
+      console.warn(
+        `${logMessage} (skipped because payment record was already processed for ${out_trade_no}).`,
+      );
+    }
+  };
+
+  // 2. Active Query (Zero Trust Principle): Get the truth from WeChat's servers.
+  let queriedTxData;
+  try {
+    queriedTxData = await retryAsync(
+      () => wechatPayAdapter.queryPaymentStatus({ out_trade_no, mchid: config.WXPAY_MCHID }),
+      3, // attempts
+      200 // initial delay ms
+    );
+  } catch (queryError) {
+    console.error(`Failed to query transaction ${out_trade_no} from WeChat Pay API after retries.`, queryError);
+
+    // Business layer error handling - no HTTP status codes
+    if (queryError instanceof WechatPayError && !queryError.isRetryable) {
+      await markPaymentAsFailed({}, `Permanent error for ${out_trade_no}: ${queryError.message}. Marked as FAILED.`);
+      return; // Stop processing.
+    }
+
+    // For all other errors (retryable WechatPayError or unknown errors), throw business exception
+    throw new PaymentQueryError("WECHAT_QUERY_FAILED_TRANSIENT", queryError);
+  }
+
+  // 3. Validate the Truth
+  const { trade_state, amount, payer, mchid, appid, transaction_id } = queriedTxData;
+
+  if (trade_state !== 'SUCCESS') {
+    const finalFailureStates = new Set(['CLOSED', 'REVOKED', 'PAYERROR']);
+    if (finalFailureStates.has(trade_state)) {
+      await markPaymentAsFailed(
+        {
+          transaction_id,
+          payer_openid: payer?.openid,
+        },
+        `Payment for ${out_trade_no} is in a final failure state (${trade_state}). Marked as FAILED.`,
+      );
+    } else {
+      // For transient states like USERPAYING, we want WeChat to retry later.
+      console.log(`Payment for ${out_trade_no} is in transient state (${trade_state}). Requesting retry.`);
+      throw new ApiError(503, `Payment in transient state: ${trade_state}`, "PAY_TRANSIENT_STATE");
+    }
+    return;
+  }
+
+  if (mchid !== config.WXPAY_MCHID || appid !== config.WX_APP_ID || amount.total !== initialPaymentRecord.amount_total) {
+    console.error(`CRITICAL: Payment data mismatch for ${out_trade_no}. Marking as FAILED.`, {
+        expected: { mchid: config.WXPAY_MCHID, appid: config.WX_APP_ID, total: initialPaymentRecord.amount_total },
+        received: { mchid, appid, total: amount.total }
     });
-
-    metrics.ordersCompleted.inc();
-    return updatedOrder;
-  });
-}
-
-export async function generatePaymentParams(pay: any, orderId: number, userId: number) {
-    return prisma.$transaction(async (tx) => {
-        const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
-        if (order.user_id !== userId) throw new ApiError(403, '无权支付此订单', 'FORBIDDEN');
-        if (order.status !== 'PENDING_PAYMENT') throw new ApiError(409, '订单状态不正确', 'ORDER_STATE_INVALID');
-
-        const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { openid: true } });
-        
-        // 创建或查找 PaymentRecord，使用精确的金额计算
-        const amount_total = new Prisma.Decimal(order.total_amount).mul(100).toDecimalPlaces(0).toNumber();
-        const out_trade_no = `BOOKWORM_${order.id}`;
-        
-        const paymentRecord = await tx.paymentRecord.upsert({
-            where: { out_trade_no },
-            create: {
-                out_trade_no,
-                order_id: order.id,
-                status: 'PENDING',
-                amount_total,
-                appid: config.WX_APP_ID,
-                mchid: config.WXPAY_MCHID
-            },
-            update: {}
-        });
-        
-        const orderItems = await tx.orderitem.findMany({ 
-            where: { order_id: orderId },
-            include: { inventoryitem: { include: { booksku: { include: { bookmaster: true } } } } }
-        });
-        const titles = orderItems.map(i => i.inventoryitem.booksku.bookmaster.title);
-        const description = titles.slice(0, 3).join('、') + (titles.length > 3 ? `等${titles.length}本书籍` : '');
-
-        const unifiedOrderResult = await pay.transactions_jsapi({
-            appid: config.WX_APP_ID,
-            mchid: config.WXPAY_MCHID,
-            description,
-            out_trade_no,
-            notify_url: config.WXPAY_NOTIFY_URL,
-            time_expire: new Date(order.paymentExpiresAt).toISOString(),
-            amount: { total: amount_total, currency: 'CNY' },
-            payer: { openid: user.openid }
-        });
-
-        const { prepay_id } = unifiedOrderResult as any;
-        if (!prepay_id) throw new ApiError(500, '微信下单失败，未返回prepay_id', 'WECHAT_PAY_ERROR');
-        
-        const timeStamp = Math.floor(Date.now() / 1000).toString();
-        const nonceStr = crypto.randomBytes(16).toString('hex');
-        const pkg = `prepay_id=${prepay_id}`;
-        const toSign = `${config.WX_APP_ID}\n${timeStamp}\n${nonceStr}\n${pkg}\n`;
-
-        const paySign = pay.sign(toSign);
-
-        return { timeStamp, nonceStr, package: pkg, signType: 'RSA', paySign };
+    await markPaymentAsFailed({
+      transaction_id,
+      payer_openid: payer?.openid,
     });
-}
+    return;
+  }
 
-// NEW: Process WeChat Pay payment notification with strict idempotency
-export async function processPaymentNotification(notificationData: any) {
-  return prisma.$transaction(async (tx) => {
-    const { 
-      out_trade_no, 
-      transaction_id, 
-      trade_state, 
-      amount, 
-      payer, 
-      mchid, 
-      appid 
-    } = notificationData;
-    
-    // 1. 幂等性检查 (第一道防线)
+  // === Phase 2: Atomic State Update (Inside Transaction) ===
+  await executeInTransaction(async (tx) => {
+    // Re-fetch payment record to ensure it's still PENDING before we start.
+    // This is an additional safeguard.
     const paymentRecord = await tx.paymentRecord.findUnique({
       where: { out_trade_no },
-      include: { Order: true }
     });
-    
-    if (!paymentRecord || paymentRecord.status === 'SUCCESS') {
-      console.log(`Payment notification for ${out_trade_no} already processed or unknown. Skipping.`);
-      return paymentRecord;
+
+    // Another process might have handled it. If so, we're done.
+    if (!paymentRecord || paymentRecord.status !== 'PENDING') {
+      console.log(`Payment ${out_trade_no} was processed by a concurrent request. Skipping.`);
+      return;
     }
-    
-    // 2. 数据校验 (第二道防线)
-    if (mchid && mchid !== config.WXPAY_MCHID) {
-      throw new ApiError(400, `商户号不匹配。期望：${config.WXPAY_MCHID}，实际：${mchid}`, 'MCHID_MISMATCH');
-    }
-    
-    if (appid && appid !== config.WX_APP_ID) {
-      throw new ApiError(400, `应用ID不匹配。期望：${config.WX_APP_ID}，实际：${appid}`, 'APPID_MISMATCH');
-    }
-    
-    if (amount.total !== paymentRecord.amount_total) {
-      throw new ApiError(400, `金额不匹配。期望：${paymentRecord.amount_total}，实际：${amount.total}`, 'AMOUNT_MISMATCH');
-    }
-    
-    // 3. 验证支付状态
-    if (trade_state !== 'SUCCESS') {
-      console.log(`Payment for ${out_trade_no} failed with state: ${trade_state}`);
-      // 可以选择更新 PaymentRecord 状态为 FAILED
-      return null;
-    }
-    
-    // 4. 核心状态更新
-    const updatedPaymentRecord = await tx.paymentRecord.update({
-      where: { out_trade_no },
+
+    // THE CRITICAL FIX: ATOMIC CONDITIONAL UPDATE
+    // Attempt to transition the order from PENDING_PAYMENT to PENDING_PICKUP.
+    // This will only succeed if the status is still PENDING_PAYMENT.
+    const updatedOrder = await tx.order.updateMany({
+      where: {
+        id: paymentRecord.order_id,
+        status: 'PENDING_PAYMENT',
+      },
       data: {
-        status: 'SUCCESS',
-        transaction_id,
-        payer_openid: payer?.openid,
-        notified_at: new Date()
-      }
+        status: 'PENDING_PICKUP',
+        paid_at: new Date(),
+      },
     });
-    
-    // 5. 关联订单状态处理
-    const order = paymentRecord.Order;
-    
-    // 处理"迟到支付"
-    if (order.status === 'CANCELLED') {
+
+    // Check if the atomic update was successful.
+    if (updatedOrder.count === 1) {
+      // SUCCESS: We won the race. The order is now PENDING_PICKUP.
+      // Finalize the payment record.
       await tx.paymentRecord.update({
         where: { out_trade_no },
-        data: { status: 'REFUND_REQUIRED' }
-      });
-      console.error(`CRITICAL: Payment succeeded for cancelled order ${order.id}. Marked for refund.`);
-      metrics.paymentsProcessed.labels('refund_required').inc();
-      return updatedPaymentRecord;
-    }
-    
-    // 处理正常支付
-    if (order.status === 'PENDING_PAYMENT') {
-      await tx.order.update({
-        where: { id: order.id },
         data: {
-          status: 'PENDING_PICKUP',
-          paid_at: new Date()
-        }
+          status: 'SUCCESS',
+          transaction_id,
+          payer_openid: payer?.openid,
+          notified_at: new Date(),
+        },
       });
-      console.log(`Order ${order.id} successfully marked as paid`);
-      metrics.paymentsProcessed.labels('success').inc();
-      return updatedPaymentRecord;
+      console.log(`Order ${paymentRecord.order_id} successfully updated to PENDING_PICKUP.`);
+      metrics.paymentsProcessed.labels({ status: "success" }).inc();
+    } else {
+      // FAILURE: We lost the race. The order was likely cancelled before payment was confirmed.
+      // Mark the payment for refund.
+      await tx.paymentRecord.update({
+        where: { out_trade_no },
+        data: {
+          status: 'REFUND_REQUIRED',
+          transaction_id,
+          payer_openid: payer?.openid,
+          notified_at: new Date(),
+        },
+      });
+      console.error(`CRITICAL: Payment succeeded for an order (${paymentRecord.order_id}) that was not PENDING_PAYMENT (likely cancelled). Marked for refund.`);
+      metrics.paymentsProcessed.labels({ status: "refund_required" }).inc();
     }
-    
-    // 其他状态的警告处理
-    console.warn(`Payment notification for order ${order.id} with unexpected status: ${order.status}`);
-    return updatedPaymentRecord;
   });
 }
 
-export async function getPendingPickupOrders() {
+export async function getPendingPickupOrders(dbCtx: PrismaClient | Prisma.TransactionClient) {
   // Linus式方案：分离查询，手动聚合，消除N+1
-  
-  // 1. 获取所有待取货订单及其orderitem（一层include）
-  const ordersWithItems = await prisma.order.findMany({
-    where: { status: 'PENDING_PICKUP' },
+
+  // 1. 获取所有待取货订单及其orderItem（一层include）
+  const ordersWithItems = await dbCtx.order.findMany({
+    where: { status: "PENDING_PICKUP" },
     include: {
-      orderitem: true, // 只include一层，避免深层嵌套
+      orderItem: true, // 只include一层，避免深层嵌套
     },
-    orderBy: { paid_at: 'asc' },
+    orderBy: { paid_at: "asc" },
   });
 
   // 2. 提取所有inventory_item_id
-  const inventoryItemIds = ordersWithItems.flatMap(o => 
-    o.orderitem.map(item => item.inventory_item_id)
+  const inventoryItemIds = ordersWithItems.flatMap((o) =>
+    o.orderItem.map((item) => item.inventory_item_id),
   );
 
   // 如果没有订单，直接返回空数组
@@ -368,122 +811,296 @@ export async function getPendingPickupOrders() {
   }
 
   // 3. 一次性查询所有相关的inventory数据
-  const inventoryItems = await prisma.inventoryitem.findMany({
+  const inventoryItems = await dbCtx.inventoryItem.findMany({
     where: {
       id: { in: inventoryItemIds },
     },
-    include: {
-      booksku: {
-        include: {
-          bookmaster: true,
+    select: {
+      id: true,
+      condition: true,
+      selling_price: true,
+      status: true,
+      bookSku: {
+        select: {
+          id: true,
+          edition: true,
+          cover_image_url: true,
+          bookMaster: {
+            select: {
+              id: true,
+              isbn13: true,
+              title: true,
+              author: true,
+              publisher: true,
+              original_price: true,
+            },
+          },
         },
       },
     },
   });
 
   // 4. 创建inventory数据的快速查找Map
-  const inventoryMap = new Map(
-    inventoryItems.map(item => [item.id, item])
-  );
+  const inventoryMap = new Map(inventoryItems.map((item) => [item.id, item]));
 
-  // 5. 手动聚合数据：将完整的inventory信息附加到每个orderitem上
-  const enrichedOrders = ordersWithItems.map(order => ({
+  // 5. 手动聚合数据：将完整的inventory信息附加到每个orderItem上
+  const enrichedOrders = ordersWithItems.map((order) => ({
     ...order,
-    orderitem: order.orderitem.map(item => ({
+    orderItem: order.orderItem.map((item) => ({
       ...item,
-      inventoryitem: inventoryMap.get(item.inventory_item_id)!,
+      inventoryItem: inventoryMap.get(item.inventory_item_id)!,
     })),
   }));
 
   return enrichedOrders;
 }
 
-export async function cancelExpiredOrders() {
-  return prisma.$transaction(async (tx) => {
-    // 1. Find all orders that are pending payment and have expired.
-    const expiredOrders = await tx.order.findMany({
-      where: {
-        status: 'PENDING_PAYMENT',
-        paymentExpiresAt: {
-          lt: new Date(), // Less than the current time
-        },
-      },
+export async function cancelExpiredOrders(dbCtx: Prisma.TransactionClient | PrismaClient) {
+  // This single CTE query performs both actions atomically.
+  // 1. `cancelled_orders` CTE finds and updates expired orders, returning their IDs.
+  // 2. `released_items` CTE uses the IDs from the first CTE to find and release the associated inventory items.
+  // 3. The final SELECT aggregates the counts from both CTEs.
+  const query = Prisma.sql`
+    WITH cancelled_orders AS (
+      UPDATE "Order"
+      SET status = 'CANCELLED', cancelled_at = NOW()
+      WHERE id IN (
+        SELECT id FROM "Order"
+        WHERE status = 'PENDING_PAYMENT' AND "paymentExpiresAt" < NOW()
+        ORDER BY "paymentExpiresAt" ASC
+        LIMIT 1000
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id
+    ),
+    released_items AS (
+      UPDATE "inventoryitem" i
+      SET status = 'in_stock', updated_at = NOW()
+      FROM inventory_reservation ir
+      WHERE ir.inventory_item_id = i.id
+        AND ir.order_id IN (SELECT id FROM cancelled_orders)
+      RETURNING i.id
+    ),
+    deleted_reservations AS (
+      DELETE FROM inventory_reservation ir
+      USING cancelled_orders co
+      WHERE ir.order_id = co.id
+      RETURNING ir.inventory_item_id
+    )
+    SELECT
+      (SELECT COUNT(*) FROM cancelled_orders) as "cancelledCount",
+      (SELECT COUNT(*) FROM released_items) as "releasedCount";
+  `;
+
+  const result = await (dbCtx as PrismaClient).$queryRaw<
+    { cancelledCount: bigint; releasedCount: bigint }[]
+  >(query);
+
+  const cancelledCount = Number(result[0]?.cancelledCount || 0);
+  const releasedCount = Number(result[0]?.releasedCount || 0);
+
+  if (cancelledCount > 0) {
+    console.log(
+      `Atomically cancelled ${cancelledCount} orders and released ${releasedCount} items back to stock.`
+    );
+    metrics.ordersCancelled.inc(cancelledCount);
+  }
+
+  // The function signature remains the same, returning only the cancelled order count.
+  return { cancelledCount };
+}
+
+export async function getOrderById(
+  dbCtx: PrismaClient | Prisma.TransactionClient,
+  orderId: number,
+  userId: number,
+) {
+  // Get user role for authorization
+  const userWithRole = await dbCtx.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!userWithRole) {
+    throw new ApiError(403, "User not found", "USER_NOT_FOUND");
+  }
+
+  const selectFields = {
+    id: true,
+    user_id: true,
+    status: true,
+    total_amount: true,
+    pickup_code: true,
+    paymentExpiresAt: true,
+    paid_at: true,
+    cancelled_at: true,
+    createdAt: true,
+    orderItem: {
       select: {
         id: true,
-      },
-    });
-
-    if (expiredOrders.length === 0) {
-      return { cancelledCount: 0 }; // Nothing to do
-    }
-
-    const expiredOrderIds = expiredOrders.map(o => o.id);
-    console.log(`Found ${expiredOrderIds.length} expired orders to cancel:`, expiredOrderIds);
-
-    // 2. Find all inventory items linked to these expired orders.
-    const itemsToRelease = await tx.orderitem.findMany({
-      where: {
-        order_id: {
-          in: expiredOrderIds,
+        order_id: true,
+        inventory_item_id: true,
+        inventoryItem: {
+          select: {
+            id: true,
+            condition: true,
+            selling_price: true,
+            bookSku: {
+              select: {
+                id: true,
+                edition: true,
+                cover_image_url: true,
+                bookMaster: {
+                  select: {
+                    id: true,
+                    isbn13: true,
+                    title: true,
+                    author: true,
+                    publisher: true,
+                    original_price: true,
+                  },
+                },
+              },
+            },
+          },
         },
       },
-      select: {
-        inventory_item_id: true,
-      },
+    },
+  };
+
+  let order;
+
+  if (userWithRole.role === "STAFF") {
+    // STAFF can access any order
+    order = await dbCtx.order.findUnique({
+      where: { id: orderId },
+      select: selectFields,
     });
+  } else {
+    // USER can only access their own orders - use findFirst with compound conditions
+    order = await dbCtx.order.findFirst({
+      where: {
+        id: orderId,
+        user_id: userId,
+      },
+      select: selectFields,
+    });
+  }
 
-    const inventoryItemIdsToRelease = itemsToRelease.map(i => i.inventory_item_id);
+  if (!order) {
+    throw new ApiError(404, "Order not found", "ORDER_NOT_FOUND");
+  }
 
-    // 3. Update the orders' status to CANCELLED.
-    await tx.order.updateMany({
+  return order;
+}
+
+async function updateOrderStatusImpl(
+  dbCtx: Prisma.TransactionClient,
+  orderId: number,
+  newStatus: "COMPLETED" | "CANCELLED",
+  user: { userId: number; role: string },
+) {
+  // Only STAFF can update order status
+  if (user.role !== "STAFF") {
+    throw new ApiError(
+      403,
+      "只有工作人员可以更新订单状态",
+      "INSUFFICIENT_PERMISSIONS",
+    );
+  }
+
+  // Get current order with items
+  const currentOrder = await dbCtx.order.findUnique({
+    where: { id: orderId },
+    include: {
+      orderItem: {
+        include: {
+          inventoryItem: true,
+        },
+      },
+    },
+  });
+
+  if (!currentOrder) {
+    throw new ApiError(404, "订单不存在", "ORDER_NOT_FOUND");
+  }
+
+  // Check if status transition is valid
+  const validTransitions: Record<string, string[]> = {
+    PENDING_PAYMENT: ["CANCELLED"],
+    PENDING_PICKUP: ["COMPLETED", "CANCELLED"],
+    COMPLETED: [],
+    CANCELLED: [],
+  };
+
+  const allowedTransitions = validTransitions[currentOrder.status];
+  if (!allowedTransitions?.includes(newStatus)) {
+    throw new ApiError(
+      400,
+      `无法将订单从 ${currentOrder.status} 更新为 ${newStatus}`,
+      "INVALID_STATUS_TRANSITION",
+    );
+  }
+
+  // Update order status
+  const updatedOrder = await dbCtx.order.update({
+    where: { id: orderId },
+    data: {
+      status: newStatus,
+      ...(newStatus === "COMPLETED" && { completed_at: new Date() }),
+      ...(newStatus === "CANCELLED" && { cancelled_at: new Date() }),
+    },
+  });
+
+  // Update inventory items based on new status
+  if (newStatus === "COMPLETED") {
+    // Mark all items as sold and clear reservation pointer
+    await dbCtx.inventoryItem.updateMany({
       where: {
         id: {
-          in: expiredOrderIds,
+          in: currentOrder.orderItem.map((item) => item.inventory_item_id),
         },
       },
       data: {
-        status: 'CANCELLED',
-        cancelled_at: new Date(),
+        status: INVENTORY_STATUS.SOLD,
+      },
+    });
+    metrics.ordersCompleted.inc();
+  } else if (newStatus === "CANCELLED") {
+    // Release inventory back to stock
+    await dbCtx.inventoryItem.updateMany({
+      where: {
+        id: {
+          in: currentOrder.orderItem.map((item) => item.inventory_item_id),
+        },
+      },
+      data: {
+        status: INVENTORY_STATUS.IN_STOCK,
       },
     });
 
-    // 4. Update the inventory items' status back to in_stock.
-    if (inventoryItemIdsToRelease.length > 0) {
-      await tx.inventoryitem.updateMany({
-        where: {
-          id: {
-            in: inventoryItemIdsToRelease,
-          },
-        },
-        data: {
-          status: 'in_stock',
-          updated_at: new Date(),
-        },
+    // If cancelling a paid order, mark payment for refund
+    if (currentOrder.status === "PENDING_PICKUP") {
+      await dbCtx.paymentRecord.updateMany({
+        where: { order_id: orderId, status: 'SUCCESS' },
+        data: { status: 'REFUND_REQUIRED' }
       });
     }
-    
-    console.log(`Cancelled ${expiredOrderIds.length} orders and released ${inventoryItemIdsToRelease.length} items back to stock.`);
-    return { cancelledCount: expiredOrderIds.length };
-  });
+
+    metrics.ordersCancelled.inc();
+  }
+
+  return updatedOrder;
 }
 
-export async function getOrderById(orderId: number) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    include: {
-      orderitem: {
-        include: {
-          inventoryitem: {
-            include: {
-              booksku: {
-                include: {
-                  bookmaster: true
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
+export async function updateOrderStatus(
+  dbCtx: PrismaClient | Prisma.TransactionClient,
+  orderId: number,
+  newStatus: "COMPLETED" | "CANCELLED",
+  user: { userId: number; role: string },
+) {
+  if ("$connect" in dbCtx) {
+    return (dbCtx as PrismaClient).$transaction((tx) => updateOrderStatusImpl(tx, orderId, newStatus, user));
+  }
+
+  return updateOrderStatusImpl(dbCtx as Prisma.TransactionClient, orderId, newStatus, user);
 }

@@ -1,11 +1,14 @@
 // miniprogram/app.js
 const auth = require('./utils/auth');
+const tokenUtil = require('./utils/token');
 
 App({
   onLaunch() {
     auth.login()
       .then(res => {
         console.log('Login successful', res);
+        tokenUtil.setToken(res.token);
+        tokenUtil.setUserId(res.userId);
         this.checkTermsAgreement();
       })
       .catch(err => {

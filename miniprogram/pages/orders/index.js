@@ -2,12 +2,17 @@
 const auth = require('../../utils/auth');
 const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
+const tokenUtil = require('../../utils/token');
+const ui = require('../../utils/ui');
+const { extractErrorMessage } = require('../../utils/error');
 
 Page({
   data: {
-    orderList: [],
-    isLoading: true,
-    error: null,
+    state: {
+      status: 'loading', // 'loading', 'success', 'error'
+      data: [],
+      error: null
+    },
     statusMap: ORDER_STATUS,
     pageInfo: null // For pagination metadata
   },
@@ -20,27 +25,50 @@ Page({
       });
     }
   },
-  async fetchUserOrders() {
-    const userId = auth.getUserId();
+  async fetchUserOrders({ preserveData = false } = {}) {
+    const userId = tokenUtil.getUserId();
     if (!userId) { return; }
-    this.setData({ isLoading: true, error: null });
-    
+    if (!preserveData) {
+      this.setData({
+        state: {
+          status: 'loading',
+          data: [],
+          error: null,
+        },
+      });
+    } else {
+      this.setData({ 'state.error': null });
+    }
+
     try {
       const data = await request({
         url: `/orders/user/${userId}`,
         method: 'GET'
       });
-      this.setData({ orderList: data.data, pageInfo: data.meta });
+      this.setData({
+        state: {
+          status: 'success',
+          data: data.data,
+          error: null
+        },
+        pageInfo: data.meta
+      });
     } catch (error) {
-      this.setData({ error: error.error || '加载订单失败。' });
-    } finally {
-      this.setData({ isLoading: false });
+      const errorMsg = extractErrorMessage(error, '加载订单失败。');
+      this.setData({
+        state: {
+          status: 'error',
+          data: [],
+          error: errorMsg
+        }
+      });
+      ui.showError(errorMsg);
     }
   },
 
   // Pull down refresh
   async onPullDownRefresh() {
-    await this.fetchUserOrders();
+    await this.fetchUserOrders({ preserveData: true });
     wx.stopPullDownRefresh();
   }
 });

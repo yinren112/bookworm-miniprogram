@@ -1,102 +1,145 @@
 // bookworm-backend/prisma/seed.ts
+
 import { PrismaClient, book_condition } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const booksToSeed = [
+  {
+    master: {
+      isbn13: '9787111594251',
+      title: '深入理解计算机系统（原书第3版）',
+      author: 'Randal E. Bryant',
+      publisher: '机械工业出版社',
+      original_price: 139.00,
+    },
+    skus: [
+      {
+        edition: '原书第3版',
+        cover_image_url: 'https://img3.doubanio.com/view/subject/l/public/s29634731.jpg',
+        inventory: [
+          { condition: book_condition.NEW, cost: 70.00, selling_price: 95.00 },
+          { condition: book_condition.GOOD, cost: 50.00, selling_price: 75.50 },
+          { condition: book_condition.ACCEPTABLE, cost: 30.00, selling_price: 45.00 },
+        ],
+      },
+    ],
+  },
+  {
+    master: {
+      isbn13: '9787115428868',
+      title: '代码整洁之道',
+      author: 'Robert C. Martin',
+      publisher: '人民邮电出版社',
+      original_price: 59.00,
+    },
+    skus: [
+      {
+        edition: '中文版',
+        cover_image_url: 'https://img1.doubanio.com/view/subject/l/public/s4418368.jpg',
+        inventory: [
+          { condition: book_condition.GOOD, cost: 25.00, selling_price: 38.00 },
+          { condition: book_condition.GOOD, cost: 26.00, selling_price: 39.00 },
+        ],
+      },
+    ],
+  },
+  {
+    master: {
+      isbn13: '9787115546029',
+      title: '深入浅出Node.js',
+      author: '朴灵',
+      publisher: '人民邮电出版社',
+      original_price: 69.00,
+    },
+    skus: [
+      {
+        edition: '第一版',
+        cover_image_url: 'https://img9.doubanio.com/view/subject/l/public/s27204686.jpg',
+        inventory: [
+          { condition: book_condition.ACCEPTABLE, cost: 15.00, selling_price: 25.00 },
+        ],
+      },
+    ],
+  },
+  {
+    master: {
+      isbn13: '9787508649719',
+      title: 'Sapiens: A Brief History of Humankind',
+      author: 'Yuval Noah Harari',
+      publisher: '中信出版社',
+      original_price: 68.00,
+    },
+    skus: [
+      {
+        edition: '中文版',
+        cover_image_url: 'https://img2.doubanio.com/view/subject/l/public/s27371512.jpg',
+        inventory: [
+          { condition: book_condition.GOOD, cost: 30.00, selling_price: 42.00 },
+        ],
+      },
+      {
+        edition: '英文原版',
+        cover_image_url: 'https://img2.doubanio.com/view/subject/l/public/s29810813.jpg',
+        inventory: [
+          { condition: book_condition.NEW, cost: 50.00, selling_price: 78.00 },
+        ],
+      }
+    ],
+  },
+];
+
 async function main() {
   console.log('Start seeding...');
 
-  // Clean up existing data to ensure a fresh start
-  await prisma.orderitem.deleteMany({});
+  // To ensure idempotency, we first clean up the tables that represent physical items.
+  // We don't delete BookMaster or BookSKU to preserve their IDs.
+  await prisma.orderItem.deleteMany({});
   await prisma.order.deleteMany({});
-  await prisma.inventoryitem.deleteMany({});
-  await prisma.booksku.deleteMany({});
-  await prisma.bookmaster.deleteMany({});
-  await prisma.user.deleteMany({});
-  console.log('Cleaned up old data.');
-
-  // Create a dummy user for potential orders
-  const user = await prisma.user.create({
-    data: {
-      openid: 'demo_user_openid',
-      nickname: 'Demo User',
-    },
-  });
-  console.log(`Created user with id: ${user.id}`);
-
-  // Define some book data
-  const booksToSeed = [
-    { 
-      isbn13: '9787532779434', title: '三体', author: '刘慈欣', 
-      items: [
-        { condition: 'A' as book_condition, cost: 30.00, selling_price: 45.50 },
-        { condition: 'B' as book_condition, cost: 25.00, selling_price: 35.00 },
-      ]
-    },
-    { 
-      isbn13: '9787020137097', title: '活着', author: '余华', 
-      items: [
-        { condition: 'A' as book_condition, cost: 15.00, selling_price: 22.00 },
-        { condition: 'B' as book_condition, cost: 12.00, selling_price: 18.00 },
-        { condition: 'C' as book_condition, cost: 8.00, selling_price: 12.50 },
-      ]
-    },
-    { 
-      isbn13: '9787544270878', title: '解忧杂货店', author: '东野圭吾', 
-      items: [
-        { condition: 'A' as book_condition, cost: 20.00, selling_price: 29.80 },
-      ]
-    },
-    { 
-      isbn13: '9787559620187', title: '人类简史', author: '尤瓦尔·赫拉利', 
-      items: [
-        { condition: 'B' as book_condition, cost: 35.00, selling_price: 55.00 },
-        { condition: 'B' as book_condition, cost: 34.00, selling_price: 54.00 },
-      ]
-    },
-    { 
-      isbn13: '9787208150330', title: '代码整洁之道', author: 'Robert C. Martin', 
-      items: [
-        { condition: 'A' as book_condition, cost: 40.00, selling_price: 68.00 },
-        { condition: 'C' as book_condition, cost: 20.00, selling_price: 35.00 },
-      ]
-    },
-    {
-      isbn13: '9787115491240', title: '深入理解计算机系统', author: 'Randal E. Bryant',
-      items: [
-        { condition: 'A' as book_condition, cost: 80.00, selling_price: 120.00 },
-        { condition: 'B' as book_condition, cost: 65.00, selling_price: 95.00 },
-      ]
-    }
-  ];
+  await prisma.inventoryItem.deleteMany({});
+  
+  console.log('Cleaned up existing inventory and order data.');
 
   for (const book of booksToSeed) {
     await prisma.$transaction(async (tx) => {
-      const bookMaster = await tx.bookmaster.upsert({
-        where: { isbn13: book.isbn13 },
-        update: {},
-        create: { isbn13: book.isbn13, title: book.title, author: book.author },
+      // Upsert BookMaster
+      const bookMaster = await tx.bookMaster.upsert({
+        where: { isbn13: book.master.isbn13 },
+        update: book.master,
+        create: book.master,
       });
 
-      const bookSku = await tx.booksku.upsert({
-        where: { master_id_edition: { master_id: bookMaster.id, edition: 'default' } },
-        update: {},
-        create: { master_id: bookMaster.id, edition: 'default' },
-      });
-
-      for (const item of book.items) {
-        await tx.inventoryitem.create({
-          data: {
-            sku_id: bookSku.id,
-            condition: item.condition,
-            cost: item.cost,
-            selling_price: item.selling_price,
-            status: 'in_stock',
+      for (const skuData of book.skus) {
+        // Upsert BookSKU
+        const bookSku = await tx.bookSku.upsert({
+          where: {
+            master_id_edition: {
+              master_id: bookMaster.id,
+              edition: skuData.edition,
+            },
+          },
+          update: {
+            cover_image_url: skuData.cover_image_url,
+          },
+          create: {
+            master_id: bookMaster.id,
+            edition: skuData.edition,
+            cover_image_url: skuData.cover_image_url,
           },
         });
+
+        // Create InventoryItems
+        if (skuData.inventory && skuData.inventory.length > 0) {
+          await tx.inventoryItem.createMany({
+            data: skuData.inventory.map(item => ({
+              sku_id: bookSku.id,
+              ...item,
+            })),
+          });
+        }
       }
     });
-    console.log(`Seeded: ${book.title}`);
+    console.log(`Seeded book: ${book.master.title}`);
   }
 
   console.log('Seeding finished.');

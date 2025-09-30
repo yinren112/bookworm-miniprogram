@@ -53,3 +53,15 @@ node_modules/
 # WeChat Developer Tools
 project.config.json
 project.private.config.json
+
+# Backup files
+*.backup
+
+# Audit reports and temporary scripts
+bookworm_code_review.txt
+BOOKWORM_AUDIT_REPORT.txt
+fix_transactions.py
+update_user_metrics.js
+test_metrics.sh
+审查.py
+审查 (v2 - 带脱敏功能).py

@@ -1,49 +1,61 @@
 // src/tests/authPlugin.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockDeep, mockReset } from 'vitest-mock-extended';
-import { PrismaClient } from '@prisma/client';
-import Fastify, { FastifyInstance } from 'fastify';
-import { createSigner } from 'fast-jwt';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mockDeep, mockReset } from "vitest-mock-extended";
+import { PrismaClient } from "@prisma/client";
+import Fastify, { FastifyInstance } from "fastify";
+import { createSigner } from "fast-jwt";
 
 const prismaMock = mockDeep<PrismaClient>();
 
-vi.mock('../db', () => ({ default: prismaMock }));
-vi.mock('../config', () => ({
+vi.mock("../db", () => ({ default: prismaMock }));
+vi.mock("../config", () => ({
   default: {
-    JWT_SECRET: 'test-jwt-secret-for-plugin',
-  }
+    JWT_SECRET: "test-jwt-secret-for-plugin",
+  },
 }));
 
 // Import AFTER mocking
-const authPlugin = await import('../plugins/auth').then(m => m.default);
+const authPlugin = await import("../plugins/auth").then((m) => m.default);
 
-describe('Auth Plugin', () => {
+describe("Auth Plugin", () => {
   let server: FastifyInstance;
 
   beforeEach(async () => {
     mockReset(prismaMock);
     server = Fastify({ logger: false });
-    
+
     await server.register(authPlugin);
-    
+
     // Test route to verify authentication
-    server.get('/protected', { preHandler: [server.authenticate] }, async (req) => ({
-      message: 'success',
-      user: req.user
-    }));
+    server.get(
+      "/protected",
+      { preHandler: [server.authenticate] },
+      async (req) => ({
+        message: "success",
+        user: req.user,
+      }),
+    );
 
     // Test route to verify role-based access
-    server.get('/staff-only', { 
-      preHandler: [server.authenticate, server.requireRole('STAFF')] 
-    }, async () => ({
-      message: 'staff access granted'
-    }));
+    server.get(
+      "/staff-only",
+      {
+        preHandler: [server.authenticate, server.requireRole("STAFF")],
+      },
+      async () => ({
+        message: "staff access granted",
+      }),
+    );
 
-    server.get('/user-only', { 
-      preHandler: [server.authenticate, server.requireRole('USER')] 
-    }, async () => ({
-      message: 'user access granted'
-    }));
+    server.get(
+      "/user-only",
+      {
+        preHandler: [server.authenticate, server.requireRole("USER")],
+      },
+      async () => ({
+        message: "user access granted",
+      }),
+    );
 
     await server.ready();
   });
@@ -52,109 +64,119 @@ describe('Auth Plugin', () => {
     if (server) await server.close();
   });
 
-  describe('authenticate decorator', () => {
-    it('returns 401 when no authorization header provided', async () => {
+  describe("authenticate decorator", () => {
+    it("returns 401 when no authorization header provided", async () => {
       const response = await server.inject({
-        method: 'GET',
-        url: '/protected',
+        method: "GET",
+        url: "/protected",
       });
 
       expect(response.statusCode).toBe(401);
-      expect(JSON.parse(response.payload)).toEqual({
-        error: 'Invalid token',
-        errorCode: 'INVALID_TOKEN'
+      const payload = JSON.parse(response.payload);
+      expect(payload).toEqual({
+        code: "UNAUTHORIZED",
+        message: "Missing authorization header",
       });
     });
 
-    it('returns 401 when authorization header is malformed', async () => {
+    it("returns 401 when authorization header is malformed", async () => {
       const response = await server.inject({
-        method: 'GET',
-        url: '/protected',
+        method: "GET",
+        url: "/protected",
         headers: {
-          authorization: 'NotBearer token'
-        }
+          authorization: "NotBearer token",
+        },
       });
 
       expect(response.statusCode).toBe(401);
+      const payload = JSON.parse(response.payload);
+      expect(payload).toEqual({
+        code: "UNAUTHORIZED",
+        message: "Invalid token",
+      });
     });
 
-    it('returns 401 when token is invalid', async () => {
+    it("returns 401 when token is invalid", async () => {
       const response = await server.inject({
-        method: 'GET',
-        url: '/protected',
+        method: "GET",
+        url: "/protected",
         headers: {
-          authorization: 'Bearer invalid.jwt.token'
-        }
+          authorization: "Bearer invalid.jwt.token",
+        },
       });
 
       expect(response.statusCode).toBe(401);
-      expect(JSON.parse(response.payload)).toEqual({
-        error: 'Invalid token',
-        errorCode: 'INVALID_TOKEN'
-      });
+      const payload = JSON.parse(response.payload);
+      expect(payload.code).toBe("UNAUTHORIZED");
+      expect(payload.message).toBe("Invalid token");
     });
 
-    it('returns 401 when token is expired', async () => {
-      const signer = createSigner({ 
-        key: 'test-jwt-secret-for-plugin',
-        expiresIn: '1ms' // Immediately expired
+    it("returns 401 when token is expired", async () => {
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1ms", // Immediately expired
       });
-      
-      const userPayload = { userId: 123, openid: 'test-openid' };
+
+      const userPayload = { userId: 123, openid: "test-openid" };
       const expiredToken = await signer(userPayload);
-      
+
       // Wait for token to expire
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/protected',
+        method: "GET",
+        url: "/protected",
         headers: {
-          authorization: `Bearer ${expiredToken}`
-        }
+          authorization: `Bearer ${expiredToken}`,
+        },
       });
 
       expect(response.statusCode).toBe(401);
+      const payload = JSON.parse(response.payload);
+      expect(payload).toEqual({
+        code: "UNAUTHORIZED",
+        message: "Invalid token",
+      });
     });
 
-    it('decorates request with user payload when token is valid', async () => {
-      const signer = createSigner({ 
-        key: 'test-jwt-secret-for-plugin',
-        expiresIn: '1h'
+    it("decorates request with user payload when token is valid", async () => {
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1h",
       });
-      
-      const userPayload = { userId: 456, openid: 'valid-test-openid' };
+
+      const userPayload = { userId: 456, openid: "valid-test-openid" };
       const validToken = await signer(userPayload);
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/protected',
+        method: "GET",
+        url: "/protected",
         headers: {
-          authorization: `Bearer ${validToken}`
-        }
+          authorization: `Bearer ${validToken}`,
+        },
       });
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.payload);
       expect(body.user).toEqual(userPayload);
-      expect(body.message).toBe('success');
+      expect(body.message).toBe("success");
     });
 
-    it('handles token without Bearer prefix gracefully', async () => {
-      const signer = createSigner({ 
-        key: 'test-jwt-secret-for-plugin',
-        expiresIn: '1h'
+    it("handles token without Bearer prefix gracefully", async () => {
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1h",
       });
-      
-      const userPayload = { userId: 789, openid: 'no-bearer-openid' };
+
+      const userPayload = { userId: 789, openid: "no-bearer-openid" };
       const validToken = await signer(userPayload);
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/protected',
+        method: "GET",
+        url: "/protected",
         headers: {
-          authorization: validToken // No "Bearer " prefix
-        }
+          authorization: validToken, // No "Bearer " prefix
+        },
       });
 
       expect(response.statusCode).toBe(200);
@@ -163,33 +185,33 @@ describe('Auth Plugin', () => {
     });
   });
 
-  describe('requireRole decorator', () => {
+  describe("requireRole decorator", () => {
     let validToken: string;
-    const userPayload = { userId: 100, openid: 'role-test-openid' };
+    const userPayload = { userId: 100, openid: "role-test-openid" };
 
     beforeEach(async () => {
-      const signer = createSigner({ 
-        key: 'test-jwt-secret-for-plugin',
-        expiresIn: '1h'
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1h",
       });
       validToken = await signer(userPayload);
     });
 
-    it('returns 401 when user is not authenticated', async () => {
+    it("returns 401 when user is not authenticated", async () => {
       const response = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
+        method: "GET",
+        url: "/staff-only",
       });
 
       expect(response.statusCode).toBe(401);
     });
 
-    it('returns 401 when req.user is missing even with token', async () => {
+    it("returns 401 when req.user is missing even with token", async () => {
       // This simulates a case where authenticate wasn't called first
       const response = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/staff-only",
+        headers: { authorization: `Bearer ${validToken}` },
       });
 
       // First authenticate should set req.user, then requireRole checks it
@@ -198,105 +220,106 @@ describe('Auth Plugin', () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       const response2 = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/staff-only",
+        headers: { authorization: `Bearer ${validToken}` },
       });
 
       expect(response2.statusCode).toBe(403);
     });
 
-    it('returns 403 when user has wrong role', async () => {
+    it("returns 403 when user has wrong role", async () => {
       // Mock user with USER role trying to access STAFF endpoint
       prismaMock.user.findUnique.mockResolvedValue({
         id: userPayload.userId,
-        role: 'USER',
+        role: "USER",
         openid: userPayload.openid,
         unionid: null,
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
       });
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/staff-only",
+        headers: { authorization: `Bearer ${validToken}` },
       });
 
       expect(response.statusCode).toBe(403);
-      expect(JSON.parse(response.payload)).toEqual({
-        error: 'Forbidden',
-        errorCode: 'FORBIDDEN'
-      });
+      const payload = JSON.parse(response.payload);
+      expect(payload.code).toBe("FORBIDDEN");
+      expect(payload.message).toBe("Forbidden");
     });
 
-    it('grants access when user has correct role', async () => {
-      // Mock user with STAFF role
-      prismaMock.user.findUnique.mockResolvedValue({
-        id: userPayload.userId,
-        role: 'STAFF',
+    it("grants access when user has correct role", async () => {
+      // Create token with STAFF role included
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1h",
+      });
+      const staffToken = await signer({
+        userId: userPayload.userId,
         openid: userPayload.openid,
-        unionid: null,
-        created_at: new Date(),
-        updated_at: new Date()
+        role: "STAFF" // Include role in JWT payload
       });
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/staff-only",
+        headers: { authorization: `Bearer ${staffToken}` },
       });
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({
-        message: 'staff access granted'
+        message: "staff access granted",
       });
     });
 
-    it('works correctly for USER role as well', async () => {
-      // Mock user with USER role accessing user endpoint
-      prismaMock.user.findUnique.mockResolvedValue({
-        id: userPayload.userId,
-        role: 'USER',
+    it("works correctly for USER role as well", async () => {
+      // Create token with USER role included
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1h",
+      });
+      const userToken = await signer({
+        userId: userPayload.userId,
         openid: userPayload.openid,
-        unionid: null,
-        created_at: new Date(),
-        updated_at: new Date()
+        role: "USER" // Include role in JWT payload
       });
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/user-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/user-only",
+        headers: { authorization: `Bearer ${userToken}` },
       });
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.payload)).toEqual({
-        message: 'user access granted'
+        message: "user access granted",
       });
     });
 
-    it('returns 403 when database lookup fails', async () => {
+    it("returns 403 when database lookup fails", async () => {
       // Mock database error
-      prismaMock.user.findUnique.mockRejectedValue(new Error('Database error'));
+      prismaMock.user.findUnique.mockRejectedValue(new Error("Database error"));
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/staff-only",
+        headers: { authorization: `Bearer ${validToken}` },
       });
 
       expect(response.statusCode).toBe(403);
     });
 
-    it('returns 403 when user not found in database', async () => {
+    it("returns 403 when user not found in database", async () => {
       // User was authenticated via JWT but doesn't exist in DB (edge case)
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       const response = await server.inject({
-        method: 'GET',
-        url: '/staff-only',
-        headers: { authorization: `Bearer ${validToken}` }
+        method: "GET",
+        url: "/staff-only",
+        headers: { authorization: `Bearer ${validToken}` },
       });
 
       expect(response.statusCode).toBe(403);

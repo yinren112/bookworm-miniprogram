@@ -1,8 +1,9 @@
 // src/services/contentService.ts
-import prisma from '../db';
+import { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
-export async function getContentBySlug(slug: string) {
-  return await prisma.content.findUniqueOrThrow({
-    where: { slug }
+export async function getContentBySlug(dbCtx: PrismaClient | Prisma.TransactionClient, slug: string) {
+  return await dbCtx.content.findUniqueOrThrow({
+    where: { slug },
   });
 }

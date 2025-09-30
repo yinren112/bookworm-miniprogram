@@ -154,10 +154,7 @@
   border-top: 1rpx solid var(--border-color);
 }
 
-/* Buy Button - Uses Global Button Class */
-.buy-button {
-  width: 100%;
-}
+/* Button styles now handled by global .btn .btn-primary classes */
 
 
 /* Responsive Design */

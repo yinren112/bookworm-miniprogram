@@ -1,25 +1,26 @@
 // src/tests/setup.ts
-import { vi } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import { vi } from "vitest";
+import { PrismaClient } from "@prisma/client";
 
 // Create a mock Prisma client
 const prismaMock = {
-  bookmaster: {
+  bookMaster: {
     upsert: vi.fn(),
     findUnique: vi.fn(),
     findMany: vi.fn(),
   },
-  booksku: {
+  bookSku: {
     upsert: vi.fn(),
     findUnique: vi.fn(),
     findMany: vi.fn(),
   },
-  inventoryitem: {
+  inventoryItem: {
     create: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
+    count: vi.fn(),
   },
   user: {
     upsert: vi.fn(),
@@ -33,26 +34,29 @@ const prismaMock = {
     findUniqueOrThrow: vi.fn(),
     update: vi.fn(),
   },
-  orderitem: {
+  orderItem: {
     create: vi.fn(),
     createMany: vi.fn(),
     findMany: vi.fn(),
   },
   paymentRecord: {
     create: vi.fn(),
+    upsert: vi.fn(),
     deleteMany: vi.fn(),
     findMany: vi.fn(),
   },
   $transaction: vi.fn(),
+  $queryRawUnsafe: vi.fn(),
 } as unknown as PrismaClient;
 
-vi.mock('../db', () => ({
+vi.mock("../db", () => ({
   __esModule: true,
   default: prismaMock,
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  (prismaMock.$transaction as unknown as any).mockImplementation(async (fn: any) => fn(prismaMock));
 });
 
 export { prismaMock };

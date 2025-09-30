@@ -47,11 +47,11 @@
     <view class="books-section">
       <view class="section-title">购买书籍</view>
       <view class="book-list">
-        <view wx:for="{{order.orderitem}}" wx:key="id" class="book-item">
+        <view wx:for="{{order.orderItem}}" wx:key="id" class="book-item">
           <view class="book-cover">
             <image 
-              wx:if="{{item.inventoryitem.booksku.cover_image_url}}"
-              src="{{item.inventoryitem.booksku.cover_image_url}}" 
+              wx:if="{{item.inventoryItem.bookSku.cover_image_url}}"
+              src="{{item.inventoryItem.bookSku.cover_image_url}}" 
               class="cover-image"
               mode="aspectFit"
             />
@@ -61,14 +61,14 @@
           </view>
           
           <view class="book-info">
-            <view class="book-title">{{item.inventoryitem.booksku.bookmaster.title}}</view>
-            <view wx:if="{{item.inventoryitem.booksku.bookmaster.author}}" class="book-author">
-              作者：{{item.inventoryitem.booksku.bookmaster.author}}
+            <view class="book-title">{{item.inventoryItem.bookSku.bookMaster.title}}</view>
+            <view wx:if="{{item.inventoryItem.bookSku.bookMaster.author}}" class="book-author">
+              作者：{{item.inventoryItem.bookSku.bookMaster.author}}
             </view>
-            <view wx:if="{{item.inventoryitem.booksku.edition}}" class="book-edition">
-              版本：{{item.inventoryitem.booksku.edition}}
+            <view wx:if="{{item.inventoryItem.bookSku.edition}}" class="book-edition">
+              版本：{{item.inventoryItem.bookSku.edition}}
             </view>
-            <view class="book-condition">品相：{{getConditionText(item.inventoryitem.condition)}}</view>
+            <view class="book-condition">品相：{{getConditionText(item.inventoryItem.condition)}}</view>
           </view>
           
           <view class="book-price">
