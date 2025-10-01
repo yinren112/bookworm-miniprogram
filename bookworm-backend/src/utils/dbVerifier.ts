@@ -65,20 +65,8 @@ const CRITICAL_CONSTRAINTS: CriticalConstraint[] = [
     },
     errorMessage: "Trigger 'inventory_reservation_enforce_cap' missing. User reservation cap is unenforced.",
   },
-  {
-    name: "Constraint trigger inventoryitem_validate_reservation",
-    query: async (db: PrismaClient) => {
-      const result = await db.$queryRaw<[{ exists: boolean }]>`
-        SELECT EXISTS (
-          SELECT 1 FROM pg_trigger
-          WHERE tgname = 'inventoryitem_validate_reservation'
-            AND tgrelid = 'inventoryitem'::regclass
-        );
-      `;
-      return result[0]?.exists === true;
-    },
-    errorMessage: "Constraint trigger 'inventoryitem_validate_reservation' missing. Inventory state consistency is not guarded.",
-  },
+  // Note: inventoryitem_validate_reservation trigger was removed in migration 20250930135002
+  // It was legacy code from an older architecture. InventoryReservation table PK now enforces uniqueness.
 ];
 
 /**

@@ -1,14 +1,14 @@
 ================================================================================
 BOOKWORM PROJECT - ESSENTIAL CODE REVIEW (UNREDACTED)
 ================================================================================
-Generated on: 2025-09-30 21:46:19
+Generated on: 2025-10-01 00:41:27
 Mode: Essential files only - Core business logic with original data.
-Total files included: 90 (精简版)
+Total files included: 93 (精简版)
 
 ### 📋 INCLUDED FILES SUMMARY ###
 ----------------------------------------
 Root files (11): AGENTS.md, CLAUDE.md, README.md, docker-compose.monitoring.yml, fix_transactions.py, package-lock.json, package.json, project.private.config.json, update_user_metrics.js, 审查 (v2 - 带脱敏功能).py, 审查.py
-Backend files (48): 48 TypeScript/config files
+Backend files (51): 51 TypeScript/config files
 Frontend files (28): 28 WeChat Mini Program files
 
 ### 📄 SOURCE CODE CONTENT ###
@@ -1609,6 +1609,193 @@ ALTER TABLE "public"."orderitem" ADD CONSTRAINT "fk_order" FOREIGN KEY ("order_i
 
 -- AddForeignKey
 ALTER TABLE "public"."PaymentRecord" ADD CONSTRAINT "PaymentRecord_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "public"."Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+
+================================================================================
+### FILE: bookworm-backend\prisma\migrations\20250930135002_restore_native_db_rules\migration.sql
+================================================================================
+
+-- Restore Native Database Rules (Triggers & Constraints Lost During Migration Squashing)
+-- This migration adds back the critical database-level business rules that Prisma doesn't understand.
+
+-- ============================================================================
+-- PHASE 1: Fix UNIQUE INDEX vs UNIQUE CONSTRAINT Issue
+-- ============================================================================
+-- dbVerifier checks pg_constraint, but Prisma's @@unique generates UNIQUE INDEX.
+-- We need a proper partial UNIQUE CONSTRAINT on pending_payment_order(user_id).
+
+-- This constraint ensures one user can only have ONE pending payment order at a time.
+-- It's the cornerstone of our order flow: users can't spam orders.
+
+-- Drop the existing index if present (Prisma may have created it)
+DROP INDEX IF EXISTS "uniq_order_pending_per_user";
+
+-- Add a proper UNIQUE CONSTRAINT
+-- Note: PostgreSQL doesn't support partial UNIQUE constraints directly via ALTER TABLE,
+-- so we use a UNIQUE partial index which serves the same purpose.
+-- dbVerifier will be updated to check for this specific index.
+CREATE UNIQUE INDEX IF NOT EXISTS "uniq_order_pending_per_user"
+ON "pending_payment_order"("user_id");
+
+-- ============================================================================
+-- PHASE 2: Restore All Missing Triggers
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- Trigger 1: order_sync_pending_payment_insert
+-- Purpose: Keep the pending_payment_order guard table in sync with Order table
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION sync_pending_payment_guard()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'INSERT' AND NEW.status = 'PENDING_PAYMENT') OR
+       (TG_OP = 'UPDATE' AND NEW.status = 'PENDING_PAYMENT' AND OLD.status != 'PENDING_PAYMENT') THEN
+        -- Order became PENDING_PAYMENT: insert into guard table
+        INSERT INTO pending_payment_order (order_id, user_id)
+        VALUES (NEW.id, NEW.user_id)
+        ON CONFLICT (order_id) DO NOTHING;
+    ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'PENDING_PAYMENT' AND NEW.status != 'PENDING_PAYMENT') OR
+          (TG_OP = 'DELETE' AND OLD.status = 'PENDING_PAYMENT') THEN
+        -- Order left PENDING_PAYMENT state: remove from guard table
+        DELETE FROM pending_payment_order WHERE order_id = OLD.id;
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS order_sync_pending_payment_insert ON "Order";
+DROP TRIGGER IF EXISTS order_sync_pending_payment_update ON "Order";
+DROP TRIGGER IF EXISTS order_sync_pending_payment_delete ON "Order";
+
+CREATE TRIGGER order_sync_pending_payment_insert
+AFTER INSERT ON "Order"
+FOR EACH ROW
+EXECUTE FUNCTION sync_pending_payment_guard();
+
+CREATE TRIGGER order_sync_pending_payment_update
+AFTER UPDATE OF status ON "Order"
+FOR EACH ROW
+EXECUTE FUNCTION sync_pending_payment_guard();
+
+CREATE TRIGGER order_sync_pending_payment_delete
+AFTER DELETE ON "Order"
+FOR EACH ROW
+EXECUTE FUNCTION sync_pending_payment_guard();
+
+-- ----------------------------------------------------------------------------
+-- Trigger 2: inventory_reservation_enforce_cap
+-- Purpose: Enforce MAX_RESERVED_ITEMS_PER_USER business rule (20 items)
+-- Fixed: Removed references to non-existent reserved_by_order_id column
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION check_user_reservation_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+    reserved_count INTEGER;
+    user_id_to_check INTEGER;
+    max_limit CONSTANT INTEGER := 20; -- MAX_RESERVED_ITEMS_PER_USER from config
+BEGIN
+    -- Get the user_id from the Order via the new reservation record
+    SELECT o.user_id INTO user_id_to_check
+    FROM "Order" o
+    WHERE o.id = NEW.order_id;
+
+    IF user_id_to_check IS NOT NULL THEN
+        -- Count current reservations for this user (including this new one)
+        SELECT COUNT(*) INTO reserved_count
+        FROM inventory_reservation ir
+        JOIN "Order" o ON ir.order_id = o.id
+        WHERE o.user_id = user_id_to_check;
+
+        IF reserved_count > max_limit THEN
+            RAISE EXCEPTION 'MAX_RESERVED_ITEMS_PER_USER: User % has exceeded the reservation limit of % items (currently has %)',
+                user_id_to_check, max_limit, reserved_count
+            USING ERRCODE = '23514'; -- check_violation
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS inventory_reservation_enforce_cap ON "inventory_reservation";
+CREATE TRIGGER inventory_reservation_enforce_cap
+AFTER INSERT ON "inventory_reservation"
+FOR EACH ROW
+EXECUTE FUNCTION check_user_reservation_limit();
+
+-- ----------------------------------------------------------------------------
+-- Trigger 3: REMOVED - inventoryitem_validate_reservation
+-- Original Purpose: Enforce InventoryItem state machine consistency
+-- Reason for Removal: This trigger referenced a non-existent column `reserved_by_order_id`
+--                     The system uses InventoryReservation table instead
+-- Date Removed: 2025-09-30
+-- ----------------------------------------------------------------------------
+-- Historical context: This was legacy code from an earlier architecture that stored
+-- reservation info directly in the InventoryItem table. The current architecture uses
+-- a separate InventoryReservation table with inventory_item_id as PRIMARY KEY,
+-- which already enforces uniqueness at the database level.
+
+-- ============================================================================
+-- Verification: Confirm all rules are in place
+-- ============================================================================
+-- You can manually verify with:
+-- SELECT conname FROM pg_constraint WHERE conname = 'uniq_order_pending_per_user';
+-- SELECT tgname FROM pg_trigger WHERE tgname IN (
+--   'order_sync_pending_payment_insert',
+--   'inventory_reservation_enforce_cap',
+--   'inventoryitem_validate_reservation'
+-- );
+
+
+================================================================================
+### FILE: bookworm-backend\prisma\migrations\20250930143355_add_concurrent_control_indexes\migration.sql
+================================================================================
+
+-- Migration: Add Partial Unique Indexes for Concurrent Control
+-- Purpose: Enforce database-level constraints to prevent race conditions
+--
+-- Background:
+-- The system uses a two-table reservation pattern:
+-- 1. PendingPaymentOrder: Enforces one pending order per user
+-- 2. InventoryReservation: Tracks inventory → order mapping
+--
+-- This migration adds an additional constraint to prevent inventory items
+-- from being referenced by multiple incomplete OrderItems.
+
+-- Critical Note: PostgreSQL partial unique indexes with WHERE clauses
+-- can only reference columns in the indexed table itself, not joined tables.
+-- Therefore, we rely on application-level transaction logic combined with
+-- the existing InventoryReservation table's unique constraint on inventory_item_id.
+
+-- Verification: The InventoryReservation table already enforces this at line 107:
+-- inventory_item_id Int @id (Primary key = unique constraint)
+-- This means one inventory item can only have ONE reservation at a time.
+
+-- Since Order → InventoryReservation is a one-to-many relationship,
+-- and InventoryReservation.inventory_item_id is unique (PK),
+-- the database already prevents one inventory from being in multiple orders.
+
+-- What we ADD here: Make it explicit in OrderItem for query optimization
+-- This is a redundant safety check and helps PostgreSQL query planner.
+
+-- Safety constraint: Ensure OrderItem's inventory_item_id uniqueness
+-- when the parent order is incomplete
+-- Note: We cannot directly query Order.status in the WHERE clause of an index on orderitem,
+-- so this index serves as documentation. The real enforcement is via:
+-- 1. InventoryReservation.inventory_item_id (PRIMARY KEY)
+-- 2. Application-level transaction that inserts both atomically
+
+-- For now, we add a comment-only migration acknowledging the existing constraints
+-- are sufficient. If needed, we can add trigger-based enforcement later.
+
+-- Summary: No SQL changes needed. Constraints are already enforced by:
+-- ✓ PendingPaymentOrder.user_id UNIQUE (line 41 in schema.prisma)
+-- ✓ InventoryReservation.inventory_item_id PRIMARY KEY (line 107 in schema.prisma)
 
 
 ================================================================================
@@ -4450,7 +4637,6 @@ async function reserveInventoryItems(
       inventory_item_id: itemId,
       order_id: orderId,
     })),
-    skipDuplicates: true,
   });
 }
 
@@ -5345,15 +5531,26 @@ async function updateOrderStatusImpl(
     });
     metrics.ordersCompleted.inc();
   } else if (newStatus === "CANCELLED") {
+    const inventoryItemIds = currentOrder.orderItem.map((item) => item.inventory_item_id);
+
     // Release inventory back to stock
     await dbCtx.inventoryItem.updateMany({
       where: {
         id: {
-          in: currentOrder.orderItem.map((item) => item.inventory_item_id),
+          in: inventoryItemIds,
         },
       },
       data: {
         status: INVENTORY_STATUS.IN_STOCK,
+      },
+    });
+
+    // Delete reservation records
+    await dbCtx.inventoryReservation.deleteMany({
+      where: {
+        inventory_item_id: {
+          in: inventoryItemIds,
+        },
       },
     });
 
@@ -5582,10 +5779,13 @@ let prisma: PrismaClient;
 beforeAll(async () => {
   console.log("Setting up database integration test environment...");
 
-  // Use SQLite in-memory database for testing if PostgreSQL test DB is not available
-  const testDatabaseUrl =
-    process.env.DATABASE_URL ||
-    "file:./test.db?connection_limit=1&pool_timeout=20";
+  // Ensure DATABASE_URL is set by globalSetup (Testcontainers)
+  const testDatabaseUrl = process.env.DATABASE_URL;
+  if (!testDatabaseUrl) {
+    throw new Error(
+      "DATABASE_URL environment variable is not set. Integration tests require PostgreSQL via Testcontainers."
+    );
+  }
 
   // Create a fresh Prisma client for testing
   prisma = new PrismaClient({
@@ -5598,16 +5798,7 @@ beforeAll(async () => {
 
   // Connect to test database
   await prisma.$connect();
-  console.log(
-    `Connected to test database: ${testDatabaseUrl.includes("file:") ? "SQLite in-memory" : "PostgreSQL"}`,
-  );
-
-  // Run database migrations for SQLite if needed
-  if (testDatabaseUrl.includes("file:")) {
-    console.log(
-      "Using SQLite for testing - schema will be auto-created by Prisma",
-    );
-  }
+  console.log(`Connected to PostgreSQL test database: ${testDatabaseUrl}`);
 
   // Basic connectivity test
   try {
@@ -6329,7 +6520,7 @@ export async function createOrderTest(
         },
       });
 
-      // Now reserve the items with the order ID (satisfies the constraint)
+      // Reserve the items by updating status and creating reservation records
       await tx.inventoryItem.updateMany({
         where: {
           id: { in: itemIds },
@@ -6337,8 +6528,15 @@ export async function createOrderTest(
         },
         data: {
           status: "reserved",
-          reserved_by_order_id: order.id,
         },
+      });
+
+      // Create reservation records in InventoryReservation table
+      await tx.inventoryReservation.createMany({
+        data: itemIds.map((itemId) => ({
+          inventory_item_id: itemId,
+          order_id: order.id,
+        })),
       });
 
       return order;
@@ -6375,14 +6573,19 @@ export async function fulfillOrderTest(
         throw new Error("订单不存在或状态错误");
       }
 
-      // Mark inventory as sold and clear reservation
+      // Mark inventory as sold
       const itemIds = order.orderItem.map((item) => item.inventory_item_id);
       await tx.inventoryItem.updateMany({
         where: { id: { in: itemIds } },
         data: {
           status: "sold",
-          reserved_by_order_id: null,
         },
+      });
+
+      // Delete reservation records (CASCADE will handle this automatically when order is updated/deleted,
+      // but we do it explicitly here for clarity in tests)
+      await tx.inventoryReservation.deleteMany({
+        where: { inventory_item_id: { in: itemIds } },
       });
 
       // Complete the order
@@ -6539,8 +6742,9 @@ const CRITICAL_CONSTRAINTS: CriticalConstraint[] = [
       const result = await db.$queryRaw<[{ exists: boolean }]>`
         SELECT EXISTS (
           SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'uniq_order_pending_per_user'
+          FROM pg_indexes
+          WHERE indexname = 'uniq_order_pending_per_user'
+            AND indexdef LIKE '%UNIQUE%'
         );
       `;
       return result[0]?.exists === true;
@@ -6787,6 +6991,13 @@ export function getErrorMessage(error: unknown): string {
   }
   return 'Unknown error';
 }
+
+
+================================================================================
+### FILE: bookworm-backend\srctestsconcurrent-order-control.integration.test.ts
+================================================================================
+
+
 
 
 ================================================================================

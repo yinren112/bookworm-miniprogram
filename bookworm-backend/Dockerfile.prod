@@ -1,0 +1,44 @@
+# bookworm-backend/Dockerfile.prod
+
+# ---- Base Stage ----
+# Use a base image to set the npm registry once.
+FROM node:18-alpine AS base
+WORKDIR /app
+# Use a more reliable registry for users in China.
+# This layer will be cached.
+RUN npm config set registry https://registry.npmmirror.com
+
+# ---- Dependencies Stage ----
+# This stage is only for installing dependencies.
+# It gets its own layer and will only be re-run if package*.json changes.
+FROM base AS dependencies
+COPY package*.json ./
+RUN npm install --omit=dev --ignore-scripts
+
+# ---- Build Stage ----
+# This stage builds the application code.
+# It re-uses the cached dependencies.
+FROM base AS builder
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
+# We need dev dependencies for prisma generate and build
+RUN npm install --ignore-scripts
+RUN npx prisma generate
+RUN npm run build
+
+# ---- Production Stage ----
+# The final, lean image.
+FROM base
+ENV NODE_ENV=production
+# Copy only the necessary production dependencies from the dedicated dependencies stage.
+COPY --from=dependencies /app/node_modules ./node_modules
+# Copy prisma schema first
+COPY --from=builder /app/prisma ./prisma
+COPY package.json .
+# Generate Prisma Client in production stage
+RUN npx prisma generate
+# Now copy the compiled code
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 8080
+CMD [ "node", "dist/src/index.js" ]

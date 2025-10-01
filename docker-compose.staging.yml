@@ -1,0 +1,45 @@
+# docker-compose.staging.yml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ./bookworm-backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080-8082:8080" # Map 3 instances to ports 8080, 8081, 8082
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/bookworm_staging?connection_limit=50&pool_timeout=10
+      - PORT=8080
+      - HOST=0.0.0.0
+      - NODE_ENV=development
+      - LOG_LEVEL=info
+      - JWT_SECRET=${JWT_SECRET:-staging-secret-change-in-production}
+      - JWT_EXPIRES_IN=7d
+      - WX_APP_ID=${WX_APP_ID:-test-app-id}
+      - WX_APP_SECRET=${WX_APP_SECRET:-test-app-secret}
+      - ORDER_PAYMENT_TTL_MINUTES=15
+      - MAX_ITEMS_PER_ORDER=10
+      - API_RATE_LIMIT_MAX=100
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15
+    ports:
+      - "5433:5432" # Use a different port to avoid conflict with dev db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=bookworm_staging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+
+volumes:
+  postgres_data_staging:
