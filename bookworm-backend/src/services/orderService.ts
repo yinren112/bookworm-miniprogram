@@ -217,6 +217,7 @@ export async function createOrder(dbCtx: PrismaClient | Prisma.TransactionClient
   userId: number;
   inventoryItemIds: number[];
 }) {
+  const endTimer = metrics.operationLatency.labels({ operation: 'create_order' }).startTimer();
   try {
     // Check if dbCtx is PrismaClient by checking for $connect method (TransactionClient doesn't have this)
     if ('$connect' in dbCtx) {
@@ -245,6 +246,8 @@ export async function createOrder(dbCtx: PrismaClient | Prisma.TransactionClient
       }
     }
     throw e;
+  } finally {
+    endTimer();
   }
 }
 
@@ -584,207 +587,216 @@ export async function processPaymentNotification(
   wechatPayAdapter: WechatPayAdapter,
   notificationData: PaymentNotificationData,
 ) {
-  const { out_trade_no, timestamp, nonce, signature, serial, body } = notificationData;
-
-  // === Phase 0: Security Validation (Zero Trust) ===
-
-  // 1. Timestamp validation to prevent replay attacks
-  const notificationTimestamp = parseInt(timestamp, 10);
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-
-  // 拒绝未来时间戳，但允许合理的时钟偏差
-  const CLOCK_SKEW_TOLERANCE = 60; // 允许60秒时钟偏差
-  if (notificationTimestamp > currentTimestamp + CLOCK_SKEW_TOLERANCE) {
-    console.warn(`Payment notification with future timestamp rejected for ${out_trade_no}. Notification: ${notificationTimestamp}, Current: ${currentTimestamp}, Tolerance: ${CLOCK_SKEW_TOLERANCE}s`);
-    throw new ApiError(400, "Invalid future timestamp", "TIMESTAMP_INVALID");
-  }
-
-  // 检查过期（只允许合理的过去时间）
-  if (currentTimestamp - notificationTimestamp > config.PAYMENT_TIMESTAMP_TOLERANCE_SECONDS) {
-    console.warn(`Payment notification timestamp validation failed for ${out_trade_no}. Age: ${currentTimestamp - notificationTimestamp}s`);
-    throw new ApiError(400, "Payment notification expired", "TIMESTAMP_EXPIRED");
-  }
-
-  // 2. Signature validation to ensure authenticity
-  const isSignatureValid = wechatPayAdapter.verifySignature({
-    timestamp,
-    nonce,
-    body,
-    signature,
-    serial,
-  });
-
-  if (!isSignatureValid) {
-    console.error(`Payment notification signature validation failed for ${out_trade_no}`);
-    throw new ApiError(400, "Invalid payment notification signature", "SIGNATURE_INVALID");
-  }
-
-  // === Phase 1: Pre-checks and Network I/O (Outside Transaction) ===
-
-  // 1. Idempotency Check: See if we've already processed this.
-  const initialPaymentRecord = await dbCtx.paymentRecord.findUnique({
-    where: { out_trade_no },
-  });
-
-  if (!initialPaymentRecord) {
-    console.warn(`Payment notification for unknown out_trade_no ${out_trade_no} received. Ignoring.`);
-    return;
-  }
-
-  if (initialPaymentRecord.status !== 'PENDING') {
-    console.log(`Payment notification for ${out_trade_no} already processed (status: ${initialPaymentRecord.status}). Skipping.`);
-    return;
-  }
-
-  const executeInTransaction = async (fn: (tx: Prisma.TransactionClient) => Promise<void>) => {
-    if ("$transaction" in dbCtx) {
-      return await (dbCtx as PrismaClient).$transaction(fn);
-    }
-
-    return await fn(dbCtx as Prisma.TransactionClient);
-  };
-
-  const markPaymentAsFailed = async (
-    updateData: Prisma.PaymentRecordUpdateManyMutationInput = {},
-    logMessage?: string,
-  ) => {
-    const failed = await dbCtx.paymentRecord.updateMany({
-      where: {
-        out_trade_no,
-        status: "PENDING",
-      },
-      data: {
-        status: "FAILED",
-        notified_at: new Date(),
-        ...updateData,
-      },
-    });
-
-    if (failed.count > 0) {
-      if (logMessage) {
-        console.warn(logMessage);
-      }
-      metrics.paymentsProcessed.labels({ status: "failed" }).inc();
-    } else if (logMessage) {
-      console.warn(
-        `${logMessage} (skipped because payment record was already processed for ${out_trade_no}).`,
-      );
-    }
-  };
-
-  // 2. Active Query (Zero Trust Principle): Get the truth from WeChat's servers.
-  let queriedTxData;
+  const endTimer = metrics.operationLatency.labels({ operation: 'process_payment' }).startTimer();
   try {
-    queriedTxData = await retryAsync(
-      () => wechatPayAdapter.queryPaymentStatus({ out_trade_no, mchid: config.WXPAY_MCHID }),
-      3, // attempts
-      200 // initial delay ms
-    );
-  } catch (queryError) {
-    console.error(`Failed to query transaction ${out_trade_no} from WeChat Pay API after retries.`, queryError);
+    const { out_trade_no, timestamp, nonce, signature, serial, body } = notificationData;
 
-    // Business layer error handling - no HTTP status codes
-    if (queryError instanceof WechatPayError && !queryError.isRetryable) {
-      await markPaymentAsFailed({}, `Permanent error for ${out_trade_no}: ${queryError.message}. Marked as FAILED.`);
-      return; // Stop processing.
+    // === Phase 0: Security Validation (Zero Trust) ===
+
+    // 1. Timestamp validation to prevent replay attacks
+    const notificationTimestamp = parseInt(timestamp, 10);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+
+    // 拒绝未来时间戳，但允许合理的时钟偏差
+    const CLOCK_SKEW_TOLERANCE = 60; // 允许60秒时钟偏差
+    if (notificationTimestamp > currentTimestamp + CLOCK_SKEW_TOLERANCE) {
+      console.warn(`Payment notification with future timestamp rejected for ${out_trade_no}. Notification: ${notificationTimestamp}, Current: ${currentTimestamp}, Tolerance: ${CLOCK_SKEW_TOLERANCE}s`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "invalid_timestamp" }).inc();
+      throw new ApiError(400, "Invalid future timestamp", "TIMESTAMP_INVALID");
     }
 
-    // For all other errors (retryable WechatPayError or unknown errors), throw business exception
-    throw new PaymentQueryError("WECHAT_QUERY_FAILED_TRANSIENT", queryError);
-  }
-
-  // 3. Validate the Truth
-  const { trade_state, amount, payer, mchid, appid, transaction_id } = queriedTxData;
-
-  if (trade_state !== 'SUCCESS') {
-    const finalFailureStates = new Set(['CLOSED', 'REVOKED', 'PAYERROR']);
-    if (finalFailureStates.has(trade_state)) {
-      await markPaymentAsFailed(
-        {
-          transaction_id,
-          payer_openid: payer?.openid,
-        },
-        `Payment for ${out_trade_no} is in a final failure state (${trade_state}). Marked as FAILED.`,
-      );
-    } else {
-      // For transient states like USERPAYING, we want WeChat to retry later.
-      console.log(`Payment for ${out_trade_no} is in transient state (${trade_state}). Requesting retry.`);
-      throw new ApiError(503, `Payment in transient state: ${trade_state}`, "PAY_TRANSIENT_STATE");
+    // 检查过期（只允许合理的过去时间）
+    if (currentTimestamp - notificationTimestamp > config.PAYMENT_TIMESTAMP_TOLERANCE_SECONDS) {
+      console.warn(`Payment notification timestamp validation failed for ${out_trade_no}. Age: ${currentTimestamp - notificationTimestamp}s`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "timestamp_expired" }).inc();
+      throw new ApiError(400, "Payment notification expired", "TIMESTAMP_EXPIRED");
     }
-    return;
-  }
 
-  if (mchid !== config.WXPAY_MCHID || appid !== config.WX_APP_ID || amount.total !== initialPaymentRecord.amount_total) {
-    console.error(`CRITICAL: Payment data mismatch for ${out_trade_no}. Marking as FAILED.`, {
-        expected: { mchid: config.WXPAY_MCHID, appid: config.WX_APP_ID, total: initialPaymentRecord.amount_total },
-        received: { mchid, appid, total: amount.total }
+    // 2. Signature validation to ensure authenticity
+    const isSignatureValid = wechatPayAdapter.verifySignature({
+      timestamp,
+      nonce,
+      body,
+      signature,
+      serial,
     });
-    await markPaymentAsFailed({
-      transaction_id,
-      payer_openid: payer?.openid,
-    });
-    return;
-  }
 
-  // === Phase 2: Atomic State Update (Inside Transaction) ===
-  await executeInTransaction(async (tx) => {
-    // Re-fetch payment record to ensure it's still PENDING before we start.
-    // This is an additional safeguard.
-    const paymentRecord = await tx.paymentRecord.findUnique({
+    if (!isSignatureValid) {
+      console.error(`Payment notification signature validation failed for ${out_trade_no}`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "invalid_signature" }).inc();
+      throw new ApiError(400, "Invalid payment notification signature", "SIGNATURE_INVALID");
+    }
+
+    // === Phase 1: Pre-checks and Network I/O (Outside Transaction) ===
+
+    // 1. Idempotency Check: See if we've already processed this.
+    const initialPaymentRecord = await dbCtx.paymentRecord.findUnique({
       where: { out_trade_no },
     });
 
-    // Another process might have handled it. If so, we're done.
-    if (!paymentRecord || paymentRecord.status !== 'PENDING') {
-      console.log(`Payment ${out_trade_no} was processed by a concurrent request. Skipping.`);
+    if (!initialPaymentRecord) {
+      console.warn(`Payment notification for unknown out_trade_no ${out_trade_no} received. Ignoring.`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "order_not_found" }).inc();
       return;
     }
 
-    // THE CRITICAL FIX: ATOMIC CONDITIONAL UPDATE
-    // Attempt to transition the order from PENDING_PAYMENT to PENDING_PICKUP.
-    // This will only succeed if the status is still PENDING_PAYMENT.
-    const updatedOrder = await tx.order.updateMany({
-      where: {
-        id: paymentRecord.order_id,
-        status: 'PENDING_PAYMENT',
-      },
-      data: {
-        status: 'PENDING_PICKUP',
-        paid_at: new Date(),
-      },
-    });
-
-    // Check if the atomic update was successful.
-    if (updatedOrder.count === 1) {
-      // SUCCESS: We won the race. The order is now PENDING_PICKUP.
-      // Finalize the payment record.
-      await tx.paymentRecord.update({
-        where: { out_trade_no },
-        data: {
-          status: 'SUCCESS',
-          transaction_id,
-          payer_openid: payer?.openid,
-          notified_at: new Date(),
-        },
-      });
-      console.log(`Order ${paymentRecord.order_id} successfully updated to PENDING_PICKUP.`);
-      metrics.paymentsProcessed.labels({ status: "success" }).inc();
-    } else {
-      // FAILURE: We lost the race. The order was likely cancelled before payment was confirmed.
-      // Mark the payment for refund.
-      await tx.paymentRecord.update({
-        where: { out_trade_no },
-        data: {
-          status: 'REFUND_REQUIRED',
-          transaction_id,
-          payer_openid: payer?.openid,
-          notified_at: new Date(),
-        },
-      });
-      console.error(`CRITICAL: Payment succeeded for an order (${paymentRecord.order_id}) that was not PENDING_PAYMENT (likely cancelled). Marked for refund.`);
-      metrics.paymentsProcessed.labels({ status: "refund_required" }).inc();
+    if (initialPaymentRecord.status !== 'PENDING') {
+      console.log(`Payment notification for ${out_trade_no} already processed (status: ${initialPaymentRecord.status}). Skipping.`);
+      return;
     }
-  });
+
+    const executeInTransaction = async (fn: (tx: Prisma.TransactionClient) => Promise<void>) => {
+      if ("$transaction" in dbCtx) {
+        return await (dbCtx as PrismaClient).$transaction(fn);
+      }
+
+      return await fn(dbCtx as Prisma.TransactionClient);
+    };
+
+    const markPaymentAsFailed = async (
+      updateData: Prisma.PaymentRecordUpdateManyMutationInput = {},
+      logMessage?: string,
+    ) => {
+      const failed = await dbCtx.paymentRecord.updateMany({
+        where: {
+          out_trade_no,
+          status: "PENDING",
+        },
+        data: {
+          status: "FAILED",
+          notified_at: new Date(),
+          ...updateData,
+        },
+      });
+
+      if (failed.count > 0) {
+        if (logMessage) {
+          console.warn(logMessage);
+        }
+        metrics.paymentsProcessed.labels({ status: "failed", result: "failed" }).inc();
+      } else if (logMessage) {
+        console.warn(
+          `${logMessage} (skipped because payment record was already processed for ${out_trade_no}).`,
+        );
+      }
+    };
+
+    // 2. Active Query (Zero Trust Principle): Get the truth from WeChat's servers.
+    let queriedTxData;
+    try {
+      queriedTxData = await retryAsync(
+        () => wechatPayAdapter.queryPaymentStatus({ out_trade_no, mchid: config.WXPAY_MCHID }),
+        3, // attempts
+        200 // initial delay ms
+      );
+    } catch (queryError) {
+      console.error(`Failed to query transaction ${out_trade_no} from WeChat Pay API after retries.`, queryError);
+
+      // Business layer error handling - no HTTP status codes
+      if (queryError instanceof WechatPayError && !queryError.isRetryable) {
+        await markPaymentAsFailed({}, `Permanent error for ${out_trade_no}: ${queryError.message}. Marked as FAILED.`);
+        return; // Stop processing.
+      }
+
+      // For all other errors (retryable WechatPayError or unknown errors), throw business exception
+      throw new PaymentQueryError("WECHAT_QUERY_FAILED_TRANSIENT", queryError);
+    }
+
+    // 3. Validate the Truth
+    const { trade_state, amount, payer, mchid, appid, transaction_id } = queriedTxData;
+
+    if (trade_state !== 'SUCCESS') {
+      const finalFailureStates = new Set(['CLOSED', 'REVOKED', 'PAYERROR']);
+      if (finalFailureStates.has(trade_state)) {
+        await markPaymentAsFailed(
+          {
+            transaction_id,
+            payer_openid: payer?.openid,
+          },
+          `Payment for ${out_trade_no} is in a final failure state (${trade_state}). Marked as FAILED.`,
+        );
+      } else {
+        // For transient states like USERPAYING, we want WeChat to retry later.
+        console.log(`Payment for ${out_trade_no} is in transient state (${trade_state}). Requesting retry.`);
+        throw new ApiError(503, `Payment in transient state: ${trade_state}`, "PAY_TRANSIENT_STATE");
+      }
+      return;
+    }
+
+    if (mchid !== config.WXPAY_MCHID || appid !== config.WX_APP_ID || amount.total !== initialPaymentRecord.amount_total) {
+      console.error(`CRITICAL: Payment data mismatch for ${out_trade_no}. Marking as FAILED.`, {
+          expected: { mchid: config.WXPAY_MCHID, appid: config.WX_APP_ID, total: initialPaymentRecord.amount_total },
+          received: { mchid, appid, total: amount.total }
+      });
+      await markPaymentAsFailed({
+        transaction_id,
+        payer_openid: payer?.openid,
+      });
+      return;
+    }
+
+    // === Phase 2: Atomic State Update (Inside Transaction) ===
+    await executeInTransaction(async (tx) => {
+      // Re-fetch payment record to ensure it's still PENDING before we start.
+      // This is an additional safeguard.
+      const paymentRecord = await tx.paymentRecord.findUnique({
+        where: { out_trade_no },
+      });
+
+      // Another process might have handled it. If so, we're done.
+      if (!paymentRecord || paymentRecord.status !== 'PENDING') {
+        console.log(`Payment ${out_trade_no} was processed by a concurrent request. Skipping.`);
+        return;
+      }
+
+      // THE CRITICAL FIX: ATOMIC CONDITIONAL UPDATE
+      // Attempt to transition the order from PENDING_PAYMENT to PENDING_PICKUP.
+      // This will only succeed if the status is still PENDING_PAYMENT.
+      const updatedOrder = await tx.order.updateMany({
+        where: {
+          id: paymentRecord.order_id,
+          status: 'PENDING_PAYMENT',
+        },
+        data: {
+          status: 'PENDING_PICKUP',
+          paid_at: new Date(),
+        },
+      });
+
+      // Check if the atomic update was successful.
+      if (updatedOrder.count === 1) {
+        // SUCCESS: We won the race. The order is now PENDING_PICKUP.
+        // Finalize the payment record.
+        await tx.paymentRecord.update({
+          where: { out_trade_no },
+          data: {
+            status: 'SUCCESS',
+            transaction_id,
+            payer_openid: payer?.openid,
+            notified_at: new Date(),
+          },
+        });
+        console.log(`Order ${paymentRecord.order_id} successfully updated to PENDING_PICKUP.`);
+        metrics.paymentsProcessed.labels({ status: "success", result: "processed" }).inc();
+      } else {
+        // FAILURE: We lost the race. The order was likely cancelled before payment was confirmed.
+        // Mark the payment for refund.
+        await tx.paymentRecord.update({
+          where: { out_trade_no },
+          data: {
+            status: 'REFUND_REQUIRED',
+            transaction_id,
+            payer_openid: payer?.openid,
+            notified_at: new Date(),
+          },
+        });
+        console.error(`CRITICAL: Payment succeeded for an order (${paymentRecord.order_id}) that was not PENDING_PAYMENT (likely cancelled). Marked for refund.`);
+        metrics.paymentsProcessed.labels({ status: "refund_required", result: "order_cancelled" }).inc();
+      }
+    });
+  } finally {
+    endTimer();
+  }
 }
 
 export async function getPendingPickupOrders(dbCtx: PrismaClient | Prisma.TransactionClient) {

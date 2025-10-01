@@ -32,7 +32,7 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
   paymentsProcessed: new client.Counter({
     name: "bookworm_payments_processed_total",
     help: "Total number of payment notifications processed",
-    labelNames: ["status"], // 'success', 'refund_required', 'failure'
+    labelNames: ["status", "result"], // status: 'success'|'failure'|'refund_required', result: 'processed'|'invalid_signature'|'order_not_found'
   }),
   dbTransactionRetries: new client.Counter({
     name: "bookworm_db_transaction_retries_total",
@@ -52,6 +52,12 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
     help: "Histogram of the time taken from payment to fulfillment for an order",
     buckets: [60, 300, 900, 1800, 3600, 7200, 86400], // 1min, 5min, 15min, 30min, 1hr, 2hr, 1day
   }),
+  operationLatency: new client.Histogram({
+    name: "bookworm_operation_latency_seconds",
+    help: "Latency of critical business operations in seconds",
+    labelNames: ["operation"], // 'create_order', 'process_payment', etc.
+    buckets: [0.1, 0.5, 1, 2, 5],
+  }),
 } : {
   // Mock metrics for testing - reuse singleton objects
   ordersCreated: { labels: () => mockIncrementer, inc: () => {} },
@@ -62,6 +68,7 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
   inventoryStatus: { labels: () => mockSetter },
   usersLoggedInTotal: { set: () => {}, inc: () => {} },
   orderFulfillmentDurationSeconds: { observe: () => {} },
+  operationLatency: { startTimer: () => () => {}, labels: () => ({ startTimer: () => () => {} }) },
 };
 
 async function metricsPlugin(fastify: FastifyInstance) {
