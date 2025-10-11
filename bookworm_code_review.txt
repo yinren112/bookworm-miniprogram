@@ -1,14 +1,14 @@
 ================================================================================
 BOOKWORM PROJECT - ESSENTIAL CODE REVIEW (UNREDACTED)
 ================================================================================
-Generated on: 2025-10-01 00:41:27
+Generated on: 2025-10-06 17:00:25
 Mode: Essential files only - Core business logic with original data.
-Total files included: 93 (精简版)
+Total files included: 103 (精简版)
 
 ### 📋 INCLUDED FILES SUMMARY ###
 ----------------------------------------
-Root files (11): AGENTS.md, CLAUDE.md, README.md, docker-compose.monitoring.yml, fix_transactions.py, package-lock.json, package.json, project.private.config.json, update_user_metrics.js, 审查 (v2 - 带脱敏功能).py, 审查.py
-Backend files (51): 51 TypeScript/config files
+Root files (16): AGENTS.md, CLAUDE.md, README.md, debug-test.js, docker-compose.monitoring.yml, docker-compose.staging.yml, fix_transactions.py, load-test-v2.js, load-test.js, package-lock.json, package.json, project.private.config.json, seed-staging.sql, update_user_metrics.js, 审查 (v2 - 带脱敏功能).py, 审查.py
+Backend files (56): 56 TypeScript/config files
 Frontend files (28): 28 WeChat Mini Program files
 
 ### 📄 SOURCE CODE CONTENT ###
@@ -1799,6 +1799,44 @@ EXECUTE FUNCTION check_user_reservation_limit();
 
 
 ================================================================================
+### FILE: bookworm-backend\prisma\migrations\20251002143259_add_sell_order_support\migration.sql
+================================================================================
+
+-- CreateEnum
+CREATE TYPE "public"."OrderType" AS ENUM ('PURCHASE', 'SELL');
+
+-- CreateEnum
+CREATE TYPE "public"."SettlementType" AS ENUM ('CASH', 'VOUCHER');
+
+-- AlterEnum
+ALTER TYPE "public"."inventory_status" ADD VALUE 'BULK_ACQUISITION';
+
+-- AlterTable
+ALTER TABLE "public"."Order" ADD COLUMN     "notes" TEXT,
+ADD COLUMN     "settlement_type" "public"."SettlementType",
+ADD COLUMN     "total_weight_kg" DOUBLE PRECISION,
+ADD COLUMN     "type" "public"."OrderType" NOT NULL DEFAULT 'PURCHASE',
+ADD COLUMN     "unit_price" INTEGER;
+
+-- AlterTable
+ALTER TABLE "public"."inventoryitem" ADD COLUMN     "source_order_id" INTEGER;
+
+-- CreateIndex
+CREATE INDEX "inventoryitem_source_order_id_idx" ON "public"."inventoryitem"("source_order_id");
+
+-- AddForeignKey
+ALTER TABLE "public"."inventoryitem" ADD CONSTRAINT "inventoryitem_source_order_id_fkey" FOREIGN KEY ("source_order_id") REFERENCES "public"."Order"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+
+================================================================================
+### FILE: bookworm-backend\prisma\migrations\20251003153140_add_voucher_value_and_fix_queries\migration.sql
+================================================================================
+
+-- AlterTable
+ALTER TABLE "public"."Order" ADD COLUMN     "voucher_face_value" INTEGER;
+
+
+================================================================================
 ### FILE: bookworm-backend\prisma\migrations\migration_lock.toml
 ================================================================================
 
@@ -1832,11 +1870,18 @@ model Order {
   paid_at          DateTime?              @db.Timestamptz(6)
   completed_at     DateTime?              @db.Timestamptz(6)
   cancelled_at     DateTime?              @db.Timestamptz(6)
+  type             OrderType              @default(PURCHASE)
+  totalWeightKg    Float?                 @map("total_weight_kg")
+  unitPrice        Int?                   @map("unit_price")
+  settlementType   SettlementType?        @map("settlement_type")
+  voucherFaceValue Int?                   @map("voucher_face_value")
+  notes            String?
   User             User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
   orderItem        OrderItem[]
   PaymentRecord    PaymentRecord[]
   reservations     InventoryReservation[]
   pendingGuard     PendingPaymentOrder?
+  sourcedInventory InventoryItem[]        @relation("SourceOrder")
 
   @@index([user_id, status], map: "idx_order_user_id_status")
   @@index([createdAt], map: "idx_order_created_at")
@@ -1908,11 +1953,14 @@ model InventoryItem {
   status        inventory_status      @default(in_stock)
   created_at    DateTime              @default(now()) @db.Timestamptz(6)
   updated_at    DateTime              @updatedAt @db.Timestamptz(6)
+  sourceOrderId Int?                  @map("source_order_id")
   bookSku       BookSku               @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
   orderItem     OrderItem[]
   reservation   InventoryReservation?
+  SourceOrder   Order?                @relation("SourceOrder", fields: [sourceOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
+  @@index([sourceOrderId])
   @@map("inventoryitem")
 }
 
@@ -1986,6 +2034,7 @@ enum inventory_status {
   sold
   returned
   damaged
+  BULK_ACQUISITION
 }
 
 enum Role {
@@ -2008,6 +2057,16 @@ enum PaymentStatus {
   REFUNDED
   FAILED
   REFUND_PROCESSING
+}
+
+enum OrderType {
+  PURCHASE
+  SELL
+}
+
+enum SettlementType {
+  CASH
+  VOUCHER
 }
 
 
@@ -2832,6 +2891,7 @@ import booksRoutes from "./routes/books";
 import inventoryRoutes from "./routes/inventory";
 import contentRoutes from "./routes/content";
 import ordersRoutes from "./routes/orders";
+import sellOrdersRoutes from "./routes/sellOrders";
 import paymentRoutes from "./routes/payment";
 
 // --- Type Augmentation for Fastify ---
@@ -3033,6 +3093,7 @@ const setupApplication = async () => {
   await fastify.register(inventoryRoutes);
   await fastify.register(contentRoutes);
   await fastify.register(ordersRoutes);
+  await fastify.register(sellOrdersRoutes);
   await fastify.register(paymentRoutes, { wechatPayAdapter });
 };
 
@@ -3401,7 +3462,7 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
   paymentsProcessed: new client.Counter({
     name: "bookworm_payments_processed_total",
     help: "Total number of payment notifications processed",
-    labelNames: ["status"], // 'success', 'refund_required', 'failure'
+    labelNames: ["status", "result"], // status: 'success'|'failure'|'refund_required', result: 'processed'|'invalid_signature'|'order_not_found'
   }),
   dbTransactionRetries: new client.Counter({
     name: "bookworm_db_transaction_retries_total",
@@ -3421,6 +3482,12 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
     help: "Histogram of the time taken from payment to fulfillment for an order",
     buckets: [60, 300, 900, 1800, 3600, 7200, 86400], // 1min, 5min, 15min, 30min, 1hr, 2hr, 1day
   }),
+  operationLatency: new client.Histogram({
+    name: "bookworm_operation_latency_seconds",
+    help: "Latency of critical business operations in seconds",
+    labelNames: ["operation"], // 'create_order', 'process_payment', etc.
+    buckets: [0.1, 0.5, 1, 2, 5],
+  }),
 } : {
   // Mock metrics for testing - reuse singleton objects
   ordersCreated: { labels: () => mockIncrementer, inc: () => {} },
@@ -3431,6 +3498,7 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
   inventoryStatus: { labels: () => mockSetter },
   usersLoggedInTotal: { set: () => {}, inc: () => {} },
   orderFulfillmentDurationSeconds: { observe: () => {} },
+  operationLatency: { startTimer: () => () => {}, labels: () => ({ startTimer: () => () => {} }) },
 };
 
 async function metricsPlugin(fastify: FastifyInstance) {
@@ -3459,6 +3527,13 @@ const LoginBodySchema = Type.Object({
   code: Type.String({ minLength: 1 }),
 });
 
+const TestAuthBodySchema = Type.Object({
+  openId: Type.String({ minLength: 1 }),
+  nickname: Type.Optional(Type.String()),
+  avatarUrl: Type.Optional(Type.String()),
+  role: Type.Optional(Type.Union([Type.Literal("USER"), Type.Literal("STAFF")]))
+});
+
 const authRoutes: FastifyPluginAsync = async function (fastify) {
   fastify.post<{ Body: Static<typeof LoginBodySchema> }>(
     "/api/auth/login",
@@ -3481,6 +3556,41 @@ const authRoutes: FastifyPluginAsync = async function (fastify) {
       reply.send({ token, userId: user.id });
     },
   );
+
+  // Test-only endpoint for load testing and staging environments
+  // SECURITY: This endpoint MUST be disabled in production
+  if (config.NODE_ENV !== "production") {
+    fastify.post<{ Body: Static<typeof TestAuthBodySchema> }>(
+      "/api/auth/test-login",
+      {
+        schema: {
+          body: TestAuthBodySchema,
+        },
+      },
+      async (request, reply) => {
+        const { openId, nickname, avatarUrl, role } = request.body;
+
+        // Find or create test user
+        const user = await prisma.user.upsert({
+          where: { openid: openId },
+          update: {
+            nickname: nickname || "Test User",
+            avatar_url: avatarUrl || "https://example.com/avatar.png",
+            ...(role ? { role } : {}),
+          },
+          create: {
+            openid: openId,
+            nickname: nickname || "Test User",
+            avatar_url: avatarUrl || "https://example.com/avatar.png",
+            role: role || "USER",
+          },
+        });
+
+        const token = generateJwtToken(user);
+        reply.send({ token, userId: user.id });
+      },
+    );
+  }
 };
 
 export default authRoutes;
@@ -4027,6 +4137,120 @@ export default paymentRoutes;
 
 
 ================================================================================
+### FILE: bookworm-backend\src\routes\sellOrders.ts
+================================================================================
+
+// bookworm-backend/src/routes/sellOrders.ts (V2 - Single Step)
+
+import { FastifyPluginAsync } from "fastify";
+import { Type, Static } from "@sinclair/typebox";
+import { createAndCompleteSellOrder } from "../services/orderService";
+import prisma from "../db";
+
+const CreateSellOrderBodySchema = Type.Object({
+  userId: Type.Number(),
+  totalWeightKg: Type.Number({ minimum: 0.01 }),
+  unitPrice: Type.Number({ minimum: 1 }), // In cents
+  settlementType: Type.Union([Type.Literal("CASH"), Type.Literal("VOUCHER")]),
+  notes: Type.Optional(Type.String()),
+});
+
+const sellOrdersRoutes: FastifyPluginAsync = async function (fastify) {
+  fastify.post<{ Body: Static<typeof CreateSellOrderBodySchema> }>(
+    "/api/sell-orders", // Simplified endpoint
+    {
+      preHandler: [fastify.authenticate, fastify.requireRole("STAFF")],
+    },
+    async (request, reply) => {
+      const { userId, totalWeightKg, unitPrice, settlementType, notes } = request.body;
+
+      const result = await createAndCompleteSellOrder(prisma, {
+        userId,
+        totalWeightKg,
+        unitPrice,
+        settlementType,
+        notes,
+      });
+
+      reply.code(201).send(result);
+    }
+  );
+};
+
+export default sellOrdersRoutes;
+
+
+================================================================================
+### FILE: bookworm-backend\src\scripts\create-test-user.ts
+================================================================================
+
+// src/scripts/create-test-user.ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function createTestUser() {
+  try {
+    // Check if user ID 1 already exists
+    const existingUser = await prisma.user.findUnique({ where: { id: 1 } });
+
+    if (existingUser) {
+      console.log("✓ 用户 ID 1 已存在");
+      console.log(`  OpenID: ${existingUser.openid}`);
+      console.log(`  Role: ${existingUser.role}`);
+      return;
+    }
+
+    // Create test user with ID 1
+    const user = await prisma.user.create({
+      data: {
+        id: 1,
+        openid: "test-user-openid-001",
+        role: "USER"
+      }
+    });
+
+    console.log("✓ 成功创建测试用户 ID 1");
+    console.log(`  OpenID: ${user.openid}`);
+    console.log(`  Role: ${user.role}`);
+  } catch (error) {
+    console.error("❌ 创建用户失败:", error);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+createTestUser();
+
+
+================================================================================
+### FILE: bookworm-backend\src\scripts\generate-staff-token.ts
+================================================================================
+
+// src/scripts/generate-staff-token.ts
+import { createSigner } from "fast-jwt";
+import config from "../config";
+
+const signer = createSigner({
+  key: config.JWT_SECRET,
+  expiresIn: config.JWT_EXPIRES_IN,
+});
+
+// Generate a test STAFF token
+const testStaffToken = signer({
+  userId: 9999,
+  openid: "test-staff-openid",
+  role: "STAFF"
+});
+
+console.log("\n=== STAFF Test Token ===");
+console.log(testStaffToken);
+console.log("\n复制上面的令牌，粘贴到操作面板的认证提示框中。");
+console.log("\n访问地址: http://localhost:3000/admin/operator/");
+console.log("========================\n");
+
+
+================================================================================
 ### FILE: bookworm-backend\src\services\authService.ts
 ================================================================================
 
@@ -4465,7 +4689,7 @@ export async function getBookById(prisma: PrismaClient | Prisma.TransactionClien
 ================================================================================
 
 // src/services/orderService.ts (fully replaced)
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient, Order, InventoryItem } from "@prisma/client";
 
 import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
 
@@ -4683,6 +4907,7 @@ export async function createOrder(dbCtx: PrismaClient | Prisma.TransactionClient
   userId: number;
   inventoryItemIds: number[];
 }) {
+  const endTimer = metrics.operationLatency.labels({ operation: 'create_order' }).startTimer();
   try {
     // Check if dbCtx is PrismaClient by checking for $connect method (TransactionClient doesn't have this)
     if ('$connect' in dbCtx) {
@@ -4711,6 +4936,8 @@ export async function createOrder(dbCtx: PrismaClient | Prisma.TransactionClient
       }
     }
     throw e;
+  } finally {
+    endTimer();
   }
 }
 
@@ -4742,6 +4969,7 @@ export async function getOrdersByUserId(
 
   const where: Prisma.OrderWhereInput = {
     user_id: userId,
+    type: 'PURCHASE',
   };
 
   if (cursorDate && cursorId !== null) {
@@ -5050,207 +5278,216 @@ export async function processPaymentNotification(
   wechatPayAdapter: WechatPayAdapter,
   notificationData: PaymentNotificationData,
 ) {
-  const { out_trade_no, timestamp, nonce, signature, serial, body } = notificationData;
-
-  // === Phase 0: Security Validation (Zero Trust) ===
-
-  // 1. Timestamp validation to prevent replay attacks
-  const notificationTimestamp = parseInt(timestamp, 10);
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-
-  // 拒绝未来时间戳，但允许合理的时钟偏差
-  const CLOCK_SKEW_TOLERANCE = 60; // 允许60秒时钟偏差
-  if (notificationTimestamp > currentTimestamp + CLOCK_SKEW_TOLERANCE) {
-    console.warn(`Payment notification with future timestamp rejected for ${out_trade_no}. Notification: ${notificationTimestamp}, Current: ${currentTimestamp}, Tolerance: ${CLOCK_SKEW_TOLERANCE}s`);
-    throw new ApiError(400, "Invalid future timestamp", "TIMESTAMP_INVALID");
-  }
-
-  // 检查过期（只允许合理的过去时间）
-  if (currentTimestamp - notificationTimestamp > config.PAYMENT_TIMESTAMP_TOLERANCE_SECONDS) {
-    console.warn(`Payment notification timestamp validation failed for ${out_trade_no}. Age: ${currentTimestamp - notificationTimestamp}s`);
-    throw new ApiError(400, "Payment notification expired", "TIMESTAMP_EXPIRED");
-  }
-
-  // 2. Signature validation to ensure authenticity
-  const isSignatureValid = wechatPayAdapter.verifySignature({
-    timestamp,
-    nonce,
-    body,
-    signature,
-    serial,
-  });
-
-  if (!isSignatureValid) {
-    console.error(`Payment notification signature validation failed for ${out_trade_no}`);
-    throw new ApiError(400, "Invalid payment notification signature", "SIGNATURE_INVALID");
-  }
-
-  // === Phase 1: Pre-checks and Network I/O (Outside Transaction) ===
-
-  // 1. Idempotency Check: See if we've already processed this.
-  const initialPaymentRecord = await dbCtx.paymentRecord.findUnique({
-    where: { out_trade_no },
-  });
-
-  if (!initialPaymentRecord) {
-    console.warn(`Payment notification for unknown out_trade_no ${out_trade_no} received. Ignoring.`);
-    return;
-  }
-
-  if (initialPaymentRecord.status !== 'PENDING') {
-    console.log(`Payment notification for ${out_trade_no} already processed (status: ${initialPaymentRecord.status}). Skipping.`);
-    return;
-  }
-
-  const executeInTransaction = async (fn: (tx: Prisma.TransactionClient) => Promise<void>) => {
-    if ("$transaction" in dbCtx) {
-      return await (dbCtx as PrismaClient).$transaction(fn);
-    }
-
-    return await fn(dbCtx as Prisma.TransactionClient);
-  };
-
-  const markPaymentAsFailed = async (
-    updateData: Prisma.PaymentRecordUpdateManyMutationInput = {},
-    logMessage?: string,
-  ) => {
-    const failed = await dbCtx.paymentRecord.updateMany({
-      where: {
-        out_trade_no,
-        status: "PENDING",
-      },
-      data: {
-        status: "FAILED",
-        notified_at: new Date(),
-        ...updateData,
-      },
-    });
-
-    if (failed.count > 0) {
-      if (logMessage) {
-        console.warn(logMessage);
-      }
-      metrics.paymentsProcessed.labels({ status: "failed" }).inc();
-    } else if (logMessage) {
-      console.warn(
-        `${logMessage} (skipped because payment record was already processed for ${out_trade_no}).`,
-      );
-    }
-  };
-
-  // 2. Active Query (Zero Trust Principle): Get the truth from WeChat's servers.
-  let queriedTxData;
+  const endTimer = metrics.operationLatency.labels({ operation: 'process_payment' }).startTimer();
   try {
-    queriedTxData = await retryAsync(
-      () => wechatPayAdapter.queryPaymentStatus({ out_trade_no, mchid: config.WXPAY_MCHID }),
-      3, // attempts
-      200 // initial delay ms
-    );
-  } catch (queryError) {
-    console.error(`Failed to query transaction ${out_trade_no} from WeChat Pay API after retries.`, queryError);
+    const { out_trade_no, timestamp, nonce, signature, serial, body } = notificationData;
 
-    // Business layer error handling - no HTTP status codes
-    if (queryError instanceof WechatPayError && !queryError.isRetryable) {
-      await markPaymentAsFailed({}, `Permanent error for ${out_trade_no}: ${queryError.message}. Marked as FAILED.`);
-      return; // Stop processing.
+    // === Phase 0: Security Validation (Zero Trust) ===
+
+    // 1. Timestamp validation to prevent replay attacks
+    const notificationTimestamp = parseInt(timestamp, 10);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+
+    // 拒绝未来时间戳，但允许合理的时钟偏差
+    const CLOCK_SKEW_TOLERANCE = 60; // 允许60秒时钟偏差
+    if (notificationTimestamp > currentTimestamp + CLOCK_SKEW_TOLERANCE) {
+      console.warn(`Payment notification with future timestamp rejected for ${out_trade_no}. Notification: ${notificationTimestamp}, Current: ${currentTimestamp}, Tolerance: ${CLOCK_SKEW_TOLERANCE}s`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "invalid_timestamp" }).inc();
+      throw new ApiError(400, "Invalid future timestamp", "TIMESTAMP_INVALID");
     }
 
-    // For all other errors (retryable WechatPayError or unknown errors), throw business exception
-    throw new PaymentQueryError("WECHAT_QUERY_FAILED_TRANSIENT", queryError);
-  }
-
-  // 3. Validate the Truth
-  const { trade_state, amount, payer, mchid, appid, transaction_id } = queriedTxData;
-
-  if (trade_state !== 'SUCCESS') {
-    const finalFailureStates = new Set(['CLOSED', 'REVOKED', 'PAYERROR']);
-    if (finalFailureStates.has(trade_state)) {
-      await markPaymentAsFailed(
-        {
-          transaction_id,
-          payer_openid: payer?.openid,
-        },
-        `Payment for ${out_trade_no} is in a final failure state (${trade_state}). Marked as FAILED.`,
-      );
-    } else {
-      // For transient states like USERPAYING, we want WeChat to retry later.
-      console.log(`Payment for ${out_trade_no} is in transient state (${trade_state}). Requesting retry.`);
-      throw new ApiError(503, `Payment in transient state: ${trade_state}`, "PAY_TRANSIENT_STATE");
+    // 检查过期（只允许合理的过去时间）
+    if (currentTimestamp - notificationTimestamp > config.PAYMENT_TIMESTAMP_TOLERANCE_SECONDS) {
+      console.warn(`Payment notification timestamp validation failed for ${out_trade_no}. Age: ${currentTimestamp - notificationTimestamp}s`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "timestamp_expired" }).inc();
+      throw new ApiError(400, "Payment notification expired", "TIMESTAMP_EXPIRED");
     }
-    return;
-  }
 
-  if (mchid !== config.WXPAY_MCHID || appid !== config.WX_APP_ID || amount.total !== initialPaymentRecord.amount_total) {
-    console.error(`CRITICAL: Payment data mismatch for ${out_trade_no}. Marking as FAILED.`, {
-        expected: { mchid: config.WXPAY_MCHID, appid: config.WX_APP_ID, total: initialPaymentRecord.amount_total },
-        received: { mchid, appid, total: amount.total }
+    // 2. Signature validation to ensure authenticity
+    const isSignatureValid = wechatPayAdapter.verifySignature({
+      timestamp,
+      nonce,
+      body,
+      signature,
+      serial,
     });
-    await markPaymentAsFailed({
-      transaction_id,
-      payer_openid: payer?.openid,
-    });
-    return;
-  }
 
-  // === Phase 2: Atomic State Update (Inside Transaction) ===
-  await executeInTransaction(async (tx) => {
-    // Re-fetch payment record to ensure it's still PENDING before we start.
-    // This is an additional safeguard.
-    const paymentRecord = await tx.paymentRecord.findUnique({
+    if (!isSignatureValid) {
+      console.error(`Payment notification signature validation failed for ${out_trade_no}`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "invalid_signature" }).inc();
+      throw new ApiError(400, "Invalid payment notification signature", "SIGNATURE_INVALID");
+    }
+
+    // === Phase 1: Pre-checks and Network I/O (Outside Transaction) ===
+
+    // 1. Idempotency Check: See if we've already processed this.
+    const initialPaymentRecord = await dbCtx.paymentRecord.findUnique({
       where: { out_trade_no },
     });
 
-    // Another process might have handled it. If so, we're done.
-    if (!paymentRecord || paymentRecord.status !== 'PENDING') {
-      console.log(`Payment ${out_trade_no} was processed by a concurrent request. Skipping.`);
+    if (!initialPaymentRecord) {
+      console.warn(`Payment notification for unknown out_trade_no ${out_trade_no} received. Ignoring.`);
+      metrics.paymentsProcessed.labels({ status: "failure", result: "order_not_found" }).inc();
       return;
     }
 
-    // THE CRITICAL FIX: ATOMIC CONDITIONAL UPDATE
-    // Attempt to transition the order from PENDING_PAYMENT to PENDING_PICKUP.
-    // This will only succeed if the status is still PENDING_PAYMENT.
-    const updatedOrder = await tx.order.updateMany({
-      where: {
-        id: paymentRecord.order_id,
-        status: 'PENDING_PAYMENT',
-      },
-      data: {
-        status: 'PENDING_PICKUP',
-        paid_at: new Date(),
-      },
-    });
-
-    // Check if the atomic update was successful.
-    if (updatedOrder.count === 1) {
-      // SUCCESS: We won the race. The order is now PENDING_PICKUP.
-      // Finalize the payment record.
-      await tx.paymentRecord.update({
-        where: { out_trade_no },
-        data: {
-          status: 'SUCCESS',
-          transaction_id,
-          payer_openid: payer?.openid,
-          notified_at: new Date(),
-        },
-      });
-      console.log(`Order ${paymentRecord.order_id} successfully updated to PENDING_PICKUP.`);
-      metrics.paymentsProcessed.labels({ status: "success" }).inc();
-    } else {
-      // FAILURE: We lost the race. The order was likely cancelled before payment was confirmed.
-      // Mark the payment for refund.
-      await tx.paymentRecord.update({
-        where: { out_trade_no },
-        data: {
-          status: 'REFUND_REQUIRED',
-          transaction_id,
-          payer_openid: payer?.openid,
-          notified_at: new Date(),
-        },
-      });
-      console.error(`CRITICAL: Payment succeeded for an order (${paymentRecord.order_id}) that was not PENDING_PAYMENT (likely cancelled). Marked for refund.`);
-      metrics.paymentsProcessed.labels({ status: "refund_required" }).inc();
+    if (initialPaymentRecord.status !== 'PENDING') {
+      console.log(`Payment notification for ${out_trade_no} already processed (status: ${initialPaymentRecord.status}). Skipping.`);
+      return;
     }
-  });
+
+    const executeInTransaction = async (fn: (tx: Prisma.TransactionClient) => Promise<void>) => {
+      if ("$transaction" in dbCtx) {
+        return await (dbCtx as PrismaClient).$transaction(fn);
+      }
+
+      return await fn(dbCtx as Prisma.TransactionClient);
+    };
+
+    const markPaymentAsFailed = async (
+      updateData: Prisma.PaymentRecordUpdateManyMutationInput = {},
+      logMessage?: string,
+    ) => {
+      const failed = await dbCtx.paymentRecord.updateMany({
+        where: {
+          out_trade_no,
+          status: "PENDING",
+        },
+        data: {
+          status: "FAILED",
+          notified_at: new Date(),
+          ...updateData,
+        },
+      });
+
+      if (failed.count > 0) {
+        if (logMessage) {
+          console.warn(logMessage);
+        }
+        metrics.paymentsProcessed.labels({ status: "failed", result: "failed" }).inc();
+      } else if (logMessage) {
+        console.warn(
+          `${logMessage} (skipped because payment record was already processed for ${out_trade_no}).`,
+        );
+      }
+    };
+
+    // 2. Active Query (Zero Trust Principle): Get the truth from WeChat's servers.
+    let queriedTxData;
+    try {
+      queriedTxData = await retryAsync(
+        () => wechatPayAdapter.queryPaymentStatus({ out_trade_no, mchid: config.WXPAY_MCHID }),
+        3, // attempts
+        200 // initial delay ms
+      );
+    } catch (queryError) {
+      console.error(`Failed to query transaction ${out_trade_no} from WeChat Pay API after retries.`, queryError);
+
+      // Business layer error handling - no HTTP status codes
+      if (queryError instanceof WechatPayError && !queryError.isRetryable) {
+        await markPaymentAsFailed({}, `Permanent error for ${out_trade_no}: ${queryError.message}. Marked as FAILED.`);
+        return; // Stop processing.
+      }
+
+      // For all other errors (retryable WechatPayError or unknown errors), throw business exception
+      throw new PaymentQueryError("WECHAT_QUERY_FAILED_TRANSIENT", queryError);
+    }
+
+    // 3. Validate the Truth
+    const { trade_state, amount, payer, mchid, appid, transaction_id } = queriedTxData;
+
+    if (trade_state !== 'SUCCESS') {
+      const finalFailureStates = new Set(['CLOSED', 'REVOKED', 'PAYERROR']);
+      if (finalFailureStates.has(trade_state)) {
+        await markPaymentAsFailed(
+          {
+            transaction_id,
+            payer_openid: payer?.openid,
+          },
+          `Payment for ${out_trade_no} is in a final failure state (${trade_state}). Marked as FAILED.`,
+        );
+      } else {
+        // For transient states like USERPAYING, we want WeChat to retry later.
+        console.log(`Payment for ${out_trade_no} is in transient state (${trade_state}). Requesting retry.`);
+        throw new ApiError(503, `Payment in transient state: ${trade_state}`, "PAY_TRANSIENT_STATE");
+      }
+      return;
+    }
+
+    if (mchid !== config.WXPAY_MCHID || appid !== config.WX_APP_ID || amount.total !== initialPaymentRecord.amount_total) {
+      console.error(`CRITICAL: Payment data mismatch for ${out_trade_no}. Marking as FAILED.`, {
+          expected: { mchid: config.WXPAY_MCHID, appid: config.WX_APP_ID, total: initialPaymentRecord.amount_total },
+          received: { mchid, appid, total: amount.total }
+      });
+      await markPaymentAsFailed({
+        transaction_id,
+        payer_openid: payer?.openid,
+      });
+      return;
+    }
+
+    // === Phase 2: Atomic State Update (Inside Transaction) ===
+    await executeInTransaction(async (tx) => {
+      // Re-fetch payment record to ensure it's still PENDING before we start.
+      // This is an additional safeguard.
+      const paymentRecord = await tx.paymentRecord.findUnique({
+        where: { out_trade_no },
+      });
+
+      // Another process might have handled it. If so, we're done.
+      if (!paymentRecord || paymentRecord.status !== 'PENDING') {
+        console.log(`Payment ${out_trade_no} was processed by a concurrent request. Skipping.`);
+        return;
+      }
+
+      // THE CRITICAL FIX: ATOMIC CONDITIONAL UPDATE
+      // Attempt to transition the order from PENDING_PAYMENT to PENDING_PICKUP.
+      // This will only succeed if the status is still PENDING_PAYMENT.
+      const updatedOrder = await tx.order.updateMany({
+        where: {
+          id: paymentRecord.order_id,
+          status: 'PENDING_PAYMENT',
+        },
+        data: {
+          status: 'PENDING_PICKUP',
+          paid_at: new Date(),
+        },
+      });
+
+      // Check if the atomic update was successful.
+      if (updatedOrder.count === 1) {
+        // SUCCESS: We won the race. The order is now PENDING_PICKUP.
+        // Finalize the payment record.
+        await tx.paymentRecord.update({
+          where: { out_trade_no },
+          data: {
+            status: 'SUCCESS',
+            transaction_id,
+            payer_openid: payer?.openid,
+            notified_at: new Date(),
+          },
+        });
+        console.log(`Order ${paymentRecord.order_id} successfully updated to PENDING_PICKUP.`);
+        metrics.paymentsProcessed.labels({ status: "success", result: "processed" }).inc();
+      } else {
+        // FAILURE: We lost the race. The order was likely cancelled before payment was confirmed.
+        // Mark the payment for refund.
+        await tx.paymentRecord.update({
+          where: { out_trade_no },
+          data: {
+            status: 'REFUND_REQUIRED',
+            transaction_id,
+            payer_openid: payer?.openid,
+            notified_at: new Date(),
+          },
+        });
+        console.error(`CRITICAL: Payment succeeded for an order (${paymentRecord.order_id}) that was not PENDING_PAYMENT (likely cancelled). Marked for refund.`);
+        metrics.paymentsProcessed.labels({ status: "refund_required", result: "order_cancelled" }).inc();
+      }
+    });
+  } finally {
+    endTimer();
+  }
 }
 
 export async function getPendingPickupOrders(dbCtx: PrismaClient | Prisma.TransactionClient) {
@@ -5258,7 +5495,7 @@ export async function getPendingPickupOrders(dbCtx: PrismaClient | Prisma.Transa
 
   // 1. 获取所有待取货订单及其orderItem（一层include）
   const ordersWithItems = await dbCtx.order.findMany({
-    where: { status: "PENDING_PICKUP" },
+    where: { status: "PENDING_PICKUP", type: 'PURCHASE' },
     include: {
       orderItem: true, // 只include一层，避免深层嵌套
     },
@@ -5331,11 +5568,12 @@ export async function cancelExpiredOrders(dbCtx: Prisma.TransactionClient | Pris
       SET status = 'CANCELLED', cancelled_at = NOW()
       WHERE id IN (
         SELECT id FROM "Order"
-        WHERE status = 'PENDING_PAYMENT' AND "paymentExpiresAt" < NOW()
+        WHERE status = 'PENDING_PAYMENT' AND "paymentExpiresAt" < NOW() AND "type" = 'PURCHASE'
         ORDER BY "paymentExpiresAt" ASC
         LIMIT 1000
         FOR UPDATE SKIP LOCKED
       )
+      AND "type" = 'PURCHASE'
       RETURNING id
     ),
     released_items AS (
@@ -5579,6 +5817,118 @@ export async function updateOrderStatus(
   }
 
   return updateOrderStatusImpl(dbCtx as Prisma.TransactionClient, orderId, newStatus, user);
+}
+
+//
+// ============================================================================
+// SECTION: Sell Order Workflow (V2 - Single-Step Completion)
+// ============================================================================
+//
+
+export interface CreateAndCompleteSellOrderInput {
+  userId: number;
+  totalWeightKg: number;
+  unitPrice: number; // Price in cents per kg
+  settlementType: 'CASH' | 'VOUCHER';
+  notes?: string;
+}
+
+export interface CreateAndCompleteSellOrderResult {
+  order: Order;
+  inventoryItem: InventoryItem;
+}
+
+const BULK_ACQUISITION_ISBN = "0000000000000";
+
+async function createAndCompleteSellOrderImpl(
+  tx: Prisma.TransactionClient,
+  input: CreateAndCompleteSellOrderInput,
+): Promise<CreateAndCompleteSellOrderResult> {
+  if (input.totalWeightKg <= 0 || input.unitPrice <= 0) {
+    throw new ApiError(400, "重量和单价必须是正数", "INVALID_SELL_ORDER_INPUT");
+  }
+
+  const baseAmount = Math.round(input.totalWeightKg * input.unitPrice);
+  const voucherFaceValue = input.settlementType === 'VOUCHER' ? baseAmount * 2 : null;
+
+  const bulkMaster = await tx.bookMaster.upsert({
+    where: { isbn13: BULK_ACQUISITION_ISBN },
+    update: {},
+    create: {
+      isbn13: BULK_ACQUISITION_ISBN,
+      title: "批量收购书籍",
+      author: "N/A",
+      publisher: "N/A",
+    },
+  });
+
+  const bulkSku = await tx.bookSku.upsert({
+    where: {
+      master_id_edition: {
+        master_id: bulkMaster.id,
+        edition: "批量",
+      },
+    },
+    update: {},
+    create: {
+      master_id: bulkMaster.id,
+      edition: "批量",
+    },
+  });
+
+  const order = await tx.order.create({
+    data: {
+      user_id: input.userId,
+      status: "COMPLETED",
+      type: "SELL",
+      total_amount: new Prisma.Decimal(baseAmount / 100),
+      voucherFaceValue,
+      pickup_code: await generateUniquePickupCode(),
+      paymentExpiresAt: new Date(),
+      completed_at: new Date(),
+      totalWeightKg: input.totalWeightKg,
+      unitPrice: input.unitPrice,
+      settlementType: input.settlementType,
+      notes: input.notes,
+    },
+  });
+
+  const inventoryItem = await tx.inventoryItem.create({
+    data: {
+      sku_id: bulkSku.id,
+      condition: "ACCEPTABLE",
+      cost: new Prisma.Decimal((voucherFaceValue ?? baseAmount) / 100),
+      selling_price: new Prisma.Decimal(0),
+      status: "BULK_ACQUISITION",
+      sourceOrderId: order.id,
+    },
+  });
+
+  if (input.settlementType === 'VOUCHER' && voucherFaceValue) {
+    // await VoucherService.issueVoucher({
+    //   userId: input.userId,
+    //   amount: voucherFaceValue,
+    //   sourceType: 'MANUAL_ACQUISITION',
+    //   sourceId: order.id,
+    // });
+  }
+
+  return { order, inventoryItem };
+}
+
+export function createAndCompleteSellOrder(
+  dbCtx: PrismaClient,
+  input: CreateAndCompleteSellOrderInput,
+): Promise<CreateAndCompleteSellOrderResult> {
+  return withTxRetry(async () => {
+    return dbCtx.$transaction(
+      (tx) => createAndCompleteSellOrderImpl(tx, input),
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: BUSINESS_LIMITS.TRANSACTION_TIMEOUT_MS,
+      }
+    );
+  });
 }
 
 
@@ -6652,6 +7002,18 @@ import crypto from "crypto";
 import { BUSINESS_LIMITS } from "../constants";
 
 /**
+ * Derives a single 32-bit integer lock key from a string lock name.
+ * Uses SHA256 hashing to ensure collision resistance.
+ *
+ * @param lockName A unique string identifier for the lock.
+ * @returns A 32-bit signed integer suitable for pg_try_advisory_lock().
+ */
+function deriveLockKey(lockName: string): number {
+  const hash = crypto.createHash("sha256").update(lockName).digest();
+  return hash.readInt32BE(0);
+}
+
+/**
  * Executes a task while holding a PostgreSQL advisory lock.
  * Ensures that only one instance of the application can run the task at the same time.
  *
@@ -6663,13 +7025,6 @@ import { BUSINESS_LIMITS } from "../constants";
  * @param task The async function to execute if the lock is acquired.
  * @returns The result of the task if the lock was acquired, otherwise null.
  */
-function deriveLockKeys(lockName: string): [number, number] {
-  const digest = crypto.createHash("sha256").update(lockName).digest();
-  const key1 = digest.readInt32BE(0);
-  const key2 = digest.readInt32BE(4);
-  return [key1, key2];
-}
-
 export async function withAdvisoryLock<T>(
   prisma: PrismaClient,
   lockName: string,
@@ -6677,12 +7032,10 @@ export async function withAdvisoryLock<T>(
 ): Promise<T | null> {
   return prisma.$transaction(
     async (tx) => {
-      const [key1, key2] = deriveLockKeys(lockName);
-      const result = await tx.$queryRaw<{ pg_try_advisory_lock: boolean }[]>(
-        Prisma.sql`SELECT pg_try_advisory_lock(${key1}, ${key2})`,
-      );
+      const lockKey = deriveLockKey(lockName);
+      const result = await tx.$queryRaw<[{ lock_acquired: boolean }]>`SELECT pg_try_advisory_lock(${lockKey}::integer) as lock_acquired`;
 
-      const lockAcquired = result[0]?.pg_try_advisory_lock;
+      const lockAcquired = result[0]?.lock_acquired;
 
       if (!lockAcquired) {
         console.log(
@@ -6697,7 +7050,7 @@ export async function withAdvisoryLock<T>(
       try {
         return await task();
       } finally {
-        await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_unlock(${key1}, ${key2})`);
+        await tx.$queryRaw`SELECT pg_advisory_unlock(${lockKey}::integer)`;
         console.log(`[AdvisoryLock] Lock released for "${lockName}".`);
       }
     },
@@ -6779,20 +7132,8 @@ const CRITICAL_CONSTRAINTS: CriticalConstraint[] = [
     },
     errorMessage: "Trigger 'inventory_reservation_enforce_cap' missing. User reservation cap is unenforced.",
   },
-  {
-    name: "Constraint trigger inventoryitem_validate_reservation",
-    query: async (db: PrismaClient) => {
-      const result = await db.$queryRaw<[{ exists: boolean }]>`
-        SELECT EXISTS (
-          SELECT 1 FROM pg_trigger
-          WHERE tgname = 'inventoryitem_validate_reservation'
-            AND tgrelid = 'inventoryitem'::regclass
-        );
-      `;
-      return result[0]?.exists === true;
-    },
-    errorMessage: "Constraint trigger 'inventoryitem_validate_reservation' missing. Inventory state consistency is not guarded.",
-  },
+  // Note: inventoryitem_validate_reservation trigger was removed in migration 20250930135002
+  // It was legacy code from an older architecture. InventoryReservation table PK now enforces uniqueness.
 ];
 
 /**
@@ -7030,6 +7371,24 @@ export function getErrorMessage(error: unknown): string {
 
 
 ================================================================================
+### FILE: debug-test.js
+================================================================================
+
+import http from 'k6/http';
+
+export default function() {
+  const res = http.get('http://localhost:8080/api/inventory/available?limit=1');
+  console.log('Status:', res.status);
+  console.log('Body length:', res.body.length);
+  console.log('Body preview:', res.body.substring(0, 200));
+}
+
+export const options = {
+  iterations: 1,
+};
+
+
+================================================================================
 ### FILE: docker-compose.monitoring.yml
 ================================================================================
 
@@ -7054,6 +7413,57 @@ services:
     ports:
       - "4000:3000" # 将Grafana的3000端口映射到宿主机的4000，避免和应用冲突
     restart: unless-stopped
+
+
+================================================================================
+### FILE: docker-compose.staging.yml
+================================================================================
+
+# docker-compose.staging.yml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ./bookworm-backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080-8082:8080" # Map 3 instances to ports 8080, 8081, 8082
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/bookworm_staging?connection_limit=50&pool_timeout=10
+      - PORT=8080
+      - HOST=0.0.0.0
+      - NODE_ENV=development
+      - LOG_LEVEL=info
+      - JWT_SECRET=${JWT_SECRET:-staging-secret-change-in-production}
+      - JWT_EXPIRES_IN=7d
+      - WX_APP_ID=${WX_APP_ID:-test-app-id}
+      - WX_APP_SECRET=${WX_APP_SECRET:-test-app-secret}
+      - ORDER_PAYMENT_TTL_MINUTES=15
+      - MAX_ITEMS_PER_ORDER=10
+      - API_RATE_LIMIT_MAX=500
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:15
+    ports:
+      - "5433:5432" # Use a different port to avoid conflict with dev db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=bookworm_staging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+
+volumes:
+  postgres_data_staging:
 
 
 ================================================================================
@@ -7088,6 +7498,150 @@ def fix_orderservice():
 if __name__ == '__main__':
     fix_orderservice()
     print("Fixed orderService.ts transaction wrappers")
+
+
+================================================================================
+### FILE: load-test-v2.js
+================================================================================
+
+// load-test-v2.js
+// Targets the new, single-step sell order creation endpoint.
+
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Counter, Rate } from 'k6/metrics';
+
+// --- Metrics ---
+const sellOrderErrors = new Counter('sell_order_errors');
+const sellOrderSuccessRate = new Rate('sell_order_success_rate');
+
+// --- Configuration ---
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8081'; // Target a known good instance
+const STAFF_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIwOTAxLCJvcGVuaWQiOiJzdGFmZi1sb2FkLXRlc3RlciIsInJvbGUiOiJTVEFGRiIsImlhdCI6MTc1OTUwNzY3NywiZXhwIjoxNzYwMTEyNDc3fQ.MzcLpjqaKa2frdetsKTFjim6xzkvt5amO_VFL7R3Wug"; // STAFF token generated for load testing
+const TEST_USER_ID = 1; // The ID of the user we are creating sell orders for (must exist beforehand)
+
+const authHeaders = {
+  Authorization: 'Bearer ' + STAFF_TOKEN,
+  'Content-Type': 'application/json',
+};
+
+export const options = {
+  stages: [
+    { duration: '30s', target: 10 },
+    { duration: '1m', target: 10 },
+    { duration: '10s', target: 0 },
+  ],
+  thresholds: {
+    'http_req_failed{status:500}': ['rate<=0'], // No 500 errors allowed
+    'http_req_duration{scenario:create_sell_order}': ['p(95)<1000'], // Sell orders should be fast
+    'sell_order_success_rate': ['rate>0.99'],
+  },
+};
+
+export default function () {
+  // Each virtual user simulates an operator creating a sell order.
+  const payload = JSON.stringify({
+    userId: TEST_USER_ID,
+    totalWeightKg: Math.random() * 10 + 1, // Random weight between 1 and 11 kg
+    unitPrice: 200, // 2.00 yuan/kg in cents
+    settlementType: Math.random() > 0.5 ? 'CASH' : 'VOUCHER',
+    notes: 'k6 iteration ' + __ITER,
+  });
+
+  const res = http.post(BASE_URL + '/api/sell-orders', payload, {
+    headers: authHeaders,
+    tags: { scenario: 'create_sell_order' },
+  });
+
+  const isSuccessful = check(res, {
+    'sell order creation successful': (r) => r.status === 201,
+  });
+
+  sellOrderSuccessRate.add(isSuccessful);
+
+  if (!isSuccessful) {
+    sellOrderErrors.add(1);
+    if (__ITER < 5) {
+      console.error('Sell order creation failed! Status: ' + res.status + ', Body: ' + res.body);
+    }
+  }
+
+  sleep(2); // Operators need some time between transactions
+}
+
+
+================================================================================
+### FILE: load-test.js
+================================================================================
+
+// load-test.js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Counter, Rate } from 'k6/metrics';
+
+// --- Custom Metrics ---
+const orderCreationErrors = new Counter('order_creation_errors');
+const inventoryFetchErrors = new Counter('inventory_fetch_errors');
+const expectedConflictErrors = new Rate('expected_conflict_errors'); // Rate of 409 responses
+
+// --- Configuration ---
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8081'; // Targeting a known good instance
+
+// --- Hardcoded Test User ---
+const authToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIwOTAwLCJvcGVuaWQiOiJsb2FkLXRlc3Rlci1wZXJtYW5lbnQiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc1OTQ4NzEzOSwiZXhwIjoxNzYwMDkxOTM5fQ.rv0EcNpsCVfU1ZaoxIBBgHVe2eUYWIhBsIekHKwf9pI";
+const authHeaders = {
+    'Authorization': `Bearer ${authToken}`,
+    'Content-Type': 'application/json'
+};
+
+export const options = {
+  stages: [
+    { duration: '20s', target: 10 }, // Shorter, more focused test
+    { duration: '30s', target: 10 },
+    { duration: '10s', target: 0 },
+  ],
+};
+
+export default function () {
+  const inventoryRes = http.get(`${BASE_URL}/api/inventory/available?limit=100`, { headers: authHeaders });
+  if (inventoryRes.status !== 200) {
+    inventoryFetchErrors.add(1);
+    return;
+  }
+
+  const inventoryData = inventoryRes.json();
+  const items = inventoryData.data;
+  if (!items || items.length === 0) return;
+
+  const randomItem = items[Math.floor(Math.random() * items.length)];
+
+  const createOrderPayload = JSON.stringify({
+    inventoryItemIds: [randomItem.id]
+  });
+
+  const orderRes = http.post(`${BASE_URL}/api/orders/create`, createOrderPayload, {
+    headers: authHeaders,
+  });
+
+  const isSuccessful = check(orderRes, {
+    'order creation successful or expected conflict': (r) => r.status === 201 || r.status === 409,
+  });
+
+  if (orderRes.status === 409) {
+    expectedConflictErrors.add(1);
+  }
+
+  if (!isSuccessful) {
+    orderCreationErrors.add(1);
+    // *** THIS IS THE CRITICAL CHANGE ***
+    // Print the response body of the first few failures to diagnose the problem.
+    if (__ITER < 5) {
+        console.error(`Order creation failed! Status: ${orderRes.status}, Body: ${orderRes.body}`);
+    }
+  }
+
+  sleep(1);
+}
 
 
 ================================================================================
@@ -9105,6 +9659,37 @@ module.exports = {
   "projectname": "%E5%9B%BE%E4%B9%A6",
   "libVersion": "3.9.3"
 }
+
+
+================================================================================
+### FILE: seed-staging.sql
+================================================================================
+
+-- Seed data for staging database load testing
+
+-- Create a test BookMaster
+INSERT INTO bookmaster (isbn13, title, author, publisher, original_price, created_at, updated_at)
+VALUES ('9787121234567', 'Load Test Book', 'Test Author', 'Test Publisher', 100.00, NOW(), NOW())
+ON CONFLICT (isbn13) DO NOTHING;
+
+-- Create a test BookSKU
+INSERT INTO booksku (master_id, edition, description, cover_image_url, created_at, updated_at)
+SELECT id, '1st Edition', 'A test book for load testing', 'https://example.com/cover.jpg', NOW(), NOW()
+FROM bookmaster
+WHERE isbn13 = '9787121234567'
+ON CONFLICT (master_id, edition) DO NOTHING;
+
+-- Create 100 inventory items for load testing
+INSERT INTO inventoryitem (sku_id, condition, cost, selling_price, status, created_at, updated_at)
+SELECT
+    (SELECT id FROM booksku WHERE master_id = (SELECT id FROM bookmaster WHERE isbn13 = '9787121234567') LIMIT 1),
+    'GOOD',
+    60.00,
+    80.00,
+    'in_stock',
+    NOW(),
+    NOW()
+FROM generate_series(1, 100);
 
 
 ================================================================================

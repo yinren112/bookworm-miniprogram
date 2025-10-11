@@ -2,7 +2,7 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import { createWechatPayAdapter, WechatPayAdapter } from "./adapters/wechatPayAdapter";
 import { Prisma } from "@prisma/client";
-import { ApiError } from "./errors";
+import { ApiError, ServiceError } from "./errors";
 import config from "./config";
 import { verifyDatabaseConstraints } from "./utils/dbVerifier";
 import prisma from "./db";
@@ -24,6 +24,8 @@ import inventoryRoutes from "./routes/inventory";
 import contentRoutes from "./routes/content";
 import ordersRoutes from "./routes/orders";
 import paymentRoutes from "./routes/payment";
+import sellOrdersRoutes from "./routes/sellOrders";
+import acquisitionsRoutes from "./routes/acquisitions";
 
 // --- Type Augmentation for Fastify ---
 declare module "fastify" {
@@ -123,7 +125,22 @@ fastify.setErrorHandler(
       });
     }
 
-    // Layer 4: Our business logic errors (ApiError)
+    // Layer 4a: Service layer errors (ServiceError) - map to HTTP status codes
+    if (error instanceof ServiceError) {
+      // Map service error codes to HTTP status codes
+      const statusCodeMap: Record<string, number> = {
+        'METADATA_SERVICE_UNAVAILABLE': 503,
+        // Add more mappings as needed
+      };
+      const statusCode = statusCodeMap[error.code] || 500;
+
+      return reply.code(statusCode).send({
+        code: error.code,
+        message: error.message,
+      });
+    }
+
+    // Layer 4b: HTTP-aware business logic errors (ApiError)
     if (error instanceof ApiError) {
       return reply.code(error.statusCode).send({
         code: error.code,
@@ -221,8 +238,10 @@ const setupApplication = async () => {
   await fastify.register(healthRoutes);
   await fastify.register(authRoutes);
   await fastify.register(booksRoutes);
+  await fastify.register(acquisitionsRoutes);
   await fastify.register(inventoryRoutes);
   await fastify.register(contentRoutes);
+  await fastify.register(sellOrdersRoutes);
   await fastify.register(ordersRoutes);
   await fastify.register(paymentRoutes, { wechatPayAdapter });
 };

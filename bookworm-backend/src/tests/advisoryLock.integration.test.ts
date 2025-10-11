@@ -15,8 +15,8 @@ describe("Advisory Lock Concurrent Execution Tests", () => {
 
     // 创建一个 mock 回调函数，记录其被调用的次数
     const mockCallback = vi.fn().mockImplementation(async () => {
-      // 模拟一些异步工作
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // 模拟较长的异步工作，确保其他竞争者在锁持有期间都会尝试获取锁
+      await new Promise(resolve => setTimeout(resolve, 200));
       return "task-completed";
     });
 

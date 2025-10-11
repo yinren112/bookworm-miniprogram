@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { getOrdersByUserId } from "../services/orderService";
 import { getPrismaClientForWorker, createTestUser } from "./globalSetup";
 
@@ -10,13 +10,19 @@ describe("Order Cursor Pagination Integration", () => {
     prisma = getPrismaClientForWorker();
   });
 
-  afterEach(async () => {
+  const cleanupTables = async () => {
+    await prisma.paymentRecord.deleteMany();
+    await prisma.inventoryReservation.deleteMany();
     await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
     await prisma.inventoryItem.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.bookSku.deleteMany();
     await prisma.bookMaster.deleteMany();
     await prisma.user.deleteMany();
+  };
+
+  afterEach(async () => {
+    await cleanupTables();
   });
 
   it("should return first page with next cursor for subsequent fetch", async () => {
@@ -30,7 +36,7 @@ describe("Order Cursor Pagination Integration", () => {
         data: {
           user_id: userId,
           status: "COMPLETED",
-          total_amount: new Prisma.Decimal(100 + i),
+          total_amount: (100 + i) * 100,
           pickup_code: `PK${i.toString().padStart(6, "0")}`,
           paymentExpiresAt: new Date(now + 15 * 60 * 1000),
           completed_at: new Date(createdAt.getTime() + 500),

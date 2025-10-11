@@ -156,7 +156,7 @@ describe("Order Integration Tests", () => {
     });
   });
 
-  describe("GET /api/orders/user/:userId", () => {
+  describe("GET /api/orders/my", () => {
     it("should return user order history", async () => {
       const { userId } = await createTestUser("USER");
       const itemIds = await createTestInventoryItems(1);
@@ -182,7 +182,7 @@ describe("Order Integration Tests", () => {
       // Get order history
       const response = await app.inject({
         method: "GET",
-        url: `/api/orders/user/${userId}`,
+        url: `/api/orders/my`,
         headers: {
           authorization: `Bearer ${token}`,
         },

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { ApiError } from "../errors";
 import { getPrismaClientForWorker, createTestUser, createTestInventoryItems } from "./globalSetup";
 import { addBookToInventoryTest, createOrderTest, fulfillOrderTest } from "./test-helpers/testServices";
+import { getAvailableBooks } from "../services/inventoryService";
 
 describe("Inventory Service Integration Tests", () => {
   let prisma: any;
@@ -185,6 +186,81 @@ describe("Inventory Service Integration Tests", () => {
 
       // Execute & Assert: Should throw Error for invalid pickup code
       await expect(fulfillOrderTest(prisma, invalidPickupCode)).rejects.toThrow("订单不存在或状态错误");
+    });
+  });
+
+  describe("getAvailableBooks - Search with special LIKE characters", () => {
+    beforeAll(async () => {
+      // Setup: Create specific books for these tests
+      await addBookToInventoryTest(prisma, {
+        isbn13: "9780000000001",
+        title: "Book with 100% guarantee",
+        author: "Test Author",
+        condition: "NEW",
+        cost: 10,
+        selling_price: 20,
+      });
+      await addBookToInventoryTest(prisma, {
+        isbn13: "9780000000002",
+        title: "Another C__ book", // Two underscores
+        author: "Test Author",
+        condition: "NEW",
+        cost: 10,
+        selling_price: 20,
+      });
+      await addBookToInventoryTest(prisma, {
+        isbn13: "9780000000003",
+        title: "A regular CSS book",
+        author: "Another Author",
+        condition: "NEW",
+        cost: 10,
+        selling_price: 20,
+      });
+      await addBookToInventoryTest(prisma, {
+        isbn13: "9780000000004",
+        title: "C++ Programming Guide",
+        author: "Different Author",
+        condition: "NEW",
+        cost: 15,
+        selling_price: 25,
+      });
+    });
+
+    it('should find a book with a literal "%" in the title', async () => {
+      const result = await getAvailableBooks(prisma, { searchTerm: "100%" });
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].booksku.bookmaster.title).toBe("Book with 100% guarantee");
+    });
+
+    it('should find a book with literal "__" in the title and not treat it as a wildcard', async () => {
+      const result = await getAvailableBooks(prisma, { searchTerm: "C__" });
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].booksku.bookmaster.title).toBe("Another C__ book");
+      // It should NOT find the 'CSS' book (which would match if __ were treated as wildcards)
+      expect(result.data.some((b: any) => b.booksku.bookmaster.title === "A regular CSS book")).toBe(false);
+    });
+
+    it('should find a book with "C++" without treating "+" as a special character', async () => {
+      const result = await getAvailableBooks(prisma, { searchTerm: "C++" });
+      expect(result.data.length).toBeGreaterThanOrEqual(1);
+      const foundCppBook = result.data.some((b: any) => b.booksku.bookmaster.title === "C++ Programming Guide");
+      expect(foundCppBook).toBe(true);
+    });
+
+    it('should handle search terms with multiple special characters', async () => {
+      // Create a book with multiple special chars
+      await addBookToInventoryTest(prisma, {
+        isbn13: "9780000000005",
+        title: "100% Complete C__ Guide",
+        author: "Special Author",
+        condition: "NEW",
+        cost: 30,
+        selling_price: 40,
+      });
+
+      const result = await getAvailableBooks(prisma, { searchTerm: "100% Complete C__" });
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].booksku.bookmaster.title).toBe("100% Complete C__ Guide");
     });
   });
 });

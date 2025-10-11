@@ -16,6 +16,16 @@ interface AddBookInput {
   selling_price: number;
 }
 
+/**
+ * Escapes special LIKE wildcard characters (%, _) in user input to treat them literally.
+ * @param searchTerm - The user input to escape
+ * @param escapeChar - The escape character to use (default: backslash)
+ * @returns The escaped string safe for use in ILIKE patterns
+ */
+function escapeLike(searchTerm: string, escapeChar = '\\'): string {
+  return searchTerm.replace(new RegExp(`[${escapeChar}%_]`, 'g'), (char) => escapeChar + char);
+}
+
 export async function persistInventoryItem(dbCtx: DbCtx, input: AddBookInput, metadata: BookMetadata | null) {
   const bookMaster = await dbCtx.bookMaster.upsert({
     where: { isbn13: input.isbn13 },
@@ -118,8 +128,10 @@ export async function getAvailableBooks(
 
   if (searchTerm && searchTerm.trim()) {
     const trimmedSearchTerm = searchTerm.trim();
-    // Prisma.sql automatically handles parameterization
-    whereConditions.push(Prisma.sql`(m.title ILIKE ${'%' + trimmedSearchTerm + '%'} OR m.author ILIKE ${'%' + trimmedSearchTerm + '%'})`);
+    // Escape special LIKE characters to treat them literally
+    const escapedSearchTerm = escapeLike(trimmedSearchTerm);
+    // Prisma.sql automatically handles parameterization, and we add ESCAPE clause
+    whereConditions.push(Prisma.sql`(m.title ILIKE ${'%' + escapedSearchTerm + '%'} ESCAPE '\\' OR m.author ILIKE ${'%' + escapedSearchTerm + '%'} ESCAPE '\\')`);
     orderByClause = Prisma.sql`ORDER BY i.created_at DESC`;
   }
 

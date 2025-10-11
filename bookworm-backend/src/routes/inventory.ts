@@ -21,14 +21,24 @@ const GetItemParamsSchema = Type.Object({
   id: Type.Number(),
 });
 
+// Linus式输入校验：在数据进入系统前就拒绝垃圾
 const AddBookBody = Type.Object({
-  isbn13: Type.String({ minLength: 10, maxLength: 13 }),
-  title: Type.String({ minLength: 1 }),
-  author: Type.Optional(Type.String()),
-  edition: Type.Optional(Type.String()),
+  // ISBN必须是10-13位数字（允许短横线分隔）
+  isbn13: Type.String({
+    minLength: 10,
+    maxLength: 17, // 13 digits + 4 hyphens max
+    pattern: '^[0-9\\-]+$', // Only digits and hyphens
+  }),
+  // 书名不能超过500字符（数据库列通常有限制）
+  title: Type.String({ minLength: 1, maxLength: 500 }),
+  // 作者名不能超过200字符
+  author: Type.Optional(Type.String({ maxLength: 200 })),
+  // 版本不能超过100字符
+  edition: Type.Optional(Type.String({ maxLength: 100 })),
   condition: Type.Union([Type.Literal("NEW"), Type.Literal("GOOD"), Type.Literal("ACCEPTABLE")]),
-  cost: Type.Number({ minimum: 0 }),
-  selling_price: Type.Number({ minimum: 0 }),
+  // 成本和售价必须>0（分为单位，最大1000万分=10万元）
+  cost: Type.Integer({ minimum: 1, maximum: 10000000 }),
+  selling_price: Type.Integer({ minimum: 1, maximum: 10000000 }),
 });
 
 const inventoryRoutes: FastifyPluginAsync = async function (fastify) {

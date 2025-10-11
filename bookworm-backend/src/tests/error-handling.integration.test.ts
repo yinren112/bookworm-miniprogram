@@ -30,7 +30,7 @@ describe("Error Handling Integration Tests", () => {
 
   describe("Layer 1: Authentication/Authorization Errors (401/403)", () => {
     it("should return 401 with correct format for missing token", async () => {
-      const response = await request(app.server).get("/api/orders/user/123");
+      const response = await request(app.server).get("/api/orders/my");
 
       expect(response.status).toBe(401);
       expect(response.body).toEqual({
@@ -41,7 +41,7 @@ describe("Error Handling Integration Tests", () => {
 
     it("should return 401 with correct format for invalid token", async () => {
       const response = await request(app.server)
-        .get("/api/orders/user/123")
+        .get("/api/orders/my")
         .set("Authorization", "Bearer invalid-token");
 
       expect(response.status).toBe(401);
@@ -210,7 +210,7 @@ describe("Error Handling Integration Tests", () => {
     it("should always return consistent error structure", async () => {
       const testCases = [
         // 401 error
-        () => request(app.server).get("/api/orders/user/123"),
+        () => request(app.server).get("/api/orders/my"),
         // 403 error
         () =>
           request(app.server)

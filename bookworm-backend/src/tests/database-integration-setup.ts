@@ -72,14 +72,16 @@ async function cleanupTestData() {
     // respecting foreign key dependencies via CASCADE.
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
-        "User",
-        "bookMaster",
-        "bookSku",
-        "inventoryItem",
-        "Order",
+        "PaymentRecord",
         "orderitem",
+        "inventory_reservation",
+        "inventoryitem",
+        "pending_payment_order",
+        "Order",
+        "booksku",
+        "bookmaster",
         "Content",
-        "PaymentRecord"
+        "User"
       RESTART IDENTITY CASCADE;
     `);
   } catch (error) {
@@ -112,7 +114,6 @@ export async function createTestUser(
   const userPayload = {
     userId: user.id,
     openid,
-    role: user.role // 包含role字段以支持新的JWT验证逻辑
   };
   const token = await signer(userPayload);
 

@@ -55,6 +55,33 @@ export function isPrismaSerializationError(error: unknown): boolean {
   );
 }
 
+// A set of Prisma error codes known to be potentially transient and safe to retry.
+// P2034: Transaction failed due to a write conflict or a deadlock. Please retry your transaction.
+// P1008: Operations timed out. (Potentially transient)
+// 40P01: Deadlock detected (PostgreSQL specific error code, might appear in meta)
+const RETRYABLE_PRISMA_CODES = new Set(["P2034", "P1008"]);
+const RETRYABLE_PG_CODES = new Set(["40P01"]);
+
+/**
+ * Type guard for Prisma errors that are safe to retry.
+ */
+export function isPrismaRetryableError(error: unknown): boolean {
+  if (!isPrismaKnownError(error)) {
+    return false;
+  }
+
+  if (RETRYABLE_PRISMA_CODES.has(error.code)) {
+    return true;
+  }
+
+  const pgCode = (error.meta as { code?: string } | undefined)?.code;
+  if (pgCode && RETRYABLE_PG_CODES.has(pgCode)) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Type guard for Prisma unique constraint errors
  */

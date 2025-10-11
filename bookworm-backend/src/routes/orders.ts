@@ -8,6 +8,7 @@ import {
   fulfillOrder,
   getPendingPickupOrders,
   updateOrderStatus,
+  formatCentsToYuanString,
 } from "../services/orderService";
 import { ApiError } from "../errors";
 import config from "../config";
@@ -29,14 +30,17 @@ const OrderIdParamsSchema = Type.Object({
   id: Type.Number(),
 });
 
-const UserIdParamsSchema = Type.Object({
-  userId: Type.Number(),
-});
-
 const OrderListQuerySchema = Type.Object({
   cursor: Type.Optional(Type.String()),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
 });
+
+const presentOrderAmount = (order: any) => ({
+  ...order,
+  total_amount: formatCentsToYuanString(order.total_amount),
+});
+
+const presentOrderList = (orders: any[]) => orders.map(presentOrderAmount);
 
 const ordersRoutes: FastifyPluginAsync = async function (fastify) {
   fastify.post<{ Body: Static<typeof CreateOrderBodySchema> }>(
@@ -60,7 +64,7 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
         userId: request.user!.userId,
         inventoryItemIds,
       });
-      reply.code(201).send(order);
+      reply.code(201).send(presentOrderAmount(order));
     },
   );
 
@@ -76,26 +80,22 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
       const orderId = request.params.id;
 
       const order = await getOrderById(prisma, orderId, request.user!.userId);
-      reply.send(order);
+      reply.send(presentOrderAmount(order));
     },
   );
 
+  // Linus式API设计：用户只能查自己的订单，URL中不需要userId参数
   fastify.get<{
-    Params: Static<typeof UserIdParamsSchema>;
     Querystring: Static<typeof OrderListQuerySchema>;
   }>(
-    "/api/orders/user/:userId",
+    "/api/orders/my",
     {
       preHandler: [fastify.authenticate],
       schema: {
-        params: UserIdParamsSchema,
         querystring: OrderListQuerySchema,
       },
     },
     async (request, reply) => {
-      if (request.params.userId !== request.user!.userId) {
-        throw new ApiError(403, "Forbidden", "USER_ACCESS_DENIED");
-      }
       const { cursor, limit } = request.query;
 
       const orders = await getOrdersByUserId(prisma, request.user!.userId, {
@@ -103,7 +103,7 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
         limit: limit ?? undefined,
       });
       reply.send({
-        data: orders.data,
+        data: presentOrderList(orders.data),
         meta: {
           nextCursor: orders.nextCursor,
         },
@@ -129,7 +129,7 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
     async (request, reply) => {
       const { pickupCode } = request.body;
       const order = await fulfillOrder(prisma, pickupCode.toUpperCase());
-      reply.send(order);
+      reply.send(order ? presentOrderAmount(order) : order);
     },
   );
 
@@ -138,7 +138,7 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
     { preHandler: [fastify.authenticate, fastify.requireRole("STAFF")] },
     async (request, reply) => {
       const orders = await getPendingPickupOrders(prisma);
-      reply.send(orders);
+      reply.send(presentOrderList(orders));
     },
   );
 
@@ -169,9 +169,18 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
         userId: request.user!.userId,
         role: request.user!.role!,
       });
-      reply.send(updatedOrder);
+      reply.send(presentOrderAmount(updatedOrder));
     },
   );
 };
 
 export default ordersRoutes;
+
+
+
+
+
+
+
+
+

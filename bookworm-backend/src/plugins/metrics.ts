@@ -58,6 +58,10 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
     labelNames: ["operation"], // 'create_order', 'process_payment', etc.
     buckets: [0.1, 0.5, 1, 2, 5],
   }),
+  amountMismatchDetected: new client.Counter({
+    name: "bookworm_amount_mismatch_total",
+    help: "Total number of critical amount mismatches detected. THIS SHOULD ALWAYS BE ZERO.",
+  }),
 } : {
   // Mock metrics for testing - reuse singleton objects
   ordersCreated: { labels: () => mockIncrementer, inc: () => {} },
@@ -69,6 +73,7 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
   usersLoggedInTotal: { set: () => {}, inc: () => {} },
   orderFulfillmentDurationSeconds: { observe: () => {} },
   operationLatency: { startTimer: () => () => {}, labels: () => ({ startTimer: () => () => {} }) },
+  amountMismatchDetected: mockIncrementer,
 };
 
 async function metricsPlugin(fastify: FastifyInstance) {

@@ -26,21 +26,27 @@ describe("Concurrent Order Control Integration Tests", () => {
       expect(firstOrder.status).toBe("PENDING_PAYMENT");
       expect(firstOrder.user_id).toBe(testUserId);
 
-      // 第二次创建订单应该失败，触发部分唯一索引或并发控制
+      // Linus式测试：明确系统的行为，而不是"可能是这个或那个"
+      // 第二次创建订单应该失败，因为同一用户已有PENDING_PAYMENT订单
+      // 系统应该在库存检查前就拒绝（数据库唯一索引或应用层检查）
+      await expect(
+        createOrder(prisma, {
+          userId: testUserId,
+          inventoryItemIds: testInventoryItemIds.slice(2, 4),
+        })
+      ).rejects.toThrow(ApiError);
+
+      // 验证错误码是CONCURRENT_PENDING_ORDER
+      // 如果这个断言失败，说明系统行为与预期不符，需要修复代码而不是测试
       try {
-        const secondOrder = await createOrder(prisma, {
+        await createOrder(prisma, {
           userId: testUserId,
           inventoryItemIds: testInventoryItemIds.slice(2, 4),
         });
-        // 如果没有抛出错误，测试应该失败
         expect.fail("Expected createOrder to throw an error, but it succeeded");
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError);
-        // 可能是数据库级别的唯一索引错误或应用层的并发保护
-        expect([
-          "CONCURRENT_PENDING_ORDER",
-          "INSUFFICIENT_INVENTORY_PRECHECK",
-        ]).toContain((error as ApiError).code);
+        expect((error as ApiError).code).toBe("CONCURRENT_PENDING_ORDER");
       }
     });
 

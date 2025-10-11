@@ -1,6 +1,7 @@
 // bookworm-backend/src/routes/payment.ts
 import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
+import { Prisma } from "@prisma/client";
 import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
 import {
   buildClientPaymentSignature,
@@ -106,8 +107,10 @@ const paymentRoutes: FastifyPluginAsync<PaymentRoutesOptions> = async function (
         });
         notificationData = JSON.parse(decryptedDataStr);
       } catch (decryptError) {
-        request.log.warn({ err: decryptError, resource }, "Payment notification decryption failed. This is a permanent error for this request.");
-        // Return 200 OK to acknowledge receipt and prevent WeChat from retrying a malformed request.
+        // Linus式错误分类：区分临时性和永久性错误
+        // 解密失败通常是永久性的（恶意请求、密钥错误、数据损坏），但也可能是密钥轮换中
+        // 由于微信支付会保持密钥兼容性，解密失败大概率是永久性问题，应返回200避免无限重试
+        request.log.warn({ err: decryptError, resource }, "Payment notification decryption failed. Likely a malformed/malicious request.");
         return reply.code(200).send({ code: WECHAT_CONSTANTS.SUCCESS_CODE, message: WECHAT_CONSTANTS.SUCCESS_MESSAGE });
       }
 
@@ -127,7 +130,9 @@ const paymentRoutes: FastifyPluginAsync<PaymentRoutesOptions> = async function (
     } catch (error) {
       request.log.error({ err: error }, "Payment notification processing failed.");
 
-      // Specific handling for transient errors where we want WeChat to retry
+      // Linus式错误处理：明确区分临时性和永久性错误
+
+      // 1. 已知的临时性错误 - 让微信重试
       if (error instanceof ApiError && error.code === 'PAY_TRANSIENT_STATE') {
         return reply.code(503).send({ code: WECHAT_CONSTANTS.FAIL_CODE, message: WECHAT_CONSTANTS.RETRY_MESSAGE });
       }
@@ -135,7 +140,20 @@ const paymentRoutes: FastifyPluginAsync<PaymentRoutesOptions> = async function (
         return reply.code(503).send({ code: WECHAT_CONSTANTS.FAIL_CODE, message: WECHAT_CONSTANTS.RETRY_MESSAGE });
       }
 
-      // For all other errors (e.g., bad signature, permanent API errors), we tell WeChat we're "done" to prevent endless retries.
+      // 2. 数据库临时性错误 - 让微信重试
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        // P1008: 数据库连接超时或操作超时 - 临时性
+        // P1001: 无法连接到数据库 - 临时性
+        // P1002: 数据库连接超时 - 临时性
+        if (['P1001', 'P1002', 'P1008'].includes(error.code)) {
+          request.log.error({ err: error, code: error.code }, "Database connection error during payment notification. Asking WeChat to retry.");
+          return reply.code(503).send({ code: WECHAT_CONSTANTS.FAIL_CODE, message: WECHAT_CONSTANTS.RETRY_MESSAGE });
+        }
+      }
+
+      // 3. 所有其他错误（签名错误、业务逻辑错误等）- 永久性，返回200避免无限重试
+      // 这包括：签名验证失败、订单不存在、状态冲突等
+      request.log.warn({ err: error }, "Permanent error during payment notification processing. Acknowledging to prevent retries.");
       reply.code(200).send({ code: WECHAT_CONSTANTS.SUCCESS_CODE, message: WECHAT_CONSTANTS.SUCCESS_MESSAGE });
     }
   });

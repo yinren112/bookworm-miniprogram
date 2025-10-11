@@ -2,13 +2,27 @@ export const ORDER_STATUS = {
   PENDING_PAYMENT: 'PENDING_PAYMENT',
   PENDING_PICKUP: 'PENDING_PICKUP',
   COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED'
+  CANCELLED: 'CANCELLED',
+  RETURNED: 'RETURNED'
 } as const;
 
 export const INVENTORY_STATUS = {
   IN_STOCK: 'in_stock',
   RESERVED: 'reserved',
-  SOLD: 'sold'
+  SOLD: 'sold',
+  RETURNED: 'returned',
+  DAMAGED: 'damaged',
+  BULK_ACQUISITION: 'BULK_ACQUISITION'
+} as const;
+
+export const ORDER_TYPE = {
+  PURCHASE: 'PURCHASE',
+  SELL: 'SELL'
+} as const;
+
+export const SETTLEMENT_TYPE = {
+  CASH: 'CASH',
+  VOUCHER: 'VOUCHER'
 } as const;
 
 export const ERROR_CODES = {
@@ -84,7 +98,8 @@ export const BUSINESS_LIMITS = {
   PAYMENT_QUERY_RETRY_DELAY_MS: 200,
   ADVISORY_LOCK_TIMEOUT_MS: 5 * 60 * 1000,
   DEFAULT_RETRY_ATTEMPTS: 3,
-  DEFAULT_RETRY_DELAY_MS: 100
+  DEFAULT_RETRY_DELAY_MS: 100,
+  MAX_ACQUISITION_ITEMS: 100
 } as const;
 
 export const ENVIRONMENT_CHECKS = {

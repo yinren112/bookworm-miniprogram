@@ -2,25 +2,35 @@
 version: '3.8'
 
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./bookworm-backend/nginx.staging.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    # Note: Start with: docker-compose -f docker-compose.staging.yml up --scale app=3
+
   app:
     build:
       context: ./bookworm-backend
       dockerfile: Dockerfile.prod
-    ports:
-      - "8080-8082:8080" # Map 3 instances to ports 8080, 8081, 8082
+    # No ports mapping - nginx will route to app instances via service name
+    # Use --scale app=3 when running docker-compose up
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/bookworm_staging?connection_limit=50&pool_timeout=10
       - PORT=8080
       - HOST=0.0.0.0
-      - NODE_ENV=development
+      - NODE_ENV=staging
       - LOG_LEVEL=info
-      - JWT_SECRET=${JWT_SECRET:-staging-secret-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRES_IN=7d
       - WX_APP_ID=${WX_APP_ID:-test-app-id}
       - WX_APP_SECRET=${WX_APP_SECRET:-test-app-secret}
       - ORDER_PAYMENT_TTL_MINUTES=15
       - MAX_ITEMS_PER_ORDER=10
-      - API_RATE_LIMIT_MAX=100
+      - API_RATE_LIMIT_MAX=500
     depends_on:
       db:
         condition: service_healthy
@@ -33,6 +43,10 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=bookworm_staging
+    command:
+      - "postgres"
+      - "-c"
+      - "bookworm.max_reserved_items_per_user=${MAX_RESERVED_ITEMS_PER_USER:-20}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

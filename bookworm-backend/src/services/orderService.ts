@@ -1,5 +1,5 @@
 // src/services/orderService.ts (fully replaced)
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient, Order, InventoryItem } from "@prisma/client";
 
 import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
 
@@ -9,13 +9,13 @@ import { ApiError, WechatPayError, PaymentQueryError } from "../errors";
 import { metrics } from "../plugins/metrics";
 import { retryAsync } from "../utils/retry";
 import {
-  isPrismaSerializationError,
-  isPrismaKnownError,
+  isPrismaRetryableError,
   isPickupCodeConstraintError
 } from "../utils/typeGuards";
 import {
   ORDER_STATUS,
   INVENTORY_STATUS,
+  ORDER_TYPE,
   ERROR_CODES,
   ERROR_MESSAGES,
   DEFAULT_VALUES,
@@ -23,34 +23,58 @@ import {
   WECHAT_CONSTANTS
 } from "../constants";
 
+const CENTS_SCALE = 100;
+
+function decimalToCents(value: Prisma.Decimal): number {
+  const scaled = value.mul(CENTS_SCALE);
+  if (!scaled.isInteger()) {
+    throw new ApiError(500, `Invalid currency precision for value ${value.toString()}`, "INVALID_PRICE_FORMAT");
+  }
+  return scaled.toNumber();
+}
+
+function normalizeCents(value: number | Prisma.Decimal): number {
+  return typeof value === "number" ? value : decimalToCents(value);
+}
+
+export function formatCentsToYuanString(value: number | Prisma.Decimal): string {
+  const cents = normalizeCents(value);
+  const negative = cents < 0;
+  const abs = Math.abs(cents);
+  const integerPart = Math.floor(abs / CENTS_SCALE);
+  const fraction = abs % CENTS_SCALE;
+  if (fraction === 0) {
+    return `${negative ? "-" : ""}${integerPart}`;
+  }
+  const fractionString = fraction.toString().padStart(2, "0").replace(/0+$/, "");
+  return `${negative ? "-" : ""}${integerPart}.${fractionString}`;
+}
+
 // 通用的事务重试辅助函数
-async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
+export async function withTxRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let i = 0; i < config.DB_TRANSACTION_RETRY_COUNT; i++) {
     try {
       return await fn();
     } catch (e: unknown) {
-      // 检查是否为 Prisma 的序列化失败
-      if (isPrismaSerializationError(e)) {
+      if (isPrismaRetryableError(e)) {
         if (i < config.DB_TRANSACTION_RETRY_COUNT - 1) {
           // Only increment on actual retries, not the final failure
           metrics.dbTransactionRetries.inc();
-        }
-        // 指数退避+抖动等待
-        await new Promise((r) =>
-          setTimeout(
-            r,
+          const delay =
             config.DB_TRANSACTION_RETRY_BASE_DELAY_MS * Math.pow(2, i) +
-              Math.random() * config.DB_TRANSACTION_RETRY_JITTER_MS,
-          ),
-        );
-        continue;
+            Math.random() * config.DB_TRANSACTION_RETRY_JITTER_MS;
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
       }
-      // 非可重试错误，立即抛出
       throw e;
     }
   }
-  // 重试后仍失败
-  throw new ApiError(409, "系统繁忙，请稍后重试", "TX_RETRY_EXCEEDED");
+  throw new ApiError(
+    500,
+    ERROR_MESSAGES.SYSTEM_BUSY,
+    ERROR_CODES.TX_RETRY_EXCEEDED,
+  );
 }
 
 // Helper functions for createOrderImpl - each with single responsibility
@@ -109,11 +133,12 @@ async function validateInventoryAndReservations(tx: Prisma.TransactionClient, us
     throw new ApiError(409, "部分书籍已不可用，请刷新后重试", "INSUFFICIENT_INVENTORY_PRECHECK");
   }
 
-  const totalAmount = itemsToReserve.reduce(
-    (sum, item) => sum.add(item.selling_price), new Prisma.Decimal(0),
+  const totalAmountCents = itemsToReserve.reduce(
+    (sum, item) => sum + decimalToCents(item.selling_price),
+    0,
   );
 
-  return { itemsToReserve, totalAmount };
+  return { itemsToReserve, totalAmountCents };
 }
 
 async function generateUniquePickupCode() {
@@ -124,7 +149,7 @@ async function generateUniquePickupCode() {
     .substring(0, config.ORDER_PICKUP_CODE_LENGTH);
 }
 
-async function createOrderRecord(tx: Prisma.TransactionClient, userId: number, totalAmount: Prisma.Decimal) {
+async function createOrderRecord(tx: Prisma.TransactionClient, userId: number, totalAmountCents: number) {
   // Create order with pickup_code retry logic
   for (let attempt = 0; attempt < config.PICKUP_CODE_RETRY_COUNT; attempt++) {
     const pickup_code = await generateUniquePickupCode();
@@ -134,7 +159,7 @@ async function createOrderRecord(tx: Prisma.TransactionClient, userId: number, t
         data: {
           user_id: userId,
           status: "PENDING_PAYMENT",
-          total_amount: totalAmount,
+          total_amount: totalAmountCents,
           pickup_code,
           paymentExpiresAt: new Date(
             Date.now() + config.ORDER_PAYMENT_TTL_MINUTES * 60 * 1000,
@@ -199,10 +224,10 @@ async function createOrderImpl(tx: Prisma.TransactionClient, input: {
   await acquireOrderLocks(tx, input.userId, itemIds);
 
   // Step 3: Validate inventory availability and user reservations
-  const { itemsToReserve, totalAmount } = await validateInventoryAndReservations(tx, input.userId, itemIds);
+  const { itemsToReserve, totalAmountCents } = await validateInventoryAndReservations(tx, input.userId, itemIds);
 
   // Step 4: Create order record with unique pickup code
-  const order = await createOrderRecord(tx, input.userId, totalAmount);
+  const order = await createOrderRecord(tx, input.userId, totalAmountCents);
 
   // Step 5: Reserve inventory and create order items
   await reserveInventoryItems(tx, order.id, itemIds);
@@ -483,18 +508,35 @@ export async function preparePaymentIntent(
       },
     });
 
-    const calculatedTotal = orderItems.reduce(
-      (sum, item) => sum.add(item.price),
-      new Prisma.Decimal(0),
+    const calculatedTotalCents = orderItems.reduce(
+      (sum, item) => sum + decimalToCents(item.price),
+      0,
     );
 
-    if (calculatedTotal.comparedTo(order.total_amount) !== 0) {
-      console.error(`CRITICAL: Amount mismatch for order ${orderId}. Stored: ${order.total_amount}, Calculated: ${calculatedTotal}`);
-      throw new ApiError(400, "订单金额异常，请联系客服", "AMOUNT_MISMATCH");
+    const storedTotalCents = normalizeCents(order.total_amount);
+
+    if (calculatedTotalCents !== storedTotalCents) {
+      // TODO: Inject Fastify logger from request context for proper structured logging
+      // For now, use console.error to log at highest severity level
+      console.error(
+        {
+          orderId: orderId,
+          storedAmount: storedTotalCents,
+          calculatedAmount: calculatedTotalCents,
+          userId: userId,
+        },
+        `CRITICAL: Amount mismatch detected for order ${orderId}. This indicates data corruption!`
+      );
+
+      // Increment dedicated metric counter for alerting
+      metrics.amountMismatchDetected.inc();
+
+      // Throw generic error to user without leaking internal details
+      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR, "AMOUNT_MISMATCH_FATAL");
     }
 
-    const amountTotal = Math.round(parseFloat(order.total_amount.toString()) * 100);
-    if (amountTotal <= 0 || amountTotal > 100000000) {
+    const amountTotal = storedTotalCents;
+    if (!Number.isInteger(amountTotal) || amountTotal <= 0 || amountTotal > 100000000) {
       throw new ApiError(400, "订单金额异常", "INVALID_AMOUNT");
     }
 
@@ -855,13 +897,34 @@ export async function getPendingPickupOrders(dbCtx: PrismaClient | Prisma.Transa
   const inventoryMap = new Map(inventoryItems.map((item) => [item.id, item]));
 
   // 5. 手动聚合数据：将完整的inventory信息附加到每个orderItem上
-  const enrichedOrders = ordersWithItems.map((order) => ({
-    ...order,
-    orderItem: order.orderItem.map((item) => ({
-      ...item,
-      inventoryItem: inventoryMap.get(item.inventory_item_id)!,
-    })),
-  }));
+  // 防御性检查：如果inventoryItem缺失（数据完整性问题），记录严重错误并过滤
+  const enrichedOrders = ordersWithItems.map((order) => {
+    const enrichedItems = order.orderItem
+      .map((item) => {
+        const inventoryItem = inventoryMap.get(item.inventory_item_id);
+
+        // CRITICAL: If inventoryItem is missing, this indicates a database integrity violation
+        if (!inventoryItem) {
+          console.error(
+            `[DATA INTEGRITY ERROR] Order ${order.id} references missing InventoryItem ${item.inventory_item_id}. ` +
+            `This should never happen if foreign key constraints are working correctly. ` +
+            `Filtering out this item from the response.`
+          );
+          return null; // Mark for filtering
+        }
+
+        return {
+          ...item,
+          inventoryItem,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null); // Filter out null items
+
+    return {
+      ...order,
+      orderItem: enrichedItems,
+    };
+  });
 
   return enrichedOrders;
 }
@@ -880,7 +943,7 @@ export async function cancelExpiredOrders(dbCtx: Prisma.TransactionClient | Pris
         WHERE status = 'PENDING_PAYMENT' AND "paymentExpiresAt" < NOW()
         ORDER BY "paymentExpiresAt" ASC
         LIMIT 1000
-        FOR UPDATE SKIP LOCKED
+        FOR UPDATE
       )
       RETURNING id
     ),
@@ -1125,4 +1188,113 @@ export async function updateOrderStatus(
   }
 
   return updateOrderStatusImpl(dbCtx as Prisma.TransactionClient, orderId, newStatus, user);
+}
+
+//
+// ============================================================================
+// SECTION: Sell Order Workflow (Single-Step Completion)
+// ============================================================================
+//
+
+export interface CreateAndCompleteSellOrderInput {
+  userId: number;
+  totalWeightKg: number;
+  unitPrice: number; // Price in cents per kg
+  settlementType: 'CASH' | 'VOUCHER';
+  notes?: string;
+}
+
+export interface CreateAndCompleteSellOrderResult {
+  order: Order;
+  inventoryItem: InventoryItem;
+}
+
+const BULK_ACQUISITION_ISBN = "0000000000000";
+
+async function createAndCompleteSellOrderImpl(
+  tx: Prisma.TransactionClient,
+  input: CreateAndCompleteSellOrderInput,
+): Promise<CreateAndCompleteSellOrderResult> {
+  if (input.totalWeightKg <= 0 || input.unitPrice <= 0) {
+    throw new ApiError(400, "重量和单价必须是正数", "INVALID_SELL_ORDER_INPUT");
+  }
+
+  const baseAmount = Math.round(input.totalWeightKg * input.unitPrice);
+  const voucherFaceValue = input.settlementType === 'VOUCHER' ? baseAmount * 2 : null;
+
+  const bulkMaster = await tx.bookMaster.upsert({
+    where: { isbn13: BULK_ACQUISITION_ISBN },
+    update: {},
+    create: {
+      isbn13: BULK_ACQUISITION_ISBN,
+      title: "批量收购书籍",
+      author: "N/A",
+      publisher: "N/A",
+    },
+  });
+
+  const bulkSku = await tx.bookSku.upsert({
+    where: {
+      master_id_edition: {
+        master_id: bulkMaster.id,
+        edition: "批量",
+      },
+    },
+    update: {},
+    create: {
+      master_id: bulkMaster.id,
+      edition: "批量",
+    },
+  });
+
+  const now = new Date();
+
+  const order = await tx.order.create({
+    data: {
+      user_id: input.userId,
+      status: ORDER_STATUS.COMPLETED,
+      type: ORDER_TYPE.SELL,
+      total_amount: baseAmount,
+      voucherFaceValue,
+      pickup_code: await generateUniquePickupCode(),
+      paymentExpiresAt: now,
+      paid_at: now,
+      completed_at: now,
+      totalWeightKg: input.totalWeightKg,
+      unitPrice: input.unitPrice,
+      settlementType: input.settlementType,
+      notes: input.notes,
+    },
+  });
+
+  const inventoryItem = await tx.inventoryItem.create({
+    data: {
+      sku_id: bulkSku.id,
+      condition: "ACCEPTABLE",
+      cost: new Prisma.Decimal((voucherFaceValue ?? baseAmount) / 100),
+      selling_price: new Prisma.Decimal(0),
+      status: INVENTORY_STATUS.BULK_ACQUISITION,
+      sourceOrderId: order.id,
+    },
+  });
+
+  if (input.settlementType === 'VOUCHER' && voucherFaceValue) {
+    // 预留钩子：后续在此调用发券服务并写入审计日志
+  }
+
+  return { order, inventoryItem };
+}
+
+export function createAndCompleteSellOrder(
+  dbCtx: PrismaClient,
+  input: CreateAndCompleteSellOrderInput,
+): Promise<CreateAndCompleteSellOrderResult> {
+  return withTxRetry(async () => {
+    return dbCtx.$transaction(
+      (tx) => createAndCompleteSellOrderImpl(tx, input),
+      {
+        timeout: BUSINESS_LIMITS.TRANSACTION_TIMEOUT_MS,
+      },
+    );
+  });
 }

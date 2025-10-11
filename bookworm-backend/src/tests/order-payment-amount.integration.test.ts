@@ -35,7 +35,7 @@ describe("order payment amount integrity", () => {
 
     await expect(
       generatePaymentParams(prisma, mockAdapter, order.id, userId),
-    ).rejects.toMatchObject({ code: "AMOUNT_MISMATCH" });
+    ).rejects.toMatchObject({ code: "AMOUNT_MISMATCH_FATAL" });
 
     expect(mockAdapter.createPaymentOrder).not.toHaveBeenCalled();
   });

@@ -32,7 +32,7 @@ describe("Authorization Fix Verification", () => {
       id: 123,
       user_id: 999, // Different from requesting user
       status: "PENDING_PAYMENT",
-      total_amount: 50,
+      total_amount: 5000,
       pickup_code: "ABC123",
       paymentExpiresAt: new Date(),
       paid_at: null,
@@ -60,7 +60,7 @@ describe("Authorization Fix Verification", () => {
       id: 123,
       user_id: 456, // Same as requesting user
       status: "PENDING_PAYMENT",
-      total_amount: 50,
+      total_amount: 5000,
       pickup_code: "ABC123",
       paymentExpiresAt: new Date(),
       paid_at: null,

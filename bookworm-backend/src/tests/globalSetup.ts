@@ -11,6 +11,7 @@ const prismaBinary = path.join(__dirname, '..', '..', 'node_modules', '.bin', 'p
 // This object will hold a mapping from worker ID to its dedicated container instance.
 const containers: Record<number, StartedPostgreSqlContainer> = {};
 const prismaClients: Record<number, PrismaClient> = {};
+const connectionUrls: Record<number, string> = {};
 
 declare global {
   // eslint-disable-next-line no-var
@@ -26,8 +27,9 @@ export async function setup(config: any) {
     containers[i] = container;
 
     const databaseUrl = container.getConnectionUri();
-
+    connectionUrls[i] = databaseUrl;
     console.log(`[Worker ${i}] Container started. Applying migrations...`);
+
     await execAsync(`${prismaBinary} migrate deploy`, {
       env: { ...process.env, DATABASE_URL: databaseUrl },
     });
@@ -46,14 +48,7 @@ export async function setup(config: any) {
   }
 
   // Pass the container details to the test environment
-  process.env.TEST_CONTAINERS = JSON.stringify(
-    Object.fromEntries(
-      Object.entries(containers).map(([workerId, container]) => [
-        workerId,
-        container.getConnectionUri(),
-      ])
-    )
-  );
+  process.env.TEST_CONTAINERS = JSON.stringify(connectionUrls);
 
   globalThis.__BOOKWORM_TRUNCATE__ = async (workerId?: number) => {
     const resolvedWorkerId = workerId ?? parseInt(process.env.VITEST_WORKER_ID || '1', 10);
@@ -64,7 +59,15 @@ export async function setup(config: any) {
 
 export async function teardown() {
   console.log('Tearing down all test containers...');
-  await Promise.all(Object.values(containers).map(container => container.stop()));
+  await Promise.all(
+    Object.values(containers).map(async (container) => {
+      try {
+        await container.stop();
+      } catch (error) {
+        console.warn('Failed to stop test container cleanly:', error);
+      }
+    })
+  );
   console.log('All containers stopped.');
 }
 
@@ -148,7 +151,6 @@ export async function createTestUser(
   const userPayload = {
     userId: user.id,
     openid,
-    role: user.role // 包含role字段以支持新的JWT验证逻辑
   };
   const token = await signer(userPayload);
 

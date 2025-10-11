@@ -8,7 +8,7 @@ const schema = Type.Object({
   PORT: Type.Number({ default: 8080 }),
   HOST: Type.String({ default: "127.0.0.1" }),
   NODE_ENV: Type.String({
-    enum: ["development", "production", "test"],
+    enum: ["development", "production", "staging", "test"],
     default: "development",
   }),
   LOG_LEVEL: Type.String({ default: "info" }),
@@ -72,18 +72,58 @@ const config = envSchema<Schema>({
 });
 
 // Production validation
-if (config.NODE_ENV === "production") {
+if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
+  const errors: string[] = [];
+
+  // JWT Configuration
   if (!config.JWT_SECRET || config.JWT_SECRET === "default-secret-for-dev") {
-    console.error(
-      "FATAL: JWT_SECRET must be set to a strong secret in production.",
-    );
-    process.exit(1);
+    errors.push("JWT_SECRET must be set to a strong secret in production.");
   }
+  if (config.JWT_SECRET && config.JWT_SECRET.length < 32) {
+    errors.push("JWT_SECRET must be at least 32 characters long.");
+  }
+
+  // Database Configuration
   if (!config.DATABASE_URL) {
-    console.error("FATAL: DATABASE_URL must be set in production.");
+    errors.push("DATABASE_URL must be set in production.");
+  }
+
+  // WeChat Mini Program Configuration
+  if (!config.WX_APP_ID || config.WX_APP_ID === "test-app-id") {
+    errors.push(
+      "WX_APP_ID must be set to a valid WeChat app ID in production.",
+    );
+  }
+  if (!config.WX_APP_SECRET || config.WX_APP_SECRET === "test-app-secret") {
+    errors.push(
+      "WX_APP_SECRET must be set to a valid WeChat app secret in production.",
+    );
+  }
+
+  // WeChat Pay Configuration (only required in production, not staging)
+  if (config.NODE_ENV === "production") {
+    if (!config.WXPAY_MCHID) {
+      errors.push("WXPAY_MCHID must be set in production.");
+    }
+    if (!config.WXPAY_PRIVATE_KEY_PATH) {
+      errors.push("WXPAY_PRIVATE_KEY_PATH must be set in production.");
+    }
+    if (!config.WXPAY_CERT_SERIAL_NO) {
+      errors.push("WXPAY_CERT_SERIAL_NO must be set in production.");
+    }
+    if (!config.WXPAY_API_V3_KEY) {
+      errors.push("WXPAY_API_V3_KEY must be set in production.");
+    }
+    if (!config.WXPAY_NOTIFY_URL) {
+      errors.push("WXPAY_NOTIFY_URL must be set in production.");
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error("FATAL: Production configuration validation failed:");
+    errors.forEach((error) => console.error(`  - ${error}`));
     process.exit(1);
   }
-  // Add other critical production checks here
 }
 
 export default config;

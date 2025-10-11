@@ -49,6 +49,7 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.load-test
 
 # WeChat Developer Tools
 project.config.json
@@ -65,3 +66,25 @@ update_user_metrics.js
 test_metrics.sh
 审查.py
 审查 (v2 - 带脱敏功能).py
+
+# Load testing and temporary files
+k6-v0.49.0-windows-amd64/
+k6-v0.49.0-windows-amd64.zip
+load-test*.js.backup
+nul
+"C:/"
+ISBN.csv
+bin/
+
+# Scripts directory
+scripts/
+
+# Claude Code settings (local only)
+.claude/settings.local.json
+.claude/commands/allowlist/
+
+# Test data and migrations (keep migrations tracked)
+# bookworm-backend/附件*.xls
+# bookworm-backend/附件*.xlsx
+*.xls
+*.xlsx

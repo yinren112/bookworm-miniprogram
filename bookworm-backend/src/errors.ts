@@ -35,3 +35,20 @@ export class PaymentQueryError extends Error {
     this.name = 'PaymentQueryError';
   }
 }
+
+/**
+ * ServiceError: Pure business logic error without HTTP coupling.
+ * Use this in service layer instead of ApiError.
+ * Route handlers should catch this and map to appropriate HTTP status codes.
+ */
+export class ServiceError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public originalError?: unknown
+  ) {
+    super(message);
+    this.name = 'ServiceError';
+    Error.captureStackTrace(this, this.constructor);
+  }
+}

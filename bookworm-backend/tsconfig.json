@@ -17,7 +17,6 @@
   "ts-node": {
     "esm": false
   },
-  "include": ["src/**/*.ts", "prisma/seed.ts", "src/jobs/cancelExpiredOrders.ts"],
-  "exclude": ["node_modules", "**/*.spec.ts", "src/tests/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts", "src/tests/**/*", "vitest.config.ts", "vitest.integration.config.ts"],
   "typeRoots": ["node_modules/@types", "src/types"]
 }

@@ -11,8 +11,8 @@ describe("Refund Recovery Integration", () => {
   const cleanupDatabase = async () => {
     await prisma.paymentRecord.deleteMany();
     await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
     await prisma.inventoryItem.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.bookSku.deleteMany();
     await prisma.bookMaster.deleteMany();
     await prisma.user.deleteMany();
@@ -44,7 +44,7 @@ describe("Refund Recovery Integration", () => {
       data: {
         user_id: userId,
         status: "CANCELLED",
-        total_amount: new Prisma.Decimal(120),
+        total_amount: 120 * 100,
         pickup_code: pickupCode,
         paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
         cancelled_at: new Date(),
@@ -101,7 +101,7 @@ describe("Refund Recovery Integration", () => {
       data: {
         user_id: userId,
         status: "CANCELLED",
-        total_amount: new Prisma.Decimal(150),
+        total_amount: 150 * 100,
         pickup_code: `RF${Date.now().toString(36).slice(-10).toUpperCase()}`,
         paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
         cancelled_at: new Date(),

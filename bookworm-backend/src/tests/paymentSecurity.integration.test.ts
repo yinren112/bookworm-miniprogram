@@ -15,6 +15,8 @@ import { getPrismaClientForWorker } from './globalSetup';
 import config from "../config";
 import { Prisma } from "@prisma/client";
 import WechatPay from "wechatpay-node-v3";
+import { preparePaymentIntent } from "../services/orderService";
+import { metrics } from "../plugins/metrics";
 
 // --- Mocks ---
 // Mock WechatPayAdapter to control its behavior during tests
@@ -63,7 +65,7 @@ vi.mock("../services/authService", () => ({
   wxLogin: vi.fn(),
 }));
 
-// Mock orderService with our actual processPaymentNotification
+// Mock orderService with our actual processPaymentNotification and preparePaymentIntent
 vi.mock("../services/orderService", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -74,8 +76,9 @@ vi.mock("../services/orderService", async (importOriginal) => {
     fulfillOrder: vi.fn(),
     generatePaymentParams: vi.fn(),
     getPendingPickupOrders: vi.fn(),
-    // Keep the real processPaymentNotification function for testing
+    // Keep the real functions for testing
     processPaymentNotification: (actual as any).processPaymentNotification,
+    preparePaymentIntent: (actual as any).preparePaymentIntent,
   };
 });
 
@@ -127,7 +130,7 @@ describe("Payment Security Integration Tests", () => {
       },
     };
 
-    it("should reject requests with expired timestamps (防重放攻击)", async () => {
+    it("should reject requests with expired timestamps (防重放攻�?", async () => {
       // Set timestamp to 5 minutes and 1 second ago (beyond the 5-minute threshold)
       const expiredTimestamp = Math.floor(
         (Date.now() - 301000) / 1000,
@@ -147,7 +150,7 @@ describe("Payment Security Integration Tests", () => {
       expect(response.body.message).toBe("成功");
     });
 
-    it("should reject requests with future timestamps (防重放攻击)", async () => {
+    it("should reject requests with future timestamps (防重放攻�?", async () => {
       // Set timestamp to 6 minutes in the future (beyond the 5-minute threshold)
       const futureTimestamp = Math.floor(
         (Date.now() + 360000) / 1000,
@@ -297,7 +300,7 @@ describe("Payment Security Integration Tests", () => {
         data: {
           user_id: user.id,
           status: "PENDING_PAYMENT",
-          total_amount: new Prisma.Decimal(88),
+          total_amount: 88 * 100,
           pickup_code: `PK${Date.now().toString(36).slice(-8).toUpperCase()}`,
           paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
         },
@@ -368,7 +371,7 @@ describe("Payment Security Integration Tests", () => {
         data: {
           user_id: user.id,
           status: "PENDING_PAYMENT",
-          total_amount: new Prisma.Decimal(66),
+          total_amount: 66 * 100,
           pickup_code: `PK${(Date.now() + 1).toString(36).slice(-8).toUpperCase()}`,
           paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
         },
@@ -435,7 +438,7 @@ describe("Payment Security Integration Tests", () => {
         data: {
           user_id: user.id,
           status: "PENDING_PAYMENT",
-          total_amount: new Prisma.Decimal(88),
+          total_amount: 88 * 100,
           pickup_code: `PK${(Date.now() + 2).toString(36).slice(-8).toUpperCase()}`,
           paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
         },
@@ -527,6 +530,99 @@ describe("Payment Security Integration Tests", () => {
       expect(response.status).toBe(200);
       expect(response.body.code).toBe("SUCCESS");
       expect(response.body.message).toBe("成功");
+    });
+  });
+
+  describe("Amount Mismatch Alert Mechanism", () => {
+    it("should trigger an amount mismatch alert if order total is inconsistent", async () => {
+      // 1. Create test user
+      const testUser = await prisma.user.create({
+        data: {
+          openid: `test-user-${Date.now()}`,
+          role: "USER",
+          nickname: "Amount Mismatch Test User",
+        },
+      });
+
+      // 2. Create book metadata for inventory
+      const bookMaster = await prisma.bookMaster.create({
+        data: {
+          isbn13: `978${Date.now().toString().slice(-10)}`,
+          title: "Test Book for Amount Mismatch",
+          author: "Test Author",
+          publisher: "Test Publisher",
+        },
+      });
+
+      const bookSku = await prisma.bookSku.create({
+        data: {
+          master_id: bookMaster.id,
+          edition: "First Edition",
+        },
+      });
+
+      // 3. Create inventory item
+      const inventoryItem = await prisma.inventoryItem.create({
+        data: {
+          sku_id: bookSku.id,
+          condition: "GOOD",
+          cost: new Prisma.Decimal(10),
+          selling_price: new Prisma.Decimal(50), // 50 yuan = 5000 cents
+          status: "reserved",
+        },
+      });
+
+      // 4. Create a valid order
+      const order = await prisma.order.create({
+        data: {
+          user_id: testUser.id,
+          status: "PENDING_PAYMENT",
+          total_amount: 5000, // Correct: 50 yuan = 5000 cents
+          pickup_code: `PK${Date.now().toString(36).slice(-8).toUpperCase()}`,
+          paymentExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        },
+      });
+
+      // 5. Create order item
+      await prisma.orderItem.create({
+        data: {
+          order_id: order.id,
+          inventory_item_id: inventoryItem.id,
+          price: new Prisma.Decimal(50), // Match inventory selling_price
+        },
+      });
+
+      // 6. Manually corrupt the order's total_amount to create mismatch
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { total_amount: 99999 }, // Obviously wrong amount
+      });
+
+      // 7. Spy on the metrics counter
+      const incSpy = vi.spyOn(metrics.amountMismatchDetected, "inc");
+
+      try {
+        // 8. Act: Call preparePaymentIntent which performs the check
+        await preparePaymentIntent(prisma, order.id, testUser.id);
+
+        // Should not reach here
+        expect.fail("Expected preparePaymentIntent to throw AMOUNT_MISMATCH_FATAL error");
+      } catch (error: any) {
+        // 9. Assert: Check error code
+        expect(error.code).toBe("AMOUNT_MISMATCH_FATAL");
+
+        // 10. Assert: Check if the alert metric was triggered
+        expect(incSpy).toHaveBeenCalledOnce();
+      } finally {
+        // Cleanup
+        incSpy.mockRestore();
+        await prisma.orderItem.deleteMany({ where: { order_id: order.id } });
+        await prisma.order.delete({ where: { id: order.id } });
+        await prisma.inventoryItem.delete({ where: { id: inventoryItem.id } });
+        await prisma.bookSku.delete({ where: { id: bookSku.id } });
+        await prisma.bookMaster.delete({ where: { id: bookMaster.id } });
+        await prisma.user.delete({ where: { id: testUser.id } });
+      }
     });
   });
 });

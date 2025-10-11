@@ -8,8 +8,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: bookworm
+    command:
+      - "postgres"
+      - "-c"
+      - "bookworm.max_reserved_items_per_user=${MAX_RESERVED_ITEMS_PER_USER:-20}"
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -28,6 +32,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: bookworm_test
+    command:
+      - "postgres"
+      - "-c"
+      - "bookworm.max_reserved_items_per_user=${MAX_RESERVED_ITEMS_PER_USER:-20}"
     ports:
       - "54320:5432"
     volumes:

@@ -9,12 +9,6 @@ const LoginBodySchema = Type.Object({
   code: Type.String({ minLength: 1 }),
 });
 
-const TestAuthBodySchema = Type.Object({
-  openId: Type.String({ minLength: 1 }),
-  nickname: Type.Optional(Type.String()),
-  avatarUrl: Type.Optional(Type.String()),
-});
-
 const authRoutes: FastifyPluginAsync = async function (fastify) {
   fastify.post<{ Body: Static<typeof LoginBodySchema> }>(
     "/api/auth/login",
@@ -37,40 +31,6 @@ const authRoutes: FastifyPluginAsync = async function (fastify) {
       reply.send({ token, userId: user.id });
     },
   );
-
-  // Test-only endpoint for load testing and staging environments
-  // SECURITY: This endpoint MUST be disabled in production
-  if (config.NODE_ENV !== "production") {
-    fastify.post<{ Body: Static<typeof TestAuthBodySchema> }>(
-      "/api/auth/test-login",
-      {
-        schema: {
-          body: TestAuthBodySchema,
-        },
-      },
-      async (request, reply) => {
-        const { openId, nickname, avatarUrl } = request.body;
-
-        // Find or create test user
-        const user = await prisma.user.upsert({
-          where: { openid: openId },
-          update: {
-            nickname: nickname || "Test User",
-            avatar_url: avatarUrl || "https://example.com/avatar.png",
-          },
-          create: {
-            openid: openId,
-            nickname: nickname || "Test User",
-            avatar_url: avatarUrl || "https://example.com/avatar.png",
-            role: "USER",
-          },
-        });
-
-        const token = generateJwtToken(user);
-        reply.send({ token, userId: user.id });
-      },
-    );
-  }
 };
 
 export default authRoutes;

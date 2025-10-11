@@ -2,7 +2,7 @@
 import axios from "axios";
 
 import config from "../config";
-import { ApiError } from "../errors";
+import { ServiceError } from "../errors";
 import { API_CONSTANTS, DEFAULT_VALUES } from "../constants";
 
 interface TanshuBookData {
@@ -37,7 +37,7 @@ interface BookMetadata {
  * Fetches book metadata from Tanshu API using ISBN.
  * @param isbn The ISBN-13 of the book.
  * @returns Parsed metadata or null if not found or service unavailable.
- * @throws ApiError with code METADATA_SERVICE_UNAVAILABLE on network errors.
+ * @throws ServiceError with code METADATA_SERVICE_UNAVAILABLE on network errors.
  */
 export async function getBookMetadata(
   isbn: string,
@@ -92,10 +92,10 @@ export async function getBookMetadata(
       `Network error calling Tanshu API for ISBN ${isbn}:`,
       errorMessage,
     );
-    throw new ApiError(
-      503,
+    throw new ServiceError(
+      "METADATA_SERVICE_UNAVAILABLE",
       `Metadata service unavailable: ${errorMessage}`,
-      "METADATA_SERVICE_UNAVAILABLE"
+      error
     );
   }
 }

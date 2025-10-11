@@ -79,7 +79,7 @@ async function ensureUserWithOpenIdOnly(dbCtx: DbCtx, openid: string) {
   return await createUser(dbCtx, openid);
 }
 
-export function generateJwtToken(user: { id: number; openid: string; role: string }) {
+export function generateJwtToken(user: { id: number; openid: string }) {
   const signer = createSigner({
     key: config.JWT_SECRET,
     expiresIn: config.JWT_EXPIRES_IN,
@@ -88,11 +88,21 @@ export function generateJwtToken(user: { id: number; openid: string; role: strin
   return signer({
     userId: user.id,
     openid: user.openid,
-    role: user.role // 将角色包含在JWT中，避免每次请求查数据库
   });
 }
 
+
 export async function requestWxSession(code: string): Promise<WxSession> {
+  if (
+    (config.NODE_ENV !== "production" && config.NODE_ENV !== "staging") ||
+    config.WX_APP_ID.startsWith("dummy") ||
+    config.WX_APP_SECRET.startsWith("dummy")
+  ) {
+    return {
+      openid: `mock-openid-${code}`,
+    };
+  }
+
   const url = `${WECHAT_CONSTANTS.JSCODE2SESSION_URL}?appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}&js_code=${code}&grant_type=${WECHAT_CONSTANTS.GRANT_TYPE}`;
   const { data } = await axios.get(url);
 

@@ -11,7 +11,7 @@ model Order {
   id               Int                    @id @default(autoincrement())
   user_id          Int
   status           OrderStatus            @default(PENDING_PAYMENT)
-  total_amount     Decimal                @db.Decimal(10, 2)
+  total_amount     Int                     @db.Integer
   pickup_code      String                 @unique @db.VarChar(16)
   createdAt        DateTime               @default(now()) @db.Timestamptz(6)
   paymentExpiresAt DateTime               @db.Timestamptz(6)
@@ -19,11 +19,18 @@ model Order {
   paid_at          DateTime?              @db.Timestamptz(6)
   completed_at     DateTime?              @db.Timestamptz(6)
   cancelled_at     DateTime?              @db.Timestamptz(6)
+  type             OrderType              @default(PURCHASE)
+  totalWeightKg    Float?                 @map("total_weight_kg")
+  unitPrice        Int?                   @map("unit_price")
+  settlementType   SettlementType?        @map("settlement_type")
+  voucherFaceValue Int?                   @map("voucher_face_value")
+  notes            String?
   User             User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
   orderItem        OrderItem[]
   PaymentRecord    PaymentRecord[]
   reservations     InventoryReservation[]
   pendingGuard     PendingPaymentOrder?
+  sourcedInventory InventoryItem[]        @relation("SourceOrder")
 
   @@index([user_id, status], map: "idx_order_user_id_status")
   @@index([createdAt], map: "idx_order_created_at")
@@ -43,15 +50,17 @@ model PendingPaymentOrder {
 }
 
 model User {
-  id            Int                   @id @default(autoincrement())
-  openid        String                @unique @db.VarChar(255)
-  unionid       String?               @unique @db.VarChar(255)
-  nickname      String?               @db.VarChar(255)
-  avatar_url    String?               @db.VarChar(255)
-  role          Role                  @default(USER)
-  created_at    DateTime              @default(now()) @db.Timestamptz(6)
-  Order         Order[]
-  pendingOrders PendingPaymentOrder[]
+  id                   Int                   @id @default(autoincrement())
+  openid               String                @unique @db.VarChar(255)
+  unionid              String?               @unique @db.VarChar(255)
+  nickname             String?               @db.VarChar(255)
+  avatar_url           String?               @db.VarChar(255)
+  role                 Role                  @default(USER)
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  Order                Order[]
+  pendingOrders        PendingPaymentOrder[]
+  StaffAcquisitions    Acquisition[]         @relation("StaffAcquisitions")
+  CustomerAcquisitions Acquisition[]         @relation("CustomerAcquisitions")
 }
 
 model BookMaster {
@@ -79,10 +88,12 @@ model BookSku {
   cover_image_url String?         @db.VarChar(255)
   created_at      DateTime        @default(now()) @db.Timestamptz(6)
   updated_at      DateTime        @updatedAt @db.Timestamptz(6)
+  is_acquirable   Boolean         @default(false)
   bookMaster      BookMaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
   inventoryItems  InventoryItem[]
 
   @@unique([master_id, edition])
+  @@index([is_acquirable], map: "booksku_is_acquirable_idx")
   @@map("booksku")
 }
 
@@ -95,11 +106,17 @@ model InventoryItem {
   status        inventory_status      @default(in_stock)
   created_at    DateTime              @default(now()) @db.Timestamptz(6)
   updated_at    DateTime              @updatedAt @db.Timestamptz(6)
+  sourceOrderId Int?                  @map("source_order_id")
+  acquisitionId Int?                  @map("acquisition_id")
   bookSku       BookSku               @relation(fields: [sku_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sku")
   orderItem     OrderItem[]
   reservation   InventoryReservation?
+  SourceOrder   Order?                @relation("SourceOrder", fields: [sourceOrderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  Acquisition   Acquisition?          @relation(fields: [acquisitionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([sku_id, status], map: "idx_inventory_item_sku_id_status")
+  @@index([sourceOrderId])
+  @@index([acquisitionId], map: "inventoryitem_acquisition_id_idx")
   @@map("inventoryitem")
 }
 
@@ -151,14 +168,32 @@ model PaymentRecord {
   mchid           String?       @db.VarChar(100)
   createdAt       DateTime      @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @db.Timestamptz(6)
-  notified_at     DateTime?
-  refunded_at     DateTime?
+  notified_at     DateTime?       @db.Timestamptz(6)
+  refunded_at     DateTime?       @db.Timestamptz(6)
   refund_id       String?       @unique @db.VarChar(100)
   refund_attempts Int           @default(0)
   Order           Order         @relation(fields: [order_id], references: [id])
 
   @@index([order_id])
   @@index([status, createdAt])
+}
+
+model Acquisition {
+  id               Int             @id @default(autoincrement())
+  staff_user_id    Int
+  customer_user_id Int?
+  total_value      Int
+  item_count       Int
+  settlement_type  SettlementType
+  voucher_code     String?         @db.VarChar(255)
+  notes            String?
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  StaffUser        User            @relation("StaffAcquisitions", fields: [staff_user_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  CustomerUser     User?           @relation("CustomerAcquisitions", fields: [customer_user_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  items            InventoryItem[]
+
+  @@index([staff_user_id], map: "Acquisition_staff_user_id_idx")
+  @@index([created_at], map: "Acquisition_created_at_idx")
 }
 
 enum book_condition {
@@ -173,6 +208,17 @@ enum inventory_status {
   sold
   returned
   damaged
+  BULK_ACQUISITION
+}
+
+enum OrderType {
+  PURCHASE
+  SELL
+}
+
+enum SettlementType {
+  CASH
+  VOUCHER
 }
 
 enum Role {

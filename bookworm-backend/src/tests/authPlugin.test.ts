@@ -195,6 +195,14 @@ describe("Auth Plugin", () => {
         expiresIn: "1h",
       });
       validToken = await signer(userPayload);
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: userPayload.userId,
+        role: "STAFF",
+        openid: userPayload.openid,
+        unionid: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
     });
 
     it("returns 401 when user is not authenticated", async () => {
@@ -207,25 +215,17 @@ describe("Auth Plugin", () => {
     });
 
     it("returns 401 when req.user is missing even with token", async () => {
-      // This simulates a case where authenticate wasn't called first
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
       const response = await server.inject({
         method: "GET",
         url: "/staff-only",
         headers: { authorization: `Bearer ${validToken}` },
       });
 
-      // First authenticate should set req.user, then requireRole checks it
-      // In our test setup, authenticate runs first, so this should work normally
-      // But we'll test the error case by mocking the database to fail
-      prismaMock.user.findUnique.mockResolvedValue(null);
-
-      const response2 = await server.inject({
-        method: "GET",
-        url: "/staff-only",
-        headers: { authorization: `Bearer ${validToken}` },
-      });
-
-      expect(response2.statusCode).toBe(403);
+      expect(response.statusCode).toBe(401);
+      const payload = JSON.parse(response.payload);
+      expect(payload.code).toBe("UNAUTHORIZED");
     });
 
     it("returns 403 when user has wrong role", async () => {
@@ -263,6 +263,15 @@ describe("Auth Plugin", () => {
         role: "STAFF" // Include role in JWT payload
       });
 
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: userPayload.userId,
+        role: "STAFF",
+        openid: userPayload.openid,
+        unionid: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
       const response = await server.inject({
         method: "GET",
         url: "/staff-only",
@@ -287,6 +296,15 @@ describe("Auth Plugin", () => {
         role: "USER" // Include role in JWT payload
       });
 
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: userPayload.userId,
+        role: "USER",
+        openid: userPayload.openid,
+        unionid: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
       const response = await server.inject({
         method: "GET",
         url: "/user-only",
@@ -299,8 +317,7 @@ describe("Auth Plugin", () => {
       });
     });
 
-    it("returns 403 when database lookup fails", async () => {
-      // Mock database error
+    it("returns 500 when database lookup fails", async () => {
       prismaMock.user.findUnique.mockRejectedValue(new Error("Database error"));
 
       const response = await server.inject({
@@ -309,11 +326,12 @@ describe("Auth Plugin", () => {
         headers: { authorization: `Bearer ${validToken}` },
       });
 
-      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).toBe(500);
+      const payload = JSON.parse(response.payload);
+      expect(payload.code).toBe("INTERNAL_ERROR");
     });
 
-    it("returns 403 when user not found in database", async () => {
-      // User was authenticated via JWT but doesn't exist in DB (edge case)
+    it("returns 401 when user not found in database", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       const response = await server.inject({
@@ -322,7 +340,10 @@ describe("Auth Plugin", () => {
         headers: { authorization: `Bearer ${validToken}` },
       });
 
-      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).toBe(401);
+      const payload = JSON.parse(response.payload);
+      expect(payload.code).toBe("UNAUTHORIZED");
+      expect(payload.message).toBe("User not found");
     });
   });
 });

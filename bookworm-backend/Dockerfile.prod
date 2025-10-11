@@ -4,9 +4,15 @@
 # Use a base image to set the npm registry once.
 FROM node:18-alpine AS base
 WORKDIR /app
-# Use a more reliable registry for users in China.
-# This layer will be cached.
-RUN npm config set registry https://registry.npmmirror.com
+# Use一个镜像源并放宽重试，避免偶发网络抖动导致构建失败
+RUN npm config set registry https://registry.npmmirror.com \
+  && npm config set fetch-retry-maxtimeout 600000 \
+  && npm config set fetch-retry-mintimeout 10000 \
+  && npm config set fetch-retries 5
+ENV PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma \
+    npm_config_fetch_retry_maxtimeout=600000 \
+    npm_config_fetch_retry_mintimeout=10000 \
+    npm_config_fetch_retries=5
 
 # ---- Dependencies Stage ----
 # This stage is only for installing dependencies.
@@ -25,20 +31,32 @@ COPY . .
 RUN npm install --ignore-scripts
 RUN npx prisma generate
 RUN npm run build
+# Copy static files that tsc doesn't handle
+RUN mkdir -p dist && cp -r public dist/public
 
 # ---- Production Stage ----
 # The final, lean image.
 FROM base
-ENV NODE_ENV=production
+# Do not hardcode NODE_ENV - let the orchestrator (docker-compose) set it
 # Copy only the necessary production dependencies from the dedicated dependencies stage.
 COPY --from=dependencies /app/node_modules ./node_modules
-# Copy prisma schema first
+# Copy the generated Prisma Client from builder stage (avoids redundant generation)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Copy prisma schema (required for migrations at runtime)
 COPY --from=builder /app/prisma ./prisma
 COPY package.json .
-# Generate Prisma Client in production stage
-RUN npx prisma generate
 # Now copy the compiled code
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 8080
-CMD [ "node", "dist/src/index.js" ]
+
+# Copy the entrypoint script
+COPY --from=builder /app/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# The default command to run after the entrypoint
+CMD ["node", "dist/src/index.js"]
