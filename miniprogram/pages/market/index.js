@@ -1,5 +1,5 @@
 // pages/market/index.js
-const { request } = require('../../utils/api');
+const { request, getRecommendations } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
 
@@ -12,7 +12,8 @@ Page({
     },
     searchTerm: '',
     searchPerformed: false, // To show different empty state messages
-    pageInfo: null // For pagination metadata
+    pageInfo: null, // For pagination metadata
+    recommendations: [] // Personalized book recommendations
   },
 
   onLoad() {
@@ -22,9 +23,11 @@ Page({
   onShow() {
     if (this.hasShownOnce) {
       this.fetchAvailableBooks({ preserveData: true });
+      this.fetchRecommendations(); // Refresh recommendations on page show
     } else {
       this.hasShownOnce = true;
       this.fetchAvailableBooks();
+      this.fetchRecommendations(); // Load recommendations on first show
     }
   },
 
@@ -88,6 +91,38 @@ Page({
   // Pull down refresh
   async onPullDownRefresh() {
     await this.fetchAvailableBooks({ preserveData: true });
+    await this.fetchRecommendations();
     wx.stopPullDownRefresh();
+  },
+
+  // Fetch personalized recommendations
+  async fetchRecommendations() {
+    try {
+      const data = await getRecommendations();
+      // Only update if we got valid recommendations
+      if (data && Array.isArray(data.recommendations)) {
+        this.setData({
+          recommendations: data.recommendations
+        });
+      }
+    } catch (error) {
+      // Silently handle errors - recommendations are optional
+      // Don't show error messages to avoid disrupting main page experience
+      console.log('Failed to load recommendations (this is optional):', error);
+      this.setData({ recommendations: [] });
+    }
+  },
+
+  // NEW: Handle recommendation card tap
+  handleRecommendationTap(e) {
+    const isbn = e.currentTarget.dataset.isbn;
+    if (isbn) {
+      // Navigate to market page with ISBN search
+      this.setData({
+        searchTerm: isbn,
+        searchPerformed: true
+      });
+      this.fetchAvailableBooks();
+    }
   }
 });

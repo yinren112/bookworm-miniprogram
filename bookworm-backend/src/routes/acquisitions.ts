@@ -21,6 +21,13 @@ const CheckResponseSchema = Type.Object({
   acquirableSkus: Type.Array(AcquisitionSkuSchema),
 });
 
+const CustomerProfileSchema = Type.Object({
+  phoneNumber: Type.Optional(Type.String({ maxLength: 20 })),
+  enrollmentYear: Type.Optional(Type.Integer({ minimum: 2000, maximum: 2100 })),
+  major: Type.Optional(Type.String({ maxLength: 100 })),
+  className: Type.Optional(Type.String({ maxLength: 50 })),
+});
+
 const CreateAcquisitionBodySchema = Type.Object({
   customerUserId: Type.Optional(Type.Integer({ minimum: 1 })),
   items: Type.Array(
@@ -34,6 +41,7 @@ const CreateAcquisitionBodySchema = Type.Object({
   settlementType: Type.Union([Type.Literal("CASH"), Type.Literal("VOUCHER")]),
   voucherCode: Type.Optional(Type.String({ maxLength: 255 })),
   notes: Type.Optional(Type.String({ maxLength: 1000 })),
+  customerProfile: Type.Optional(CustomerProfileSchema),
 });
 
 type CreateAcquisitionBody = Static<typeof CreateAcquisitionBodySchema>;
@@ -100,6 +108,35 @@ const acquisitionsRoutes: FastifyPluginAsync = async (fastify) => {
           };
         }),
       };
+    }
+  );
+
+  // POST /api/acquisitions - 创建收购记录
+  fastify.post<{
+    Body: CreateAcquisitionBody;
+  }>(
+    "/api/acquisitions",
+    {
+      preHandler: [fastify.authenticate, fastify.requireRole("STAFF")],
+      schema: {
+        body: CreateAcquisitionBodySchema,
+      },
+    },
+    async (request, reply) => {
+      const staffUserId = request.user!.userId;
+      const body = request.body;
+
+      const acquisition = await createAcquisition(prisma, {
+        staffUserId,
+        customerUserId: body.customerUserId,
+        items: body.items,
+        settlementType: body.settlementType,
+        voucherCode: body.voucherCode,
+        notes: body.notes,
+        customerProfile: body.customerProfile,
+      });
+
+      return reply.code(201).send(acquisition);
     }
   );
 };

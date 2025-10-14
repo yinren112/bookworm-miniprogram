@@ -3,8 +3,35 @@
 
 <view class="container">
   <view class="header-title">二手书市场</view>
-  
+
   <template is="searchBar" data="{{placeholder: '搜索书名、作者或ISBN', searchTerm: searchTerm}}" />
+
+  <!-- Personalized Recommendations Section -->
+  <view wx:if="{{recommendations.length > 0}}" class="recommendations-section">
+    <view class="section-header">
+      <text class="section-title">为你推荐</text>
+      <text class="section-subtitle">根据你的专业和年级精选</text>
+    </view>
+    <scroll-view class="recommendations-scroll" scroll-x="true" enable-flex="true">
+      <view class="recommendation-card card"
+            wx:for="{{recommendations}}"
+            wx:key="skuId"
+            data-isbn="{{item.isbn}}"
+            bindtap="handleRecommendationTap">
+        <image class="recommendation-cover"
+               src="{{item.coverImageUrl || '/images/placeholder-cover.svg'}}"
+               mode="aspectFill" />
+        <view class="recommendation-info">
+          <text class="recommendation-title">{{item.title}}</text>
+          <text class="recommendation-author">{{item.author || '作者未知'}}</text>
+          <view class="recommendation-meta">
+            <text class="recommendation-price">¥{{item.minPrice / 100}}</text>
+            <text class="recommendation-stock">库存{{item.availableCount}}本</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
 
   <!-- Skeleton Loading State -->
   <skeleton wx:if="{{state.status === 'loading'}}" type="grid" count="4" />

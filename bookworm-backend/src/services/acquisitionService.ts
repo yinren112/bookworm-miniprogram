@@ -13,6 +13,16 @@ export interface AcquisitionItemInput {
 }
 
 /**
+ * 用户画像信息（收购时收集）
+ */
+export interface CustomerProfileInput {
+  phoneNumber?: string;
+  enrollmentYear?: number;
+  major?: string;
+  className?: string;
+}
+
+/**
  * 创建收购记录的输入参数
  */
 export interface CreateAcquisitionInput {
@@ -22,6 +32,7 @@ export interface CreateAcquisitionInput {
   settlementType: SettlementType;
   voucherCode?: string;
   notes?: string;
+  customerProfile?: CustomerProfileInput;
 }
 
 /**
@@ -83,6 +94,27 @@ async function createAcquisitionImpl(
     },
   });
 
+  // 如果提供了用户画像信息，则创建或更新 UserProfile
+  if (input.customerProfile && input.customerUserId) {
+    await tx.userProfile.upsert({
+      where: { user_id: input.customerUserId },
+      create: {
+        user_id: input.customerUserId,
+        phone_number: input.customerProfile.phoneNumber ?? null,
+        enrollment_year: input.customerProfile.enrollmentYear ?? null,
+        major: input.customerProfile.major ?? null,
+        class_name: input.customerProfile.className ?? null,
+      },
+      update: {
+        phone_number: input.customerProfile.phoneNumber ?? null,
+        enrollment_year: input.customerProfile.enrollmentYear ?? null,
+        major: input.customerProfile.major ?? null,
+        class_name: input.customerProfile.className ?? null,
+        updated_at: new Date(),
+      },
+    });
+  }
+
   // 批量创建 InventoryItem 记录
   // 注意：我们使用 createMany 进行批量插入以提高性能
   await tx.inventoryItem.createMany({
@@ -92,7 +124,7 @@ async function createAcquisitionImpl(
       cost: item.acquisitionPrice / 100, // 转换为元，Decimal 格式
       selling_price: item.acquisitionPrice / 100, // 初始售价等于成本价
       status: "in_stock" as const,
-      acquisition_id: acquisition.id,
+      acquisitionId: acquisition.id,
     })),
   });
 

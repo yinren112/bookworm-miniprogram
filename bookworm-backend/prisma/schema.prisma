@@ -56,11 +56,16 @@ model User {
   nickname             String?               @db.VarChar(255)
   avatar_url           String?               @db.VarChar(255)
   role                 Role                  @default(USER)
+  phone_number         String?               @unique @db.VarChar(20)
+  status               UserStatus            @default(REGISTERED)
   created_at           DateTime              @default(now()) @db.Timestamptz(6)
   Order                Order[]
   pendingOrders        PendingPaymentOrder[]
   StaffAcquisitions    Acquisition[]         @relation("StaffAcquisitions")
   CustomerAcquisitions Acquisition[]         @relation("CustomerAcquisitions")
+  profile              UserProfile?
+
+  @@index([phone_number])
 }
 
 model BookMaster {
@@ -81,16 +86,17 @@ model BookMaster {
 }
 
 model BookSku {
-  id              Int             @id @default(autoincrement())
-  master_id       Int
-  edition         String?         @db.VarChar(50)
-  description     String?
-  cover_image_url String?         @db.VarChar(255)
-  created_at      DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime        @updatedAt @db.Timestamptz(6)
-  is_acquirable   Boolean         @default(false)
-  bookMaster      BookMaster      @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
-  inventoryItems  InventoryItem[]
+  id                     Int                   @id @default(autoincrement())
+  master_id              Int
+  edition                String?               @db.VarChar(50)
+  description            String?
+  cover_image_url        String?               @db.VarChar(255)
+  created_at             DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime              @updatedAt @db.Timestamptz(6)
+  is_acquirable          Boolean               @default(false)
+  bookMaster             BookMaster            @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
+  inventoryItems         InventoryItem[]
+  recommendedBookItems   RecommendedBookItem[]
 
   @@unique([master_id, edition])
   @@index([is_acquirable], map: "booksku_is_acquirable_idx")
@@ -226,6 +232,11 @@ enum Role {
   STAFF
 }
 
+enum UserStatus {
+  REGISTERED
+  PRE_REGISTERED
+}
+
 enum OrderStatus {
   PENDING_PAYMENT
   PENDING_PICKUP
@@ -241,4 +252,36 @@ enum PaymentStatus {
   REFUNDED
   FAILED
   REFUND_PROCESSING
+}
+
+model UserProfile {
+  user_id         Int      @id
+  phone_number    String?  @db.VarChar(20)
+  enrollment_year Int?
+  major           String?  @db.VarChar(100)
+  class_name      String?  @db.VarChar(50)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model RecommendedBookList {
+  id              Int                   @id @default(autoincrement())
+  enrollment_year Int
+  major           String                @db.VarChar(100)
+  items           RecommendedBookItem[]
+
+  @@unique([enrollment_year, major])
+  @@index([enrollment_year])
+}
+
+model RecommendedBookItem {
+  list_id Int
+  sku_id  Int
+
+  list    RecommendedBookList @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  bookSku BookSku             @relation(fields: [sku_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([list_id, sku_id])
+  @@index([sku_id])
 }

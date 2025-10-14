@@ -11,6 +11,8 @@ describe("Order Cursor Pagination Integration", () => {
   });
 
   const cleanupTables = async () => {
+    await prisma.recommendedBookItem.deleteMany();
+    await prisma.recommendedBookList.deleteMany();
     await prisma.paymentRecord.deleteMany();
     await prisma.inventoryReservation.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -18,6 +20,7 @@ describe("Order Cursor Pagination Integration", () => {
     await prisma.order.deleteMany();
     await prisma.bookSku.deleteMany();
     await prisma.bookMaster.deleteMany();
+    await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
   };
 

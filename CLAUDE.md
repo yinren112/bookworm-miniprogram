@@ -194,9 +194,11 @@ The system follows a strict "books as atomic inventory items" model where each i
 **Core Services:**
 - `src/services/inventoryService.ts` - Book inventory management
 - `src/services/orderService.ts` - Order processing with inventory reservation
-- `src/services/authService.ts` - WeChat OAuth integration
+- `src/services/authService.ts` - WeChat OAuth integration and account merging
 - `src/services/bookMetadataService.ts` - Book metadata fetching from external APIs
+- `src/services/bookService.ts` - Book search and management
 - `src/services/contentService.ts` - Static content management
+- `src/services/acquisitionService.ts` - Book acquisition (buying from customers)
 - `src/services/refundService.ts` - Processes payments marked for refund
 
 **Key Architectural Decisions:**
@@ -215,8 +217,9 @@ The system follows a strict "books as atomic inventory items" model where each i
 - `pages/market/` - Book marketplace with search
 - `pages/book-detail/` - Individual book details with purchase flow
 - `pages/orders/` - User order history
-- `pages/profile/` - User profile and support contact
+- `pages/profile/` - User profile, phone authorization, and support contact
 - `pages/order-confirm/` - Order confirmation flow
+- `pages/acquisition-scan/` - Book acquisition scanning (staff only)
 
 **Design System:**
 - Global CSS variables in `app.wxss` (V10 design system)
@@ -278,9 +281,10 @@ The system uses PostgreSQL with these core entities:
 - `InventoryItem` - Individual physical books for sale
 
 **Transaction Flow:**
-- `User` - WeChat users via OpenID
+- `User` - WeChat users via OpenID, with optional phone_number and status (REGISTERED | PRE_REGISTERED)
 - `Order` - Purchase orders with pickup codes
 - `OrderItem` - Links orders to specific inventory items
+- `SellOrder` - Records of books acquired from customers (staff only)
 
 **Critical States:**
 - `inventory_status`: `in_stock` → `reserved` → `sold`
@@ -292,6 +296,12 @@ The system uses PostgreSQL with these core entities:
 2. **Reservation Model**: Books are `reserved` before payment, preventing overselling
 3. **No Partial Orders**: All items in an order must be available or the entire order fails
 4. **Pickup Flow**: Orders use unique pickup codes for fulfillment
+5. **Account Merging**: System supports two user types:
+   - **REGISTERED**: Normal WeChat users with openid
+   - **PRE_REGISTERED**: Placeholder accounts created during sell-book transactions (no WeChat login yet)
+   - When a PRE_REGISTERED user logs in via WeChat and authorizes phone number, accounts automatically merge
+   - Phone number serves as the bridge between the two identity systems
+   - Merge preserves all historical sell order records
 
 ## Key Files to Understand
 
@@ -324,13 +334,13 @@ The system uses PostgreSQL with these core entities:
 Backend requires `.env` file in `bookworm-backend/`:
 ```bash
 # Server Configuration
-PORT=3000
+PORT=8080
 HOST=0.0.0.0
 NODE_ENV=development
 LOG_LEVEL=info
 
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/bookworm?connection_limit=10&pool_timeout=30
+DATABASE_URL=postgresql://postgres:password@localhost:65432/bookworm?connection_limit=50&pool_timeout=10
 
 # JWT Configuration
 JWT_SECRET=your-secret-key-here
@@ -371,7 +381,7 @@ These values should be tuned for production environments based on expected concu
 **Test Environment:**
 Create `.env.test` for testing:
 ```bash
-DATABASE_URL=postgresql://postgres:password@localhost:5432/bookworm_test?connection_limit=5&pool_timeout=15
+TEST_DATABASE_URL=postgresql://postgres:password@localhost:5433/bookworm_test?connection_limit=5&pool_timeout=15
 NODE_ENV=test
 JWT_SECRET=test-secret
 WX_APP_ID=test-app-id
@@ -382,7 +392,8 @@ WX_APP_SECRET=test-app-secret
 
 **Core APIs** (all prefixed with `/api`):
 - `GET /health` - Health check endpoint
-- `POST /auth/login` - WeChat Mini Program authentication
+- `POST /auth/login` - WeChat Mini Program authentication (accepts optional `phoneCode` for account merging)
+- `GET /users/me` - Get current user info (returns id, role, phone_number, createdAt)
 - `GET /books/meta?isbn=` - Book metadata lookup
 - `GET /inventory/available` - List available books with search & pagination
 - `GET /inventory/item/:id` - Book details
@@ -395,6 +406,8 @@ WX_APP_SECRET=test-app-secret
 - `GET /orders/pending-pickup` - List pending pickup orders (staff only)
 - `POST /orders/:orderId/pay` - Generate WeChat payment parameters
 - `POST /payment/notify` - WeChat Pay callback webhook
+- `POST /sell-orders` - Create sell order (staff only, for acquiring books from customers)
+- `GET /acquisitions/check?isbn=` - Check if ISBN is eligible for acquisition
 
 **System APIs:**
 - `GET /metrics` - Prometheus metrics for monitoring
@@ -405,6 +418,13 @@ WX_APP_SECRET=test-app-secret
 - User identification by WeChat OpenID
 - Mini program uses `wx.request()` to call backend APIs
 - Payment integration with WeChat Pay (optional)
+- **Phone Number Authorization**:
+  - Uses WeChat's `open-type="getPhoneNumber"` button component
+  - Requires verified enterprise mini program (个体工商户 or 企业, not personal account)
+  - 2024 requirement: Requires quota allocation (0.03 yuan per successful call, 1000 free calls initially)
+  - Phone authorization enables account merging between PRE_REGISTERED and REGISTERED users
+  - Returns `phoneCode` which backend exchanges for actual phone number via WeChat API
+  - Access token cached with 5-minute buffer to minimize API calls
 
 ## Important Development Notes
 
@@ -506,7 +526,7 @@ npx vitest run --config vitest.database-integration.config.ts
 docker build -t bookworm-backend .
 
 # Run container
-docker run -p 3000:3000 --env-file .env bookworm-backend
+docker run -p 8080:8080 --env-file .env bookworm-backend
 ```
 
 **Multi-stage Build:**

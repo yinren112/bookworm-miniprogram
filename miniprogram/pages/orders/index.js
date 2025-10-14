@@ -42,7 +42,7 @@ Page({
 
     try {
       const data = await request({
-        url: `/orders/user/${userId}`,
+        url: `/orders/my`,
         method: 'GET'
       });
       this.setData({

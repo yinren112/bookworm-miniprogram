@@ -1197,7 +1197,7 @@ export async function updateOrderStatus(
 //
 
 export interface CreateAndCompleteSellOrderInput {
-  userId: number;
+  customerPhoneNumber: string;
   totalWeightKg: number;
   unitPrice: number; // Price in cents per kg
   settlementType: 'CASH' | 'VOUCHER';
@@ -1218,6 +1218,24 @@ async function createAndCompleteSellOrderImpl(
   if (input.totalWeightKg <= 0 || input.unitPrice <= 0) {
     throw new ApiError(400, "重量和单价必须是正数", "INVALID_SELL_ORDER_INPUT");
   }
+
+  // Find or create the user associated with the phone number
+  let user = await tx.user.findUnique({
+    where: { phone_number: input.customerPhoneNumber },
+  });
+
+  if (!user) {
+    user = await tx.user.create({
+      data: {
+        phone_number: input.customerPhoneNumber,
+        openid: `placeholder_${input.customerPhoneNumber}_${Date.now()}`,
+        role: 'USER',
+        status: 'PRE_REGISTERED',
+      },
+    });
+  }
+
+  const userId = user.id;
 
   const baseAmount = Math.round(input.totalWeightKg * input.unitPrice);
   const voucherFaceValue = input.settlementType === 'VOUCHER' ? baseAmount * 2 : null;
@@ -1251,7 +1269,7 @@ async function createAndCompleteSellOrderImpl(
 
   const order = await tx.order.create({
     data: {
-      user_id: input.userId,
+      user_id: userId,
       status: ORDER_STATUS.COMPLETED,
       type: ORDER_TYPE.SELL,
       total_amount: baseAmount,

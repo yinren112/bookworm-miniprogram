@@ -52,7 +52,10 @@ describe("Acquisitions Allowlist API", () => {
 
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.payload);
-    expect(body.acquirableEditions).toEqual(["Hardcover"]);
+    expect(body.acquirableSkus).toBeDefined();
+    expect(Array.isArray(body.acquirableSkus)).toBe(true);
+    expect(body.acquirableSkus.length).toBe(1);
+    expect(body.acquirableSkus[0].edition).toBe("Hardcover");
   });
 
   it("查询非白名单ISBN时返回空数组", async () => {
@@ -63,6 +66,6 @@ describe("Acquisitions Allowlist API", () => {
 
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.payload);
-    expect(body.acquirableEditions).toEqual([]);
+    expect(body.acquirableSkus).toEqual([]);
   });
 });

@@ -35,6 +35,7 @@
     "fastify": "^4.27.0",
     "fastify-plugin": "^5.0.1",
     "fastify-raw-body": "^4.3.0",
+    "iconv-lite": "^0.7.0",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^4.2.1",
     "prom-client": "^15.1.3",

@@ -110,12 +110,16 @@ export function getPrismaClientForWorker(): PrismaClient {
 async function truncateAllTables(prisma: PrismaClient) {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "RecommendedBookItem",
+      "RecommendedBookList",
+      "UserProfile",
       "PaymentRecord",
       "orderitem",
       "inventory_reservation",
       "inventoryitem",
       "pending_payment_order",
       "Order",
+      "Acquisition",
       "booksku",
       "bookmaster",
       "Content",

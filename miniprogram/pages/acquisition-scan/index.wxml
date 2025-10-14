@@ -1,0 +1,105 @@
+<!-- pages/acquisition-scan/index.wxml -->
+<view class="container">
+  <view class="header">
+    <text class="header-title">扫码收购书籍</text>
+    <text class="header-subtitle">扫描ISBN条码以添加书籍</text>
+  </view>
+
+  <!-- 扫码按钮 -->
+  <button class="scan-button" bindtap="onScanCode">
+    <text class="scan-icon">📷</text>
+    <text class="scan-text">扫描ISBN条码</text>
+  </button>
+
+  <!-- 已扫描书籍列表 -->
+  <view wx:if="{{scannedItems.length > 0}}" class="scanned-list">
+    <view class="list-header">
+      <text class="list-title">已扫描书籍 ({{scannedItems.length}})</text>
+    </view>
+
+    <view class="book-item {{item.status === 'acquirable' ? 'acquirable' : 'rejected'}}"
+          wx:for="{{scannedItems}}"
+          wx:key="index">
+      <view class="book-info">
+        <view class="book-header">
+          <text class="book-title">{{item.skuInfo ? item.skuInfo.title : item.isbn}}</text>
+          <view class="status-badge {{item.status}}">
+            {{item.status === 'acquirable' ? '可收购' : '不收购'}}
+          </view>
+        </view>
+
+        <text wx:if="{{item.skuInfo}}" class="book-author">{{item.skuInfo.author || '作者未知'}}</text>
+        <text wx:if="{{item.skuInfo}}" class="book-edition">版本: {{item.skuInfo.edition || '未知'}}</text>
+
+
+        <text wx:if="{{item.status === 'rejected'}}" class="rejection-reason">此书籍不在收购白名单中</text>
+      </view>
+
+      <view class="book-actions">
+        <button class="remove-button" data-index="{{index}}" bindtap="onRemoveItem">移除</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{scannedItems.length === 0}}" class="empty-state">
+    <text class="empty-icon">📚</text>
+    <text class="empty-text">还没有扫描任何书籍</text>
+    <text class="empty-hint">点击上方按钮开始扫码</text>
+  </view>
+
+  <!-- 结算信息 -->
+  <view wx:if="{{summary.count > 0}}" class="summary-section">
+    <view class="summary-row">
+      <text class="summary-label">可收购数量:</text>
+      <text class="summary-value">{{summary.count}} 本</text>
+    </view>
+
+    <!-- 顾客手机号 -->
+    <view class="input-row">
+      <text class="input-label">顾客手机号:</text>
+      <input
+        class="text-input"
+        type="number"
+        value="{{customerPhone}}"
+        bindinput="onPhoneInput"
+        placeholder="请输入手机号"
+        maxlength="11" />
+    </view>
+
+    <!-- 总重量 -->
+    <view class="input-row">
+      <text class="input-label">总重量 (kg):</text>
+      <input
+        class="number-input"
+        type="digit"
+        value="{{totalWeight}}"
+        bindinput="onWeightInput"
+        placeholder="0.00" />
+    </view>
+
+    <!-- 单价 -->
+    <view class="input-row">
+      <text class="input-label">单价 (元/kg):</text>
+      <input
+        class="number-input"
+        type="digit"
+        value="{{unitPriceYuan}}"
+        bindinput="onUnitPriceInput"
+        placeholder="0.00" />
+    </view>
+
+    <!-- 最终总金额 -->
+    <view class="summary-row total">
+      <text class="summary-label">最终总金额:</text>
+      <text class="summary-value highlight">¥{{finalAmount}}</text>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view wx:if="{{summary.count > 0}}" class="submit-section">
+    <button class="submit-button" bindtap="onSubmit" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '确认收购'}}
+    </button>
+  </view>
+</view>

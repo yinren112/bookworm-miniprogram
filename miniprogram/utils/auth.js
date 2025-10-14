@@ -14,12 +14,18 @@ function callWxLogin() {
   });
 }
 
-function exchangeCodeForToken(code) {
+function exchangeCodeForToken(code, phoneCode) {
   return new Promise((resolve, reject) => {
+    const requestData = { code };
+    // 只有当 phoneCode 存在时才添加到请求中
+    if (phoneCode) {
+      requestData.phoneCode = phoneCode;
+    }
+
     wx.request({
       url: config.apiBaseUrl + '/auth/login',
       method: 'POST',
-      data: { code },
+      data: requestData,
       header: {
         'Content-Type': 'application/json',
       },
@@ -45,6 +51,21 @@ async function login() {
   return data;
 }
 
+async function loginWithPhoneNumber(phoneCode) {
+  try {
+    const code = await callWxLogin();
+    const data = await exchangeCodeForToken(code, phoneCode);
+    tokenUtil.setToken(data.token);
+    if (data.userId) {
+      tokenUtil.setUserId(data.userId);
+    }
+    return data;
+  } catch (error) {
+    console.error('Login with phone number failed:', error);
+    throw error;
+  }
+}
+
 async function ensureLoggedIn() {
   const token = tokenUtil.getToken();
   if (token) {
@@ -60,5 +81,6 @@ async function ensureLoggedIn() {
 
 module.exports = {
   login,
+  loginWithPhoneNumber,
   ensureLoggedIn,
 };

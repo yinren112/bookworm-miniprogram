@@ -26,6 +26,7 @@ import ordersRoutes from "./routes/orders";
 import paymentRoutes from "./routes/payment";
 import sellOrdersRoutes from "./routes/sellOrders";
 import acquisitionsRoutes from "./routes/acquisitions";
+import usersRoutes from "./routes/users";
 
 // --- Type Augmentation for Fastify ---
 declare module "fastify" {
@@ -237,6 +238,7 @@ const setupApplication = async () => {
   // Register all routes
   await fastify.register(healthRoutes);
   await fastify.register(authRoutes);
+  await fastify.register(usersRoutes);
   await fastify.register(booksRoutes);
   await fastify.register(acquisitionsRoutes);
   await fastify.register(inventoryRoutes);
@@ -273,3 +275,5 @@ const start = async () => {
 if (require.main === module) {
   start();
 }
+
+

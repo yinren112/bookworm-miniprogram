@@ -9,12 +9,15 @@ describe("Refund Recovery Integration", () => {
   let prisma: PrismaClient;
 
   const cleanupDatabase = async () => {
+    await prisma.recommendedBookItem.deleteMany();
+    await prisma.recommendedBookList.deleteMany();
     await prisma.paymentRecord.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.inventoryItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.bookSku.deleteMany();
     await prisma.bookMaster.deleteMany();
+    await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
   };
 

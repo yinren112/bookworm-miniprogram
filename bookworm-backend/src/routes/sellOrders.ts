@@ -4,7 +4,7 @@ import { createAndCompleteSellOrder } from "../services/orderService";
 import prisma from "../db";
 
 const CreateSellOrderBodySchema = Type.Object({
-  userId: Type.Integer({ minimum: 1 }),
+  customerPhoneNumber: Type.String({ minLength: 1, maxLength: 20 }),
   totalWeightKg: Type.Number({ exclusiveMinimum: 0 }),
   unitPrice: Type.Integer({ minimum: 1 }), // Stored in cents
   settlementType: Type.Union([Type.Literal("CASH"), Type.Literal("VOUCHER")]),
@@ -23,13 +23,13 @@ const sellOrdersRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const { userId, totalWeightKg, unitPrice, settlementType, notes } = request.body;
+      const { customerPhoneNumber, totalWeightKg, unitPrice, settlementType, notes } = request.body;
 
       // Linus式审计：记录敏感操作的执行者
-      // 每个STAFF创建的卖书订单都会被记录，包括操作员ID、目标用户ID和金额
+      // 每个STAFF创建的卖书订单都会被记录，包括操作员ID、客户手机号和金额
       request.log.info({
         operatorId: request.user!.userId,
-        targetUserId: userId,
+        customerPhoneNumber,
         totalWeightKg,
         unitPriceCents: unitPrice,
         settlementType,
@@ -37,7 +37,7 @@ const sellOrdersRoutes: FastifyPluginAsync = async (fastify) => {
       }, 'STAFF member creating sell order');
 
       const result = await createAndCompleteSellOrder(prisma, {
-        userId,
+        customerPhoneNumber,
         totalWeightKg,
         unitPrice,
         settlementType,
@@ -47,7 +47,7 @@ const sellOrdersRoutes: FastifyPluginAsync = async (fastify) => {
       // 记录成功创建的订单ID，用于后续审计追踪
       request.log.info({
         operatorId: request.user!.userId,
-        targetUserId: userId,
+        targetUserId: result.order.user_id,
         orderId: result.order.id,
         totalAmount: result.order.total_amount,
         action: 'SELL_ORDER_CREATED',

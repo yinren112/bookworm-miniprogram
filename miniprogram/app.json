@@ -8,7 +8,8 @@
     "pages/order-confirm/index",
     "pages/order-detail/index",
     "pages/webview/index",
-    "pages/customer-service/index"
+    "pages/customer-service/index",
+    "pages/acquisition-scan/index"
   ],
   "window": {
     "backgroundTextStyle": "light",

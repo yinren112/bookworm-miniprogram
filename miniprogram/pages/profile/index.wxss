@@ -141,19 +141,136 @@
   margin-bottom: 0;
 }
 
+/* Staff Operations Section */
+.staff-section {
+  background: linear-gradient(135deg, #2c5f2d 0%, #558056 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.staff-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-l);
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  z-index: 1;
+}
+
+.title-text {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: white;
+}
+
+.staff-badge {
+  padding: var(--space-xs) var(--space-m);
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8rpx;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  color: white;
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.staff-section .menu-item {
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+.staff-section .menu-item:last-child {
+  border-bottom: none;
+}
+
+.staff-section .menu-item:active {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.menu-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+}
+
+.icon-text {
+  font-size: 40rpx;
+}
+
+.staff-section .menu-text {
+  color: white;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.staff-section .menu-arrow {
+  filter: brightness(0) invert(1);
+  opacity: 0.8;
+}
+
+/* Phone Number Authorization Button */
+.auth-phone-button {
+  margin-top: var(--space-l);
+  padding: var(--space-m) var(--space-xl);
+  background: linear-gradient(135deg, #2c5f2d 0%, #558056 100%);
+  color: white;
+  border-radius: 40rpx;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  border: none;
+  box-shadow: 0 4rpx 16rpx rgba(44, 95, 45, 0.3);
+  transition: all 0.3s ease;
+}
+
+.auth-phone-button::after {
+  border: none;
+}
+
+.auth-phone-button:active {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
+
 /* Responsive Design */
 @media screen and (min-width: 768px) {
   .profile-container {
     max-width: 600rpx;
     margin: 0 auto;
   }
-  
+
   .header {
     padding: var(--space-xl);
   }
-  
+
   .avatar-wrapper {
     width: 240rpx;
     height: 240rpx;
+  }
+
+  .auth-phone-button {
+    font-size: var(--font-size-title);
+    padding: var(--space-l) var(--space-xxl);
   }
 }

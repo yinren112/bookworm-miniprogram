@@ -66,6 +66,8 @@ export const HTTP_STATUS = {
 
 export const WECHAT_CONSTANTS = {
   JSCODE2SESSION_URL: 'https://api.weixin.qq.com/sns/jscode2session',
+  GET_ACCESS_TOKEN_URL: 'https://api.weixin.qq.com/cgi-bin/token',
+  GET_PHONE_NUMBER_URL: 'https://api.weixin.qq.com/wxa/business/getuserphonenumber',
   GRANT_TYPE: 'authorization_code',
   SUCCESS_CODE: 'SUCCESS',
   FAIL_CODE: 'FAIL',
