@@ -60,7 +60,7 @@ export function isPrismaSerializationError(error: unknown): boolean {
 // P1008: Operations timed out. (Potentially transient)
 // 40P01: Deadlock detected (PostgreSQL specific error code, might appear in meta)
 const RETRYABLE_PRISMA_CODES = new Set(["P2034", "P1008"]);
-const RETRYABLE_PG_CODES = new Set(["40P01"]);
+const RETRYABLE_PG_CODES = new Set(["40001", "40P01", "55P03"]);
 
 /**
  * Type guard for Prisma errors that are safe to retry.
@@ -77,6 +77,17 @@ export function isPrismaRetryableError(error: unknown): boolean {
   const pgCode = (error.meta as { code?: string } | undefined)?.code;
   if (pgCode && RETRYABLE_PG_CODES.has(pgCode)) {
     return true;
+  }
+
+  if (typeof error.message === "string") {
+    const lower = error.message.toLowerCase();
+    if (
+      lower.includes("deadlock detected") ||
+      lower.includes("could not serialize access due to") ||
+      lower.includes("could not serialize transaction")
+    ) {
+      return true;
+    }
   }
 
   return false;

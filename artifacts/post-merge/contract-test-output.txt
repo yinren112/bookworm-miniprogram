@@ -1,0 +1,128 @@
+
+> bookworm-backend@1.0.0 test:integration
+> dotenv -e .env.test -- vitest run --config vitest.integration.config.ts src/tests/contract/api.contract.integration.test.ts -u
+
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90mC:/Users/wapadil/WeChatProjects/miniprogram-13/bookworm-backend[39m
+
+[Worker 1] Starting a dedicated PostgreSQL container...
+[Worker 1] Container started. Applying migrations...
+[Worker 1] Migrations applied.
+[90mstdout[2m | src/tests/contract/api.contract.integration.test.ts[2m > [22m[2mAPI Contract Tests
+[22m[39mCreating new Prisma client for worker 1 with URL: postgres://test:test@localhost...
+
+[90mstderr[2m | src/tests/contract/api.contract.integration.test.ts[2m > [22m[2mAPI Contract Tests
+[22m[39m✅ Test database URL set for worker 1: postgres://test:test@localhost...
+
+Sourcemap for "C:/Users/wapadil/WeChatProjects/miniprogram-13/bookworm-backend/node_modules/node-cron/dist/esm/node-cron.js" points to missing source files
+[90mstderr[2m | src/tests/contract/api.contract.integration.test.ts[2m > [22m[2mAPI Contract Tests
+[22m[39m!!! WARNING: Failed to initialize WeChat Pay SDK. Payment features will be disabled. Reason: WeChat Pay configuration is incomplete or certificate files are missing.
+
+[90mstderr[2m | src/tests/contract/api.contract.integration.test.ts[2m > [22m[2mAPI Contract Tests
+[22m[39mMetrics endpoint registered at /metrics
+
+{"level":30,"time":1760785033201,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-1","req":{"method":"POST","url":"/api/auth/login","hostname":"127.0.0.1:13564","remoteAddress":"::ffff:127.0.0.1","remotePort":13565},"msg":"incoming request"}
+{"level":30,"time":1760785033237,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-1","res":{"statusCode":200},"responseTime":34.96059999987483,"msg":"request completed"}
+{"level":30,"time":1760785033504,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-2","req":{"method":"GET","url":"/api/inventory/available?page=1&limit=10","hostname":"127.0.0.1:9119","remoteAddress":"::ffff:127.0.0.1","remotePort":9120},"msg":"incoming request"}
+{"level":30,"time":1760785033523,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-2","res":{"statusCode":200},"responseTime":19.09889999963343,"msg":"request completed"}
+{"level":30,"time":1760785033772,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-3","req":{"method":"GET","url":"/api/inventory/item/1","hostname":"127.0.0.1:9123","remoteAddress":"::ffff:127.0.0.1","remotePort":9124},"msg":"incoming request"}
+{"level":30,"time":1760785033781,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-3","res":{"statusCode":200},"responseTime":8.978500000201166,"msg":"request completed"}
+{"level":30,"time":1760785034041,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-4","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:9125","remoteAddress":"::ffff:127.0.0.1","remotePort":9126},"msg":"incoming request"}
+{"level":30,"time":1760785034085,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-4","res":{"statusCode":201},"responseTime":43.00880000088364,"msg":"request completed"}
+{"level":30,"time":1760785034379,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-5","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:9129","remoteAddress":"::ffff:127.0.0.1","remotePort":9130},"msg":"incoming request"}
+{"level":30,"time":1760785034404,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-5","res":{"statusCode":201},"responseTime":25.28359999973327,"msg":"request completed"}
+{"level":30,"time":1760785034408,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-6","req":{"method":"GET","url":"/api/orders/1","hostname":"127.0.0.1:9131","remoteAddress":"::ffff:127.0.0.1","remotePort":9132},"msg":"incoming request"}
+{"level":30,"time":1760785034419,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-6","res":{"statusCode":200},"responseTime":11.482400000095367,"msg":"request completed"}
+{"level":30,"time":1760785034668,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-7","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:9133","remoteAddress":"::ffff:127.0.0.1","remotePort":9134},"msg":"incoming request"}
+{"level":30,"time":1760785034687,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-7","res":{"statusCode":201},"responseTime":19.441199999302626,"msg":"request completed"}
+{"level":30,"time":1760785034690,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-8","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:9135","remoteAddress":"::ffff:127.0.0.1","remotePort":9136},"msg":"incoming request"}
+[90mstdout[2m | src/tests/contract/api.contract.integration.test.ts[2m > [22m[2mAPI Contract Tests[2m > [22m[2mOrder APIs[2m > [22m[2mGET /api/orders/my - 获取用户订单列表
+[22m[39mprisma:error 
+Invalid `tx.order.create()` invocation in
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\create.ts:161:29
+
+  158 const pickup_code = await generateUniquePickupCode();
+  159 
+  160 try {
+→ 161   return await tx.order.create(
+Unique constraint failed on the fields: (`user_id`)
+
+{"level":50,"time":1760785034731,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-8","err":{"type":"ApiError","message":"您有一个正在付款的订单，请先完成付款或等待订单过期","stack":"ApiError: 您有一个正在付款的订单，请先完成付款或等待订单过期\n    at createOrder (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\src\\services\\orders\\create.ts:331:15)\n    at Object.<anonymous> (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\src\\routes\\orders.ts:63:21)","name":"ApiError","statusCode":409,"code":"CONCURRENT_PENDING_ORDER"},"req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:9135","remoteAddress":"::ffff:127.0.0.1","remotePort":9136},"msg":"An error occurred during the request"}
+{"level":30,"time":1760785034733,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-8","res":{"statusCode":409},"responseTime":42.43779999949038,"msg":"request completed"}
+{"level":30,"time":1760785034737,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-9","req":{"method":"GET","url":"/api/orders/my?limit=10","hostname":"127.0.0.1:9137","remoteAddress":"::ffff:127.0.0.1","remotePort":9138},"msg":"incoming request"}
+{"level":30,"time":1760785034748,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-9","res":{"statusCode":200},"responseTime":10.47869999986142,"msg":"request completed"}
+{"level":30,"time":1760785035009,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-a","req":{"method":"GET","url":"/api/books/recommendations","hostname":"127.0.0.1:9139","remoteAddress":"::ffff:127.0.0.1","remotePort":9140},"msg":"incoming request"}
+{"level":30,"time":1760785035013,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-a","res":{"statusCode":200},"responseTime":4.400400000624359,"msg":"request completed"}
+{"level":30,"time":1760785035247,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-b","req":{"method":"GET","url":"/api/books/recommendations","hostname":"127.0.0.1:9141","remoteAddress":"::ffff:127.0.0.1","remotePort":9142},"msg":"incoming request"}
+{"level":30,"time":1760785035255,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-b","res":{"statusCode":200},"responseTime":7.846400000154972,"msg":"request completed"}
+{"level":30,"time":1760785035519,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-c","req":{"method":"GET","url":"/api/content/test-content-1760785035514","hostname":"127.0.0.1:13624","remoteAddress":"::ffff:127.0.0.1","remotePort":13625},"msg":"incoming request"}
+{"level":30,"time":1760785035527,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-c","res":{"statusCode":200},"responseTime":7.421100000850856,"msg":"request completed"}
+{"level":30,"time":1760785035772,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-d","req":{"method":"GET","url":"/api/users/me","hostname":"127.0.0.1:13626","remoteAddress":"::ffff:127.0.0.1","remotePort":13627},"msg":"incoming request"}
+{"level":30,"time":1760785035781,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-d","res":{"statusCode":200},"responseTime":8.79700000025332,"msg":"request completed"}
+{"level":30,"time":1760785036036,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-e","req":{"method":"GET","url":"/api/orders/my","hostname":"127.0.0.1:13628","remoteAddress":"::ffff:127.0.0.1","remotePort":13629},"msg":"incoming request"}
+{"level":30,"time":1760785036037,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-e","res":{"statusCode":401},"responseTime":0.5251000002026558,"msg":"request completed"}
+{"level":30,"time":1760785036335,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-f","req":{"method":"GET","url":"/api/orders/pending-pickup","hostname":"127.0.0.1:13632","remoteAddress":"::ffff:127.0.0.1","remotePort":13633},"msg":"incoming request"}
+{"level":30,"time":1760785036342,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-f","res":{"statusCode":403},"responseTime":6.927399999462068,"msg":"request completed"}
+{"level":30,"time":1760785036616,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-g","req":{"method":"GET","url":"/api/orders/99999","hostname":"127.0.0.1:13634","remoteAddress":"::ffff:127.0.0.1","remotePort":13635},"msg":"incoming request"}
+{"level":50,"time":1760785036625,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-g","err":{"type":"ApiError","message":"Order not found","stack":"ApiError: Order not found\n    at getOrderById (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\src\\services\\orders\\queries.ts:142:11)\n    at Object.<anonymous> (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\src\\routes\\orders.ts:82:21)","name":"ApiError","statusCode":404,"code":"ORDER_NOT_FOUND"},"req":{"method":"GET","url":"/api/orders/99999","hostname":"127.0.0.1:13634","remoteAddress":"::ffff:127.0.0.1","remotePort":13635},"msg":"An error occurred during the request"}
+{"level":30,"time":1760785036627,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-g","res":{"statusCode":404},"responseTime":11.22069999948144,"msg":"request completed"}
+{"level":30,"time":1760785036944,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-h","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:13636","remoteAddress":"::ffff:127.0.0.1","remotePort":13637},"msg":"incoming request"}
+{"level":50,"time":1760785036945,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-h","err":{"type":"Error","message":"body/inventoryItemIds must be array","stack":"Error: body/inventoryItemIds must be array\n    at defaultSchemaErrorFormatter (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\context.js:114:10)\n    at wrapValidationError (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\validation.js:249:17)\n    at validate (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\validation.js:167:16)\n    at preValidationCallback (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\handleRequest.js:93:25)\n    at handler (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\handleRequest.js:77:7)\n    at C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\contentTypeParser.js:199:9\n    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)\n    at done (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\contentTypeParser.js:192:14)\n    at Parser.defaultJsonParser [as fn] (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\contentTypeParser.js:304:5)\n    at IncomingMessage.onEnd (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\node_modules\\fastify\\lib\\contentTypeParser.js:283:27)","statusCode":400,"code":"FST_ERR_VALIDATION","validation":[{"instancePath":"/inventoryItemIds","schemaPath":"#/properties/inventoryItemIds/type","keyword":"type","params":{"type":"array"},"message":"must be array"}],"validationContext":"body"},"req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:13636","remoteAddress":"::ffff:127.0.0.1","remotePort":13637},"msg":"An error occurred during the request"}
+{"level":30,"time":1760785036946,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-h","res":{"statusCode":400},"responseTime":2.1311999997124076,"msg":"request completed"}
+{"level":30,"time":1760785037295,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-i","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:13638","remoteAddress":"::ffff:127.0.0.1","remotePort":13639},"msg":"incoming request"}
+{"level":30,"time":1760785037320,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-i","res":{"statusCode":201},"responseTime":24.870899999514222,"msg":"request completed"}
+{"level":30,"time":1760785037338,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-j","req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:13640","remoteAddress":"::ffff:127.0.0.1","remotePort":13641},"msg":"incoming request"}
+[90mstdout[2m | src/tests/contract/api.contract.integration.test.ts[2m > [22m[2mAPI Contract Tests[2m > [22m[2mError Response Contracts[2m > [22m[2m409 Conflict - 业务冲突
+[22m[39mprisma:error 
+Invalid `tx.order.create()` invocation in
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\create.ts:161:29
+
+  158 const pickup_code = await generateUniquePickupCode();
+  159 
+  160 try {
+→ 161   return await tx.order.create(
+Unique constraint failed on the fields: (`user_id`)
+
+{"level":50,"time":1760785037355,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-j","err":{"type":"ApiError","message":"您有一个正在付款的订单，请先完成付款或等待订单过期","stack":"ApiError: 您有一个正在付款的订单，请先完成付款或等待订单过期\n    at createOrder (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\src\\services\\orders\\create.ts:331:15)\n    at Object.<anonymous> (C:\\Users\\wapadil\\WeChatProjects\\miniprogram-13\\bookworm-backend\\src\\routes\\orders.ts:63:21)","name":"ApiError","statusCode":409,"code":"CONCURRENT_PENDING_ORDER"},"req":{"method":"POST","url":"/api/orders/create","hostname":"127.0.0.1:13640","remoteAddress":"::ffff:127.0.0.1","remotePort":13641},"msg":"An error occurred during the request"}
+{"level":30,"time":1760785037355,"pid":30512,"hostname":"LAPTOP-P2FCIAFQ","reqId":"req-j","res":{"statusCode":409},"responseTime":16.664000000804663,"msg":"request completed"}
+ [31m❯[39m src/tests/contract/api.contract.integration.test.ts [2m([22m[2m15 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 6215[2mms[22m[39m
+   [33m[2m✓[22m[39m API Contract Tests[2m > [22mAuthentication APIs[2m > [22mPOST /api/auth/login - 登录成功返回token和userId [33m 323[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mInventory APIs[2m > [22mGET /api/inventory/available - 获取可用库存列表[32m 280[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mInventory APIs[2m > [22mGET /api/inventory/item/:id - 获取单个库存详情[32m 263[2mms[22m[39m
+   [33m[2m✓[22m[39m API Contract Tests[2m > [22mOrder APIs[2m > [22mPOST /api/orders/create - 创建订单 [33m 311[2mms[22m[39m
+   [33m[2m✓[22m[39m API Contract Tests[2m > [22mOrder APIs[2m > [22mGET /api/orders/:id - 获取订单详情 [33m 321[2mms[22m[39m
+[31m   [31m×[31m API Contract Tests[2m > [22mOrder APIs[2m > [22mGET /api/orders/my - 获取用户订单列表[39m[33m 343[2mms[22m[39m
+[31m     → expected { data: [ { id: 1, …(9) } ], …(1) } to have property "orders"[39m
+   [32m✓[39m API Contract Tests[2m > [22mBooks Recommendation APIs[2m > [22mGET /api/books/recommendations - 获取推荐书籍（无用户资料）[32m 256[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mBooks Recommendation APIs[2m > [22mGET /api/books/recommendations - 获取推荐书籍（有用户资料）[32m 267[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mContent APIs[2m > [22mGET /api/content/:slug - 获取静态内容[32m 250[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mUser APIs[2m > [22mGET /api/users/me - 获取当前用户信息[32m 247[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mError Response Contracts[2m > [22m401 Unauthorized - 缺少认证令牌[32m 288[2mms[22m[39m
+   [33m[2m✓[22m[39m API Contract Tests[2m > [22mError Response Contracts[2m > [22m403 Forbidden - 权限不足 [33m 314[2mms[22m[39m
+   [32m✓[39m API Contract Tests[2m > [22mError Response Contracts[2m > [22m404 Not Found - 资源不存在[32m 295[2mms[22m[39m
+   [33m[2m✓[22m[39m API Contract Tests[2m > [22mError Response Contracts[2m > [22m400 Bad Request - 验证错误 [33m 316[2mms[22m[39m
+   [33m[2m✓[22m[39m API Contract Tests[2m > [22mError Response Contracts[2m > [22m409 Conflict - 业务冲突 [33m 359[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/tests/contract/api.contract.integration.test.ts[2m > [22mAPI Contract Tests[2m > [22mOrder APIs[2m > [22mGET /api/orders/my - 获取用户订单列表
+[31m[1mAssertionError[22m: expected { data: [ { id: 1, …(9) } ], …(1) } to have property "orders"[39m
+[36m [2m❯[22m src/tests/contract/api.contract.integration.test.ts:[2m278:24[22m[39m
+    [90m276| [39m
+    [90m277| [39m      [90m// 验证基本结构[39m
+    [90m278| [39m      [34mexpect[39m(res[33m.[39mbody)[33m.[39m[34mtoHaveProperty[39m([32m'orders'[39m)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m279| [39m      [34mexpect[39m([33mArray[39m[33m.[39m[34misArray[39m(res[33m.[39mbody[33m.[39morders))[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m280| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m  Snapshots [22m [1m[32m14 written[39m[22m
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m14 passed[39m[22m[90m (15)[39m
+[2m   Start at [22m 18:57:03
+[2m   Duration [22m 14.50s[2m (transform 453ms, setup 1.04s, collect 180ms, tests 6.22s, environment 0ms, prepare 150ms)[22m
+
+Tearing down all test containers...
+All containers stopped.

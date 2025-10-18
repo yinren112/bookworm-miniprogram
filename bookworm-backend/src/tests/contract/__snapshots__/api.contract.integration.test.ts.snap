@@ -1,0 +1,293 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`API Contract Tests > Authentication APIs > POST /api/auth/login - 登录成功返回token和userId 1`] = `
+{
+  "merged": false,
+  "token": "[DYNAMIC]",
+  "userId": 4,
+}
+`;
+
+exports[`API Contract Tests > Books Recommendation APIs > GET /api/books/recommendations - 获取推荐书籍（无用户资料） 1`] = `
+{
+  "count": 0,
+  "recommendations": [],
+}
+`;
+
+exports[`API Contract Tests > Books Recommendation APIs > GET /api/books/recommendations - 获取推荐书籍（有用户资料） 1`] = `
+{
+  "count": 0,
+  "items": undefined,
+  "recommendations": [],
+}
+`;
+
+exports[`API Contract Tests > Content APIs > GET /api/content/:slug - 获取静态内容 1`] = `
+{
+  "body": "这是测试内容的正文",
+  "createdAt": "[DYNAMIC_TIMESTAMP]",
+  "id": "[DYNAMIC_ID]",
+  "slug": "[DYNAMIC_SLUG]",
+  "title": "测试内容",
+  "updatedAt": "[DYNAMIC_TIMESTAMP]",
+}
+`;
+
+exports[`API Contract Tests > Error Response Contracts > 400 Bad Request - 验证错误 1`] = `
+{
+  "code": "VALIDATION_ERROR",
+  "details": [
+    {
+      "instancePath": "/inventoryItemIds",
+      "keyword": "type",
+      "message": "must be array",
+      "params": {
+        "type": "array",
+      },
+      "schemaPath": "#/properties/inventoryItemIds/type",
+    },
+  ],
+  "message": "Request validation failed",
+}
+`;
+
+exports[`API Contract Tests > Error Response Contracts > 401 Unauthorized - 缺少认证令牌 1`] = `
+{
+  "code": "UNAUTHORIZED",
+  "message": "Missing authorization header",
+}
+`;
+
+exports[`API Contract Tests > Error Response Contracts > 403 Forbidden - 权限不足 1`] = `
+{
+  "code": "FORBIDDEN",
+  "message": "Forbidden",
+}
+`;
+
+exports[`API Contract Tests > Error Response Contracts > 404 Not Found - 资源不存在 1`] = `
+{
+  "code": "ORDER_NOT_FOUND",
+  "message": "Order not found",
+}
+`;
+
+exports[`API Contract Tests > Error Response Contracts > 409 Conflict - 业务冲突 1`] = `
+{
+  "code": "CONCURRENT_PENDING_ORDER",
+  "message": "您有一个正在付款的订单，请先完成付款或等待订单过期",
+}
+`;
+
+exports[`API Contract Tests > Inventory APIs > GET /api/inventory/available - 获取可用库存列表 1`] = `
+{
+  "data": [
+    {
+      "booksku": {
+        "bookmaster": {
+          "author": "Test Author",
+          "id": "[DYNAMIC_ID]",
+          "isbn13": "9781000000001",
+          "original_price": 10000,
+          "publisher": "Test Publisher",
+          "title": "Test Book 1-1",
+        },
+        "cover_image_url": "https://example.com/cover.jpg",
+        "edition": "1st Edition",
+        "id": "[DYNAMIC_ID]",
+      },
+      "condition": "GOOD",
+      "id": "[DYNAMIC_ID]",
+      "selling_price": 8000,
+      "status": "in_stock",
+    },
+    {
+      "booksku": {
+        "bookmaster": {
+          "author": "Test Author",
+          "id": "[DYNAMIC_ID]",
+          "isbn13": "9781000000001",
+          "original_price": 10000,
+          "publisher": "Test Publisher",
+          "title": "Test Book 1-1",
+        },
+        "cover_image_url": "https://example.com/cover.jpg",
+        "edition": "1st Edition",
+        "id": "[DYNAMIC_ID]",
+      },
+      "condition": "GOOD",
+      "id": "[DYNAMIC_ID]",
+      "selling_price": 8000,
+      "status": "in_stock",
+    },
+    {
+      "booksku": {
+        "bookmaster": {
+          "author": "Test Author",
+          "id": "[DYNAMIC_ID]",
+          "isbn13": "9781000000001",
+          "original_price": 10000,
+          "publisher": "Test Publisher",
+          "title": "Test Book 1-1",
+        },
+        "cover_image_url": "https://example.com/cover.jpg",
+        "edition": "1st Edition",
+        "id": "[DYNAMIC_ID]",
+      },
+      "condition": "GOOD",
+      "id": "[DYNAMIC_ID]",
+      "selling_price": 8000,
+      "status": "in_stock",
+    },
+  ],
+  "meta": {
+    "currentPage": 1,
+    "itemsPerPage": 10,
+    "totalItems": 3,
+    "totalPages": 1,
+  },
+}
+`;
+
+exports[`API Contract Tests > Inventory APIs > GET /api/inventory/item/:id - 获取单个库存详情 1`] = `
+{
+  "bookSku": {
+    "bookMaster": {
+      "author": "Test Author",
+      "id": 1,
+      "isbn13": "9781000000002",
+      "original_price": 10000,
+      "publisher": "Test Publisher",
+      "title": "Test Book 1-2",
+    },
+    "cover_image_url": "https://example.com/cover.jpg",
+    "edition": "1st Edition",
+    "id": 1,
+  },
+  "booksku": undefined,
+  "condition": "GOOD",
+  "id": "[DYNAMIC_ID]",
+  "selling_price": 8000,
+  "sku_id": "[DYNAMIC_ID]",
+  "status": "in_stock",
+}
+`;
+
+exports[`API Contract Tests > Order APIs > GET /api/orders/:id - 获取订单详情 1`] = `
+{
+  "cancelled_at": null,
+  "createdAt": "[DYNAMIC_TIMESTAMP]",
+  "id": "[DYNAMIC_ID]",
+  "items": undefined,
+  "orderItem": [
+    {
+      "id": 1,
+      "inventoryItem": {
+        "bookSku": {
+          "bookMaster": {
+            "author": "Test Author",
+            "id": 1,
+            "isbn13": "9781000000004",
+            "original_price": 10000,
+            "publisher": "Test Publisher",
+            "title": "Test Book 1-4",
+          },
+          "cover_image_url": "https://example.com/cover.jpg",
+          "edition": "1st Edition",
+          "id": 1,
+        },
+        "condition": "GOOD",
+        "id": 1,
+        "selling_price": 8000,
+      },
+      "inventory_item_id": 1,
+      "order_id": 1,
+    },
+  ],
+  "paid_at": null,
+  "paymentExpiresAt": "[DYNAMIC_TIMESTAMP]",
+  "pickup_code": "[DYNAMIC_PICKUP_CODE]",
+  "status": "PENDING_PAYMENT",
+  "total_amount": "80",
+  "user_id": "[DYNAMIC_USER_ID]",
+}
+`;
+
+exports[`API Contract Tests > Order APIs > GET /api/orders/my - 获取用户订单列表 1`] = `
+{
+  "data": [
+    {
+      "cancelled_at": null,
+      "createdAt": "[DYNAMIC_TIMESTAMP]",
+      "id": "[DYNAMIC_ID]",
+      "orderItem": [
+        {
+          "id": 1,
+          "inventoryItem": {
+            "bookSku": {
+              "bookMaster": {
+                "author": "Test Author",
+                "id": 1,
+                "isbn13": "9781000000005",
+                "original_price": 10000,
+                "publisher": "Test Publisher",
+                "title": "Test Book 1-5",
+              },
+              "cover_image_url": "https://example.com/cover.jpg",
+              "edition": "1st Edition",
+              "id": 1,
+            },
+            "condition": "GOOD",
+            "id": 1,
+            "selling_price": 8000,
+          },
+          "inventory_item_id": 1,
+          "order_id": 1,
+        },
+      ],
+      "paid_at": null,
+      "paymentExpiresAt": "[DYNAMIC_TIMESTAMP]",
+      "pickup_code": "[DYNAMIC_PICKUP_CODE]",
+      "status": "PENDING_PAYMENT",
+      "total_amount": "80",
+      "user_id": "[DYNAMIC_USER_ID]",
+    },
+  ],
+  "meta": {
+    "nextCursor": null,
+  },
+}
+`;
+
+exports[`API Contract Tests > Order APIs > POST /api/orders/create - 创建订单 1`] = `
+{
+  "cancelled_at": null,
+  "completed_at": null,
+  "createdAt": "[DYNAMIC_TIMESTAMP]",
+  "id": "[DYNAMIC_ID]",
+  "notes": null,
+  "paid_at": null,
+  "paymentExpiresAt": "[DYNAMIC_TIMESTAMP]",
+  "pickupExpiresAt": null,
+  "pickup_code": "[DYNAMIC_PICKUP_CODE]",
+  "settlementType": null,
+  "status": "PENDING_PAYMENT",
+  "totalWeightKg": null,
+  "total_amount": "160",
+  "type": "PURCHASE",
+  "unitPrice": null,
+  "userId": "[DYNAMIC_USER_ID]",
+  "user_id": 2,
+  "voucherFaceValue": null,
+}
+`;
+
+exports[`API Contract Tests > User APIs > GET /api/users/me - 获取当前用户信息 1`] = `
+{
+  "createdAt": "[DYNAMIC_TIMESTAMP]",
+  "id": "[DYNAMIC_ID]",
+  "phone_number": "[DYNAMIC_PHONE]",
+  "role": "USER",
+}
+`;

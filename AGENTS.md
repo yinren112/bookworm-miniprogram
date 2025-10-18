@@ -191,3 +191,81 @@
 
 - 贡献与评审需以“Linus Torvalds”视角执行：优先梳理数据结构，消除特殊分支，避免多层缩进，任何改动不得破坏既有功能。
 - 交付报告固定以`[X] passed, [Y] failed, [Z] total`开头，随后列出事实性变更，若遇阻塞需明确说明缺失信息。
+
+## 项目概览
+
+**Bookworm** 是一个校园二手教材平台，由微信小程序前端与 Fastify + Prisma 后端构成。系统以“书目 → SKU → 实体库存”三级模型管理每一本实体书，所有流程围绕库存状态流转设计。
+
+## Bookworm 核心原则
+
+1. **数据库即法律**：通过部分唯一索引、CHECK 约束与 `pg_advisory_xact_lock` 保证并发一致性。应用层必须优雅处理 Prisma 错误（如 `P2002`），禁止写“先查再写”的竞态代码。
+2. **零信任**：`processPaymentNotification` 主动查单并验证签名时间戳，所有外部输入均需验证与指数退避重试。
+3. **测试即真相**：`npm test` 覆盖单测，`npm run test:integration` 借助 Testcontainers 串行跑完真实数据库集成测试。任何改动都要让全部测试通过。
+4. **基础设施即代码**：开发环境由 `docker-compose` 与 Testcontainers 描述，数据库连接池通过 `globalThis` 单例与优雅关闭钩子管理，禁止依赖手工配置。
+
+## 架构速览
+
+### 后端 (`bookworm-backend/`)
+
+- **核心服务**
+  - `src/services/purchaseOrderService.ts`：购书订单创建、付款意图、履约、状态流转等全部读取写入逻辑。
+  - `src/services/sellOrderService.ts`：按重量收购（SELL 单）的一步流转，创建 `PRE_REGISTERED` 用户、批量 SKU 与 `BULK_ACQUISITION` 库存。
+  - `src/services/orderService.ts`：仅作为聚合出口，重新导出购书与收购服务，保持既有引用路径兼容。
+  - 其余服务（`inventoryService.ts`、`authService.ts`、`acquisitionService.ts`、`refundService.ts` 等）保持 TypeScript 事务注入模式。
+- **外部适配器**
+  - `src/adapters/wechatPayAdapter.ts`：封装 wechatpay-node-v3，按“可重试/不可重试”分类错误。
+- **共享 Schema**
+  - `src/routes/sharedSchemas.ts` 定义 TypeBox 校验（如手机号、分页参数）。
+- **插件与作业**
+  - 认证、指标、限流均以 Fastify 插件注册；`src/jobs/cancelExpiredOrders.ts`、`src/jobs/refundProcessor.ts` 等以 CRON 驱动。
+- **测试配置**
+  - `vitest.config.ts`：单测。`vitest.integration.config.ts`：集成测试。`vitest.database-integration.config.ts` 已删除，禁止引用旧配置名称。
+
+### 前端 (`miniprogram/`)
+
+- **页面**
+  - `pages/market/`、`pages/orders/`、`pages/profile/` 为 TabBar 主入口。
+  - `pages/order-confirm/`、`pages/order-detail/`、`pages/acquisition-scan/` 等承载核心业务流。
+- **核心工具模块**
+  - `utils/token.js`：本地持久化 token 与 userId。
+  - `utils/api.js`：统一封装请求、重试与 401 处理，通过 `setLoginProvider` 注入登录 Promise，避免循环依赖。
+  - `utils/auth.js`：封装 `wx.login` / `/auth/login` 交换逻辑、手机号绑定与 UI 提示。
+  - 其余 `ui.js`、`payment.js`、`constants.js` 提供 UI 与支付辅助。
+- **WXS 模块**
+  - `formatter.wxs`、`filters.wxs` 等用于 WXML 渲染格式化，命名需和模板引用一致。
+
+### 关键业务规则
+
+- 库存状态流转：`IN_STOCK → RESERVED → SOLD`，另含 `RETURNED`、`DAMAGED`、`BULK_ACQUISITION`。
+- 订单状态：`PENDING_PAYMENT → PENDING_PICKUP → COMPLETED`，取消/退货穿插于流程。
+- 单用户仅允许一个待支付订单，最大预留数量与单笔订单条目由配置约束。
+- 收购单使用保留 ISBN `0000000000000` 创建批量 SKU，并即时完结。
+
+## 开发与测试命令
+
+```bash
+cd bookworm-backend
+npm run dev                      # 热重载开发
+npm run build && npm run start   # 生产流程
+npm test                         # Vitest 单测 + 覆盖率
+npm run test:integration         # Testcontainers 集成测试
+npm run lint                     # ESLint 检查
+npm run migrate:dev              # 开发迁移
+dotenv -e .env.test -- npx prisma migrate reset --force  # 重置测试库
+```
+
+小程序需在微信开发者工具导入 `miniprogram/`，并在 `miniprogram/config.js` 设置后端 `apiBaseUrl`。
+
+## 环境配置要点
+
+- 复制 `.env.example` 为 `.env`，按需覆盖数据库、JWT、微信参数。
+- 数据库连接串需附带 `connection_limit` 与 `pool_timeout`，测试环境独立使用 `.env.test`。
+- 微信手机号授权需企业资质并消耗配额；处理失败时要给出明确 UI 反馈。
+- 监控入口：`/metrics`（Prometheus），`/api/health`（健康检查）。
+
+## 常见注意事项
+
+- 任何库存/订单写操作必须运行在事务中，并接受传入的 `Prisma.TransactionClient`。
+- 401 自动重登仅通过 `api.setLoginProvider(auth.ensureLoggedIn)` 注入，禁止在模块顶层互相 `require`。
+- 提交前需确保 `npm test` 与（涉及数据库改动时）`npm run test:integration` 均通过。
+- 修改监控或计量逻辑时提供 `test_metrics.sh` 输出。

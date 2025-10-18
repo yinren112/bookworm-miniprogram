@@ -193,13 +193,22 @@ The system follows a strict "books as atomic inventory items" model where each i
 
 **Core Services:**
 - `src/services/inventoryService.ts` - Book inventory management
-- `src/services/orderService.ts` - Order processing with inventory reservation
+- `src/services/orderService.ts` - Order processing with inventory reservation (handles both PURCHASE and SELL orders)
 - `src/services/authService.ts` - WeChat OAuth integration and account merging
 - `src/services/bookMetadataService.ts` - Book metadata fetching from external APIs
 - `src/services/bookService.ts` - Book search and management
 - `src/services/contentService.ts` - Static content management
 - `src/services/acquisitionService.ts` - Book acquisition (buying from customers)
 - `src/services/refundService.ts` - Processes payments marked for refund
+
+**External Adapters:**
+- `src/adapters/wechatPayAdapter.ts` - Type-safe wrapper for wechatpay-node-v3 SDK
+  - Isolates all SDK 'any' casts to adapter layer
+  - Error classification: retryable vs non-retryable
+  - Core methods: createPaymentOrder, queryPaymentStatus, verifySignature, createRefund
+
+**Shared Validation Schemas:**
+- `src/routes/sharedSchemas.ts` - TypeBox schemas shared across routes (e.g., PhoneNumberSchema)
 
 **Key Architectural Decisions:**
 - **Monolithic Design**: Single Fastify server handling all APIs
@@ -214,12 +223,15 @@ The system follows a strict "books as atomic inventory items" model where each i
 ### Frontend Structure (`miniprogram/`)
 
 **Page Structure:**
-- `pages/market/` - Book marketplace with search
+- `pages/market/` - Book marketplace with search (TabBar)
+- `pages/orders/` - User order history (TabBar)
+- `pages/profile/` - User profile, phone authorization, and support contact (TabBar)
 - `pages/book-detail/` - Individual book details with purchase flow
-- `pages/orders/` - User order history
-- `pages/profile/` - User profile, phone authorization, and support contact
 - `pages/order-confirm/` - Order confirmation flow
+- `pages/order-detail/` - Order detail view with status tracking
 - `pages/acquisition-scan/` - Book acquisition scanning (staff only)
+- `pages/customer-service/` - Customer support (WeChat ID copy)
+- `pages/webview/` - Generic WebView for dynamic content loading
 
 **Design System:**
 - Global CSS variables in `app.wxss` (V10 design system)
@@ -227,10 +239,23 @@ The system follows a strict "books as atomic inventory items" model where each i
 - Brand colors: Primary green `#2c5f2d`, secondary `#558056`
 
 **Module Architecture:**
-- **Dependency Chain**: Frontend utilities follow a strict linear dependency chain (`auth.js` → `api.js` → `token.js`) to prevent circular dependencies.
-- `token.js`: Manages user token and ID in local storage. Zero dependencies.
-- `api.js`: Handles all API requests, depends on `token.js`.
-- `auth.js`: Manages login/logout flow, depends on `api.js` and `token.js`.
+- **Core Utility Modules**:
+  - `token.js`: Manages user token and ID in local storage. Zero dependencies.
+  - `api.js`: Handles all API requests, depends on `config.js`, `token.js`, `auth.js`
+  - `auth.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
+
+- **Additional Utility Modules**:
+  - `ui.js`: UI helpers (showError, showSuccess, formatPrice)
+  - `error.js`: Error message extraction
+  - `payment.js`: Payment workflow (createOrderAndPay, safeCreateOrderAndPay)
+  - `constants.js`: Business constants (ORDER_STATUS enums)
+  - `config.js`: API configuration (apiBaseUrl)
+
+- **WXS Modules** (for WXML rendering):
+  - `formatter.wxs`: Time formatting (formatTime, formatOrderTime)
+  - `filters.wxs`: Price formatting (formatPrice, formatCurrency, formatCurrencyFromCents)
+
+**⚠️ Dependency Note**: `api.js` requires `auth.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.performRequest → 401 handling → auth.ensureLoggedIn → auth.login → wx.request).
 
 ## Development Commands
 
@@ -250,6 +275,10 @@ npm run start
 # Testing
 npm test                    # Unit tests with coverage
 npm run test:integration    # Integration tests
+
+# Code Quality
+npm run lint                # Run ESLint checks
+npm run lint:fix            # Auto-fix ESLint issues
 
 # Database operations
 npm run migrate:dev         # Run development migrations
@@ -276,19 +305,34 @@ npx prisma migrate dev
 The system uses PostgreSQL with these core entities:
 
 **Book Hierarchy:**
-- `BookMaster` - Book metadata (ISBN, title, author)  
-- `BookSKU` - Book editions/variants
+- `BookMaster` - Book metadata (ISBN, title, author)
+- `BookSKU` - Book editions/variants (with is_acquirable flag)
 - `InventoryItem` - Individual physical books for sale
 
 **Transaction Flow:**
 - `User` - WeChat users via OpenID, with optional phone_number and status (REGISTERED | PRE_REGISTERED)
-- `Order` - Purchase orders with pickup codes
+- `Order` - Purchase and sell orders with pickup codes (type: PURCHASE | SELL)
 - `OrderItem` - Links orders to specific inventory items
-- `SellOrder` - Records of books acquired from customers (staff only)
+- `PendingPaymentOrder` - Enforces one pending payment order per user (unique constraint)
+
+**Payment & Acquisition:**
+- `PaymentRecord` - Complete payment flow tracking with refund support (status: PENDING → SUCCESS → REFUNDED)
+- `Acquisition` - Book acquisition records (staff purchases from customers)
+
+**Recommendation System:**
+- `UserProfile` - Student identity (enrollment_year, major, class_name)
+- `RecommendedBookList` - Per-major book recommendations
+- `RecommendedBookItem` - Links BookSKU to recommendation lists
+
+**Static Content:**
+- `Content` - CMS-style static content (slug-based routing)
 
 **Critical States:**
-- `inventory_status`: `in_stock` → `reserved` → `sold`
-- `order_status`: `pending_payment` → `pending_pickup` → `completed`
+- `inventory_status`: `in_stock` → `reserved` → `sold` (also: `returned`, `damaged`, `BULK_ACQUISITION`)
+- `order_status`: `pending_payment` → `pending_pickup` → `completed` (also: `cancelled`, `returned`)
+- `order_type`: `PURCHASE` (user buys books) | `SELL` (staff acquires from customers)
+- `payment_status`: `PENDING` → `SUCCESS` → `REFUND_REQUIRED` → `REFUND_PROCESSING` → `REFUNDED` (also: `FAILED`)
+- `user_status`: `REGISTERED` (WeChat login) | `PRE_REGISTERED` (placeholder for phone-based merge)
 
 ## Business Rules
 
@@ -301,15 +345,24 @@ The system uses PostgreSQL with these core entities:
    - **PRE_REGISTERED**: Placeholder accounts created during sell-book transactions (no WeChat login yet)
    - When a PRE_REGISTERED user logs in via WeChat and authorizes phone number, accounts automatically merge
    - Phone number serves as the bridge between the two identity systems
-   - Merge preserves all historical sell order records
+   - Merge preserves all historical sell order records and acquisitions
+6. **Sell Order Workflow** (Book Acquisition from Customers):
+   - Staff acquires books from customers via single-step flow (no payment step required)
+   - Creates PRE_REGISTERED user if phone number doesn't exist in system
+   - Generates Order(type='SELL') with: totalWeightKg, unitPrice, settlementType, voucherFaceValue
+   - Creates InventoryItem(status='BULK_ACQUISITION', sourceOrderId=order.id)
+   - Settlement types: CASH (direct payment) or VOUCHER (store credit = baseAmount × 2)
+   - Special ISBN "0000000000000" used for bulk acquisitions without specific ISBN tracking
+   - Order is immediately marked as COMPLETED (no pickup flow for sell orders)
 
 ## Key Files to Understand
 
 **Backend Core:**
 - `bookworm-backend/src/index.ts` - Main API server with global error handling
-- `bookworm-backend/src/config.ts` - Environment configuration with validation
+- `bookworm-backend/src/config.ts` - Environment configuration with validation (64 environment variables)
 - `bookworm-backend/prisma/schema.prisma` - Complete database schema with enums and constraints
-- `bookworm-backend/Dockerfile` - Multi-stage Docker build for production
+- `bookworm-backend/Dockerfile.prod` - Production multi-stage Docker build (3-stage with npm mirror)
+- `bookworm-backend/entrypoint.sh` - Production startup script with database migration
 
 **Plugins & Middleware:**
 - `bookworm-backend/src/plugins/auth.ts` - JWT authentication plugin
@@ -362,13 +415,31 @@ TANSHU_API_KEY=
 
 # Business Logic Configuration (optional, has defaults)
 ORDER_PAYMENT_TTL_MINUTES=15
+ORDER_PICKUP_CODE_LENGTH=10
+ORDER_PICKUP_CODE_BYTES=5
 MAX_ITEMS_PER_ORDER=10
+MAX_RESERVED_ITEMS_PER_USER=20
+
+# Database Transaction Retry Configuration
+DB_TRANSACTION_RETRY_COUNT=3
+DB_TRANSACTION_RETRY_BASE_DELAY_MS=20
+DB_TRANSACTION_RETRY_JITTER_MS=40
+PICKUP_CODE_RETRY_COUNT=5
+
+# Payment Security Configuration
+PAYMENT_TIMESTAMP_TOLERANCE_SECONDS=300
+
+# API Rate Limiting Configuration
 API_RATE_LIMIT_MAX=5
+API_RATE_LIMIT_WINDOW_MINUTES=1
+API_LOGIN_RATE_LIMIT_MAX=10
+API_FULFILL_RATE_LIMIT_MAX=30
 
 # Scheduled Jobs (cron expressions)
 CRON_ORDER_CLEANUP=*/1 * * * *
 CRON_INVENTORY_METRICS=*/5 * * * *
 CRON_WECHAT_CERT_REFRESH=0 */10 * * *
+CRON_REFUND_PROCESSOR=*/10 * * * *
 ```
 
 **Database Connection Pooling:**
@@ -395,19 +466,22 @@ WX_APP_SECRET=test-app-secret
 - `POST /auth/login` - WeChat Mini Program authentication (accepts optional `phoneCode` for account merging)
 - `GET /users/me` - Get current user info (returns id, role, phone_number, createdAt)
 - `GET /books/meta?isbn=` - Book metadata lookup
+- `GET /books/recommendations` - Get personalized book recommendations (requires authentication)
 - `GET /inventory/available` - List available books with search & pagination
 - `GET /inventory/item/:id` - Book details
 - `POST /inventory/add` - Add book to inventory (staff only)
 - `GET /content/:slug` - Static content retrieval
 - `POST /orders/create` - Create new order (reserves inventory)
 - `GET /orders/:id` - Get specific order details
-- `GET /orders/user/:userId` - User order history
+- `GET /orders/my` - User order history with cursor-based pagination (secure: uses JWT userId)
 - `POST /orders/fulfill` - Fulfill order with pickup code (staff only)
 - `GET /orders/pending-pickup` - List pending pickup orders (staff only)
+- `PATCH /orders/:id/status` - Update order status to COMPLETED or CANCELLED (staff only)
 - `POST /orders/:orderId/pay` - Generate WeChat payment parameters
-- `POST /payment/notify` - WeChat Pay callback webhook
-- `POST /sell-orders` - Create sell order (staff only, for acquiring books from customers)
+- `POST /payment/notify` - WeChat Pay callback webhook (signature-verified, no JWT required)
 - `GET /acquisitions/check?isbn=` - Check if ISBN is eligible for acquisition
+- `POST /acquisitions` - Create acquisition record (staff only)
+- `POST /sell-orders` - Create sell order (staff only, for acquiring books from customers)
 
 **System APIs:**
 - `GET /metrics` - Prometheus metrics for monitoring
@@ -466,24 +540,33 @@ WX_APP_SECRET=test-app-secret
 
 ## Testing Strategy
 
-**Unit Tests:** Use Vitest for service layer testing
+**Unit Tests:** Use Vitest with mocks for service layer testing
 ```bash
 npm test                    # Run all unit tests with coverage
 ```
+- Uses Vitest's `vi.mock()` to mock Prisma client (no real database)
+- Fast execution, focused on business logic
+- Coverage reporting enabled
 
-**Integration Tests:** Test API endpoints with real database
+**Integration Tests:** Test API endpoints with real PostgreSQL
 ```bash
-npm run test:integration    # Run integration tests
+npm run test:integration    # Run integration tests with Testcontainers
 ```
+- Uses `@testcontainers/postgresql` to dynamically create isolated PostgreSQL instances
+- Each test worker gets its own PostgreSQL container
+- Configured for single-worker execution (threads: false, singleFork: true)
+- Database cleanup handled automatically via `integrationSetup.ts` hooks
 
-**Database Integration:** Comprehensive order flow and payment testing
-```bash
-npx vitest run --config vitest.database-integration.config.ts
-```
+**Test Infrastructure:**
+- `globalSetup.ts`: Starts Testcontainers and provides helper functions (createTestUser, createTestInventoryItems)
+- `integrationSetup.ts`: Provides beforeEach/afterEach hooks for automatic database cleanup
+- `setup.ts`: Provides Prisma mocks for unit tests
+- Test helpers in `test-helpers/testServices.ts`: Business logic test utilities
 
-**Test Database:** Separate SQLite database for testing to avoid conflicts
-- Unit tests: In-memory SQLite
-- Integration tests: File-based SQLite with real PostgreSQL schema
+**Important Notes:**
+- docker-compose.yml defines `postgres_test` service (port 54320) but is NOT used by integration tests
+- Integration tests create their own containers via Testcontainers, independent of docker-compose
+- vitest.database-integration.config.ts is legacy and not actively used (no corresponding npm script)
 
 ## Monitoring & Observability
 
@@ -505,37 +588,70 @@ npx vitest run --config vitest.database-integration.config.ts
 ## Background Jobs & Scheduled Tasks
 
 **Order Cleanup:** Automatically cancel expired orders
-- Runs every minute in development (configurable)
+- Runs every minute in development (configurable via CRON_ORDER_CLEANUP)
 - Releases reserved inventory back to available pool
 - Updates metrics counters
+- Uses atomic CTE queries for consistency
 
 **Inventory Metrics:** Update Prometheus gauges
-- Runs every 5 minutes
-- Tracks inventory by status (in_stock, reserved, sold)
+- Runs every 5 minutes (configurable via CRON_INVENTORY_METRICS)
+- Tracks inventory by status (in_stock, reserved, sold, BULK_ACQUISITION, etc.)
 
 **WeChat Pay Certificates:** Auto-refresh platform certificates
-- Runs every 10 hours
+- Runs every 10 hours (configurable via CRON_WECHAT_CERT_REFRESH)
 - Critical for payment verification
 - Graceful fallback and error handling
+
+**Refund Processor:** Process pending refunds
+- Runs every 10 minutes (configurable via CRON_REFUND_PROCESSOR)
+- Scans for PaymentRecord with status=REFUND_REQUIRED
+- Initiates refund via WeChat Pay API
+- Updates status to REFUND_PROCESSING → REFUNDED
+- Includes retry logic with exponential backoff
 
 ## Deployment
 
 **Docker Support:**
 ```bash
-# Build production image
-docker build -t bookworm-backend .
+# Build production image (uses Dockerfile.prod in staging/production)
+docker build -f Dockerfile.prod -t bookworm-backend .
 
-# Run container
+# Run container (default port: 8080)
 docker run -p 8080:8080 --env-file .env bookworm-backend
 ```
 
-**Multi-stage Build:**
-- Stage 1: Build TypeScript and generate Prisma client
-- Stage 2: Lightweight runtime with only production dependencies
+**Multi-stage Build (Dockerfile.prod):**
+- Stage 1 (base): Node.js 20 alpine with npm mirror configuration
+- Stage 2 (dependencies): Install production dependencies
+- Stage 3 (builder): Build TypeScript and generate Prisma client
+- Stage 4 (production): Lightweight runtime with only production dependencies
+- Includes `entrypoint.sh` for database migration on startup
+
+**Staging Environment:**
+```bash
+# Deploy staging environment with load balancer
+docker-compose -f docker-compose.staging.yml up -d
+
+# Components:
+# - Backend (3 replicas via Dockerfile.prod)
+# - PostgreSQL (persistent volume)
+# - Nginx (load balancer, nginx.staging.conf)
+# - Monitoring stack (Grafana + Prometheus via docker-compose.monitoring.yml)
+```
+
+**⚠️ Port Configuration Note:**
+- Default application port: **8080** (configurable via PORT env var)
+- `Dockerfile` exposes port 3000 (legacy/dev config, ignore this)
+- `Dockerfile.prod` correctly exposes port 8080 (production config)
+- Local development (`npm run dev`) uses PORT from config.ts (default: 8080)
 
 **Production Checklist:**
 - Set strong `JWT_SECRET`
-- Configure proper `DATABASE_URL`
-- Set up WeChat app credentials
-- Configure monitoring endpoints
-- Set appropriate cron schedules
+- Configure proper `DATABASE_URL` with connection pooling
+- Set up WeChat app credentials (WX_APP_ID, WX_APP_SECRET)
+- Configure WeChat Pay credentials (WXPAY_*)
+- Configure monitoring endpoints (/metrics, /health)
+- Set appropriate cron schedules for background jobs
+- Review and adjust rate limiting configuration
+- Configure database transaction retry parameters
+- Set PAYMENT_TIMESTAMP_TOLERANCE_SECONDS appropriately

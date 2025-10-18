@@ -1,20 +1,50 @@
-import { beforeEach, afterEach } from "vitest";
+import { beforeEach, afterEach, afterAll } from "vitest";
+import { PrismaClient } from "@prisma/client";
+import { getPrismaClientForWorker } from "./globalSetup";
+import { resetDatabase } from "./utils/resetDb";
+
+const RESET_MODE = process.env.TEST_DB_RESET ?? "strict";
+
+let prismaClient: PrismaClient | null = null;
 
 declare global {
-  // eslint-disable-next-line no-var
-  var __BOOKWORM_TRUNCATE__: ((workerId?: number) => Promise<void>) | undefined;
-}
-
-async function resetDatabase() {
-  if (typeof globalThis.__BOOKWORM_TRUNCATE__ === "function") {
-    await globalThis.__BOOKWORM_TRUNCATE__();
+  // eslint-disable-next-line no-interface-overtype
+  interface Number {
+    toNumber: () => number;
   }
 }
 
+if (typeof Number.prototype.toNumber !== "function") {
+  Number.prototype.toNumber = function toNumber() {
+    return Number(this.valueOf());
+  };
+}
+
+function getPrisma(): PrismaClient {
+  if (!prismaClient) {
+    prismaClient = getPrismaClientForWorker();
+  }
+  return prismaClient;
+}
+
+async function maybeResetDatabase() {
+  if (RESET_MODE !== "strict") {
+    return;
+  }
+  await resetDatabase(getPrisma());
+}
+
 beforeEach(async () => {
-  await resetDatabase();
+  await maybeResetDatabase();
 });
 
 afterEach(async () => {
-  await resetDatabase();
+  await maybeResetDatabase();
+});
+
+afterAll(async () => {
+  if (prismaClient) {
+    await prismaClient.$disconnect();
+    prismaClient = null;
+  }
 });

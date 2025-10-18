@@ -1,0 +1,68 @@
+name: CI Lint & Security Scan
+
+on:
+  pull_request:
+    branches: [ main, master, develop ]
+  push:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-scan:
+    name: Code Quality & Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 需要完整的 git 历史用于 grep 扫描
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            bookworm-backend/package-lock.json
+            package-lock.json
+
+      # ============================================
+      # 后端 Lint
+      # ============================================
+      - name: Install backend dependencies
+        working-directory: bookworm-backend
+        run: npm ci
+
+      - name: Run backend ESLint
+        working-directory: bookworm-backend
+        run: npm run lint
+
+      # ============================================
+      # 前端 Lint (需要先安装 eslint)
+      # ============================================
+      - name: Install root dependencies for frontend lint
+        run: npm install --save-dev eslint@8
+
+      - name: Run frontend ESLint
+        run: npx eslint miniprogram --ext .js,.wxs --config .eslintrc.js
+
+      # ============================================
+      # 护栏扫描脚本
+      # ============================================
+      - name: Run CI Security Scan
+        run: |
+          chmod +x scripts/ci-lint-scan.sh
+          bash scripts/ci-lint-scan.sh
+
+      # ============================================
+      # 失败时上传日志
+      # ============================================
+      - name: Upload scan results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-scan-results
+          path: |
+            bookworm-backend/eslint-report.txt
+            miniprogram/eslint-report.txt
+          retention-days: 7

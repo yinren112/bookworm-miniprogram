@@ -80,10 +80,15 @@ describe("User Profile & Recommendations Integration Tests", () => {
       });
 
       expect(profile).not.toBeNull();
-      expect(profile!.phone_number).toBe("13800138000");
       expect(profile!.enrollment_year).toBe(2023);
       expect(profile!.major).toBe("计算机科学与技术");
       expect(profile!.class_name).toBe("计科2301");
+
+      // 验证手机号已存储在 User 表（单一真相源）
+      const user = await prisma.user.findUnique({
+        where: { id: customerId },
+      });
+      expect(user!.phone_number).toBe("13800138000");
 
       // 验证库存项已创建
       const inventoryCount = await prisma.inventoryItem.count({
@@ -162,8 +167,13 @@ describe("User Profile & Recommendations Integration Tests", () => {
       });
 
       expect(profile).not.toBeNull();
-      expect(profile!.phone_number).toBe("13900139001"); // 已更新
       expect(profile!.class_name).toBe("软工2302"); // 已更新
+
+      // 验证手机号已更新在 User 表（单一真相源）
+      const user = await prisma.user.findUnique({
+        where: { id: customerId },
+      });
+      expect(user!.phone_number).toBe("13900139001"); // 已更新
     });
 
     it("应该在不提供画像时正常创建收购", async () => {
@@ -263,7 +273,7 @@ describe("User Profile & Recommendations Integration Tests", () => {
           title: "深入理解计算机系统",
           author: "Randal E. Bryant",
           publisher: "机械工业出版社",
-          original_price: 139.0,
+          original_price: 13900, // 139 yuan = 13900 cents
         },
       });
 
@@ -293,9 +303,9 @@ describe("User Profile & Recommendations Integration Tests", () => {
       // 创建库存（book1有2本，book2有1本）
       await prisma.inventoryItem.createMany({
         data: [
-          { sku_id: book1Sku.id, condition: "GOOD", cost: 70.0, selling_price: 85.0, status: "in_stock" },
-          { sku_id: book1Sku.id, condition: "NEW", cost: 90.0, selling_price: 110.0, status: "in_stock" },
-          { sku_id: book2Sku.id, condition: "GOOD", cost: 60.0, selling_price: 80.0, status: "in_stock" },
+          { sku_id: book1Sku.id, condition: "GOOD", cost: 7000, selling_price: 8500, status: "in_stock" }, // 70 yuan = 7000 cents, 85 yuan = 8500 cents
+          { sku_id: book1Sku.id, condition: "NEW", cost: 9000, selling_price: 11000, status: "in_stock" }, // 90 yuan = 9000 cents, 110 yuan = 11000 cents
+          { sku_id: book2Sku.id, condition: "GOOD", cost: 6000, selling_price: 8000, status: "in_stock" }, // 60 yuan = 6000 cents, 80 yuan = 8000 cents
         ],
       });
 
@@ -303,7 +313,6 @@ describe("User Profile & Recommendations Integration Tests", () => {
       await prisma.userProfile.create({
         data: {
           user_id: userId,
-          phone_number: "13700137000",
           enrollment_year: 2023,
           major: "计算机科学与技术",
           class_name: "计科2301",
@@ -383,7 +392,7 @@ describe("User Profile & Recommendations Integration Tests", () => {
 
       // 只为 book1 创建库存
       await prisma.inventoryItem.create({
-        data: { sku_id: book1Sku.id, condition: "GOOD", cost: 50.0, selling_price: 70.0, status: "in_stock" },
+        data: { sku_id: book1Sku.id, condition: "GOOD", cost: 5000, selling_price: 7000, status: "in_stock" }, // 50 yuan = 5000 cents, 70 yuan = 7000 cents
       });
 
       // 创建用户画像

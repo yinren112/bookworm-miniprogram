@@ -14,6 +14,7 @@ describe("Refund Recovery Integration", () => {
     await prisma.paymentRecord.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.inventoryItem.deleteMany();
+    await prisma.acquisition.deleteMany(); // Delete Acquisition before User
     await prisma.order.deleteMany();
     await prisma.bookSku.deleteMany();
     await prisma.bookMaster.deleteMany();

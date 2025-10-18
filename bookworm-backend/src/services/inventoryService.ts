@@ -2,6 +2,7 @@
 import { Prisma, PrismaClient, book_condition } from "@prisma/client";
 import { getBookMetadata } from "./bookMetadataService";
 import { DEFAULT_VALUES, INVENTORY_STATUS } from "../constants";
+import { inventorySelectBasic } from "../db/views/inventoryView";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 type BookMetadata = Awaited<ReturnType<typeof getBookMetadata>>;
@@ -163,28 +164,6 @@ export async function getAvailableBooks(
 export async function getBookById(prisma: PrismaClient | Prisma.TransactionClient, id: number) {
   return prisma.inventoryItem.findUnique({
     where: { id },
-    select: {
-      id: true,
-      condition: true,
-      selling_price: true,
-      status: true,
-      bookSku: {
-        select: {
-          id: true,
-          edition: true,
-          cover_image_url: true,
-          bookMaster: {
-            select: {
-              id: true,
-              isbn13: true,
-              title: true,
-              author: true,
-              publisher: true,
-              original_price: true,
-            },
-          },
-        },
-      },
-    },
+    select: inventorySelectBasic,
   });
 }

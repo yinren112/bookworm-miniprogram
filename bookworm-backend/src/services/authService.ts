@@ -5,6 +5,8 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import config from "../config";
 import { metrics } from "../plugins/metrics";
 import { WECHAT_CONSTANTS } from "../constants";
+import { maskOpenId, maskPhoneNumber } from "../lib/logSanitizer";
+import { log } from "../lib/logger";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -116,7 +118,7 @@ async function findAndMergePreRegisteredUser(
   openid: string,
   unionid?: string,
 ) {
-  // Look for PRE_REGISTERED user with matching phone number
+  // STEP 1: Look for PRE_REGISTERED user with matching phone number
   const preRegisteredUser = await dbCtx.user.findFirst({
     where: {
       phone_number: phoneNumber,
@@ -124,22 +126,126 @@ async function findAndMergePreRegisteredUser(
     },
   });
 
-  if (preRegisteredUser) {
-    // Merge: Update the placeholder account with real WeChat credentials
-    const mergedUser = await dbCtx.user.update({
-      where: { id: preRegisteredUser.id },
-      data: {
-        openid,
-        unionid,
-        status: 'REGISTERED',
-      },
-    });
-
-    console.log(`Merged PRE_REGISTERED user ${preRegisteredUser.id} with WeChat openid ${openid}`);
-    return mergedUser;
+  if (!preRegisteredUser) {
+    return null;
   }
 
-  return null;
+  // STEP 2: CRITICAL - Check if this openid/unionid is already in use by a REGISTERED user
+  // This prevents violating UNIQUE constraints and data corruption
+  const conflictingUser = await dbCtx.user.findFirst({
+    where: {
+      OR: [
+        { openid },
+        unionid ? { unionid } : undefined,
+      ].filter(Boolean) as any,
+      status: 'REGISTERED',
+    },
+  });
+
+  if (conflictingUser) {
+    // CONFLICT RESOLUTION:
+    // The openid/unionid already belongs to an existing REGISTERED user.
+    // This means the phone number owner has ALREADY logged in via WeChat before.
+    // We should:
+    // 1. Transfer the phone_number to the existing REGISTERED user (if missing)
+    // 2. Delete the placeholder PRE_REGISTERED user
+    // 3. Transfer any associated data (e.g., sell orders) to the REGISTERED user
+
+    log.info(
+      {
+        preRegisteredUserId: preRegisteredUser.id,
+        conflictingUserId: conflictingUser.id,
+        phone: maskPhoneNumber(phoneNumber),
+        openid: maskOpenId(openid)
+      },
+      'Merge conflict: PRE_REGISTERED user conflicts with existing REGISTERED user, merging into REGISTERED user'
+    );
+
+    // CRITICAL: Transfer ALL associated records BEFORE deleting placeholder user
+    // This prevents foreign key constraint violations and preserves data integrity
+
+    // Step 1: Transfer all orders from PRE_REGISTERED to REGISTERED user
+    await dbCtx.order.updateMany({
+      where: { user_id: preRegisteredUser.id },
+      data: { user_id: conflictingUser.id },
+    });
+
+    // Step 2: Transfer all pending payment orders
+    await dbCtx.pendingPaymentOrder.updateMany({
+      where: { user_id: preRegisteredUser.id },
+      data: { user_id: conflictingUser.id },
+    });
+
+    // Step 3: Transfer acquisition records (as customer)
+    await dbCtx.acquisition.updateMany({
+      where: { customer_user_id: preRegisteredUser.id },
+      data: { customer_user_id: conflictingUser.id },
+    });
+
+    // Step 4: Handle UserProfile migration
+    // Check if both users have profiles
+    const preRegProfile = await dbCtx.userProfile.findUnique({
+      where: { user_id: preRegisteredUser.id },
+    });
+    const conflictingProfile = await dbCtx.userProfile.findUnique({
+      where: { user_id: conflictingUser.id },
+    });
+
+    if (preRegProfile && !conflictingProfile) {
+      // PRE_REGISTERED has profile but REGISTERED doesn't - transfer it
+      await dbCtx.userProfile.update({
+        where: { user_id: preRegisteredUser.id },
+        data: { user_id: conflictingUser.id },
+      });
+    } else if (preRegProfile && conflictingProfile) {
+      // Both have profiles - delete PRE_REGISTERED profile (keep REGISTERED one)
+      await dbCtx.userProfile.delete({
+        where: { user_id: preRegisteredUser.id },
+      });
+    }
+    // If only conflictingUser has profile or neither has profile, nothing to do
+
+    // Step 5: Delete the PRE_REGISTERED placeholder (releases phone_number)
+    await dbCtx.user.delete({
+      where: { id: preRegisteredUser.id },
+    });
+
+    // Step 6: Update REGISTERED user with phone number (if not already set)
+    // This is now safe because PRE_REGISTERED user is deleted
+    if (!conflictingUser.phone_number) {
+      await dbCtx.user.update({
+        where: { id: conflictingUser.id },
+        data: { phone_number: phoneNumber },
+      });
+    }
+
+    log.info(
+      { preRegisteredUserId: preRegisteredUser.id, registeredUserId: conflictingUser.id },
+      'Merge complete: Transferred data from PRE_REGISTERED user to REGISTERED user and deleted placeholder'
+    );
+
+    // Return the updated REGISTERED user
+    return await dbCtx.user.findUniqueOrThrow({
+      where: { id: conflictingUser.id },
+    });
+  }
+
+  // STEP 3: No conflict - safe to merge
+  // Update the PRE_REGISTERED placeholder with real WeChat credentials
+  const mergedUser = await dbCtx.user.update({
+    where: { id: preRegisteredUser.id },
+    data: {
+      openid,
+      unionid,
+      status: 'REGISTERED',
+    },
+  });
+
+  log.info(
+    { userId: preRegisteredUser.id, openid: maskOpenId(openid) },
+    'Merge: PRE_REGISTERED user upgraded to REGISTERED'
+  );
+  return mergedUser;
 }
 
 export function generateJwtToken(user: { id: number; openid: string }) {

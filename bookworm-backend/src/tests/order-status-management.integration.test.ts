@@ -1,5 +1,5 @@
 // Order Status Management Integration Tests
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import { createTestApp } from "../app-factory";
 import { FastifyInstance } from "fastify";
@@ -10,7 +10,6 @@ describe("Order Status Management Integration Tests", () => {
   let staffToken: string;
   let userToken: string;
   let testUserId: number;
-  let staffUserId: number;
   let inventoryItemIds: number[];
   let testOrderId: number;
   let prisma: any;
@@ -20,46 +19,6 @@ describe("Order Status Management Integration Tests", () => {
     app = await createTestApp();
     await app.ready();
 
-    // Create test users
-    const staffUser = await createTestUser("STAFF");
-    const regularUser = await createTestUser("USER");
-
-    staffToken = staffUser.token;
-    userToken = regularUser.token;
-    staffUserId = staffUser.userId;
-    testUserId = regularUser.userId;
-
-    // Create test inventory items
-    inventoryItemIds = await createTestInventoryItems(2);
-  });
-
-  afterEach(async () => {
-    // Clean up any pending orders for the test user to prevent constraint violations
-    if (testUserId && prisma) {
-      // First delete reservation records to avoid FK constraint violations
-      const pendingOrders = await prisma.order.findMany({
-        where: {
-          user_id: testUserId,
-          status: { in: ["PENDING_PAYMENT", "PENDING_PICKUP"] }
-        },
-        select: { id: true }
-      });
-
-      const orderIds = pendingOrders.map(o => o.id);
-
-      if (orderIds.length > 0) {
-        // Delete reservations first
-        await prisma.inventoryReservation.deleteMany({
-          where: { order_id: { in: orderIds } }
-        });
-
-        // Then update order status
-        await prisma.order.updateMany({
-          where: { id: { in: orderIds } },
-          data: { status: "CANCELLED" }
-        });
-      }
-    }
   });
 
   afterAll(async () => {
@@ -67,6 +26,13 @@ describe("Order Status Management Integration Tests", () => {
   });
 
   beforeEach(async () => {
+    const staffUser = await createTestUser("STAFF");
+    const regularUser = await createTestUser("USER");
+
+    staffToken = staffUser.token;
+    userToken = regularUser.token;
+    testUserId = regularUser.userId;
+
     // Create fresh inventory items for each test
     inventoryItemIds = await createTestInventoryItems(2);
 

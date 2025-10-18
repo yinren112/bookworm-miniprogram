@@ -132,7 +132,7 @@ export async function createTestInventoryItems(
       title: "Test Book",
       author: "Test Author",
       publisher: "Test Publisher",
-      original_price: 100.0,
+      original_price: 10000, // 100 yuan = 10000 cents
     },
   });
 
@@ -152,8 +152,8 @@ export async function createTestInventoryItems(
       data: {
         sku_id: bookSku.id,
         condition: "GOOD",
-        cost: 60.0,
-        selling_price: 80.0,
+        cost: 6000, // 60 yuan = 6000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
         status: "in_stock",
       },
     });

@@ -1,6 +1,6 @@
 // Error Handling Integration Tests
 // Tests the layered global error handler to ensure consistent error responses
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { createTestApp } from "../app-factory";
 import { FastifyInstance } from "fastify";
@@ -16,8 +16,9 @@ describe("Error Handling Integration Tests", () => {
     prisma = getPrismaClientForWorker();
     app = await createTestApp();
     await app.ready();
+  });
 
-    // Create test users for authentication tests
+  beforeEach(async () => {
     const userResult = await createTestUser("USER");
     const staffResult = await createTestUser("STAFF");
     validToken = userResult.token;

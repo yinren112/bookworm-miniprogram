@@ -7,6 +7,7 @@ import {
   requestWxSession,
   requestWxPhoneNumber
 } from "../services/authService";
+import { maskPhoneNumber } from "../lib/logSanitizer";
 import config from "../config";
 import prisma from "../db";
 
@@ -41,7 +42,11 @@ const authRoutes: FastifyPluginAsync = async function (fastify) {
         const fetchedPhoneNumber = await requestWxPhoneNumber(phoneCode);
         if (fetchedPhoneNumber) {
           phoneNumber = fetchedPhoneNumber;
-          request.log.info({ phoneNumber }, "User authorized phone number");
+          // 安全日志：脱敏手机号
+          request.log.info(
+            { phoneNumber: maskPhoneNumber(phoneNumber) },
+            "User authorized phone number"
+          );
         } else {
           request.log.warn("Failed to fetch phone number despite phoneCode being provided");
         }

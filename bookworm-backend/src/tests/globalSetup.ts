@@ -3,6 +3,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { resetDatabase } from './utils/resetDb';
 
 const execAsync = promisify(exec);
 
@@ -44,7 +45,7 @@ export async function setup(config: any) {
       },
     });
 
-    await truncateAllTables(prismaClients[i]);
+    await resetDatabase(prismaClients[i]);
   }
 
   // Pass the container details to the test environment
@@ -53,7 +54,7 @@ export async function setup(config: any) {
   globalThis.__BOOKWORM_TRUNCATE__ = async (workerId?: number) => {
     const resolvedWorkerId = workerId ?? parseInt(process.env.VITEST_WORKER_ID || '1', 10);
     const client = prismaClients[resolvedWorkerId] ?? getPrismaClientForWorker();
-    await truncateAllTables(client);
+    await resetDatabase(client);
   };
 }
 
@@ -108,24 +109,7 @@ export function getPrismaClientForWorker(): PrismaClient {
 }
 
 async function truncateAllTables(prisma: PrismaClient) {
-  await prisma.$executeRawUnsafe(`
-    TRUNCATE TABLE
-      "RecommendedBookItem",
-      "RecommendedBookList",
-      "UserProfile",
-      "PaymentRecord",
-      "orderitem",
-      "inventory_reservation",
-      "inventoryitem",
-      "pending_payment_order",
-      "Order",
-      "Acquisition",
-      "booksku",
-      "bookmaster",
-      "Content",
-      "User"
-    RESTART IDENTITY CASCADE;
-  `);
+  await resetDatabase(prisma);
 }
 
 // Helper functions that use the worker's Prisma client
@@ -168,24 +152,22 @@ export async function createTestInventoryItems(
 ): Promise<number[]> {
   const prisma = getPrismaClientForWorker();
 
-  // Generate a truly unique ISBN using multiple entropy sources
+  // Generate a stable, deterministic ISBN for contract tests
   const workerId = parseInt(process.env.VITEST_WORKER_ID || '1', 10);
-  const timestamp = Date.now();
-  const randomNum = Math.floor(Math.random() * 100000);
   testBookCounter++;
 
-  // Use upsert to handle potential conflicts gracefully
-  const uniqueIsbn = `978${workerId}${testBookCounter}${randomNum}`.slice(0, 13).padEnd(13, '0');
+  // Use deterministic ISBN based on worker ID and counter only (no timestamp/random)
+  const uniqueIsbn = `978${workerId}${String(testBookCounter).padStart(9, '0')}`.slice(0, 13);
 
   const bookMaster = await prisma.bookMaster.upsert({
     where: { isbn13: uniqueIsbn },
     update: {},
     create: {
       isbn13: uniqueIsbn,
-      title: `Test Book ${timestamp}-${testBookCounter}`,
+      title: `Test Book ${workerId}-${testBookCounter}`,
       author: "Test Author",
       publisher: "Test Publisher",
-      original_price: 100.0,
+      original_price: 10000, // 100 yuan = 10000 cents
     },
   });
 
@@ -205,8 +187,8 @@ export async function createTestInventoryItems(
       data: {
         sku_id: bookSku.id,
         condition: "GOOD",
-        cost: 60.0,
-        selling_price: 80.0,
+        cost: 6000, // 60 yuan = 6000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
         status: "in_stock",
       },
     });

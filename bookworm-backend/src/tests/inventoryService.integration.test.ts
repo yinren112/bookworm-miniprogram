@@ -1,5 +1,5 @@
 // src/tests/inventoryService.integration.test.ts - Integration Tests
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { ApiError } from "../errors";
 import { getPrismaClientForWorker, createTestUser, createTestInventoryItems } from "./globalSetup";
 import { addBookToInventoryTest, createOrderTest, fulfillOrderTest } from "./test-helpers/testServices";
@@ -19,8 +19,8 @@ describe("Inventory Service Integration Tests", () => {
         title: "Advanced Mathematics",
         author: "John Smith",
         condition: "NEW" as const,
-        cost: 15.0,
-        selling_price: 25.0,
+        cost: 1500, // 15 yuan = 1500 cents
+        selling_price: 2500, // 25 yuan = 2500 cents
       };
 
       // Execute: Add book to inventory
@@ -29,8 +29,8 @@ describe("Inventory Service Integration Tests", () => {
       // Assert: Check inventory item was created correctly
       expect(inventoryItem).toBeDefined();
       expect(inventoryItem.condition).toBe("NEW");
-      expect(Number(inventoryItem.cost)).toBe(15.0);
-      expect(Number(inventoryItem.selling_price)).toBe(25.0);
+      expect(Number(inventoryItem.cost)).toBe(1500); // 15 yuan = 1500 cents
+      expect(Number(inventoryItem.selling_price)).toBe(2500); // 25 yuan = 2500 cents
       expect(inventoryItem.status).toBe("in_stock");
 
       // Assert: Check bookMaster was created
@@ -69,8 +69,8 @@ describe("Inventory Service Integration Tests", () => {
         author: "Jane Doe",
         edition: "Second Edition",
         condition: "NEW" as const,
-        cost: 20.0,
-        selling_price: 35.0,
+        cost: 2000, // 20 yuan = 2000 cents
+        selling_price: 3500, // 35 yuan = 3500 cents
       };
 
       // Setup: Create first book
@@ -98,8 +98,8 @@ describe("Inventory Service Integration Tests", () => {
       const secondBookData = {
         ...bookData,
         condition: "GOOD" as const,
-        cost: 15.0,
-        selling_price: 28.0,
+        cost: 1500, // 15 yuan = 1500 cents
+        selling_price: 2800, // 28 yuan = 2800 cents
       };
 
       const secondInventoryItem = await addBookToInventoryTest(prisma, secondBookData);
@@ -131,8 +131,8 @@ describe("Inventory Service Integration Tests", () => {
 
       // Assert: Second inventory item has correct different properties
       expect(secondInventoryItem.condition).toBe("GOOD");
-      expect(Number(secondInventoryItem.cost)).toBe(15.0);
-      expect(Number(secondInventoryItem.selling_price)).toBe(28.0);
+      expect(Number(secondInventoryItem.cost)).toBe(1500); // 15 yuan = 1500 cents
+      expect(Number(secondInventoryItem.selling_price)).toBe(2800); // 28 yuan = 2800 cents
     });
   });
 
@@ -190,39 +190,38 @@ describe("Inventory Service Integration Tests", () => {
   });
 
   describe("getAvailableBooks - Search with special LIKE characters", () => {
-    beforeAll(async () => {
-      // Setup: Create specific books for these tests
+    beforeEach(async () => {
       await addBookToInventoryTest(prisma, {
         isbn13: "9780000000001",
         title: "Book with 100% guarantee",
         author: "Test Author",
         condition: "NEW",
-        cost: 10,
-        selling_price: 20,
+        cost: 1000,
+        selling_price: 2000,
       });
       await addBookToInventoryTest(prisma, {
         isbn13: "9780000000002",
-        title: "Another C__ book", // Two underscores
+        title: "Another C__ book",
         author: "Test Author",
         condition: "NEW",
-        cost: 10,
-        selling_price: 20,
+        cost: 1000,
+        selling_price: 2000,
       });
       await addBookToInventoryTest(prisma, {
         isbn13: "9780000000003",
         title: "A regular CSS book",
         author: "Another Author",
         condition: "NEW",
-        cost: 10,
-        selling_price: 20,
+        cost: 1000,
+        selling_price: 2000,
       });
       await addBookToInventoryTest(prisma, {
         isbn13: "9780000000004",
         title: "C++ Programming Guide",
         author: "Different Author",
         condition: "NEW",
-        cost: 15,
-        selling_price: 25,
+        cost: 1500,
+        selling_price: 2500,
       });
     });
 
@@ -254,8 +253,8 @@ describe("Inventory Service Integration Tests", () => {
         title: "100% Complete C__ Guide",
         author: "Special Author",
         condition: "NEW",
-        cost: 30,
-        selling_price: 40,
+        cost: 3000, // 30 yuan = 3000 cents
+        selling_price: 4000, // 40 yuan = 4000 cents
       });
 
       const result = await getAvailableBooks(prisma, { searchTerm: "100% Complete C__" });

@@ -11,7 +11,7 @@ export const setupTestDatabase = () => {
     if (databaseUrl) {
       // Override the DATABASE_URL for this process
       process.env.DATABASE_URL = databaseUrl;
-      console.log(`✅ Test database URL set for worker ${workerId}: ${databaseUrl.substring(0, 30)}...`);
+      console.error(`✅ Test database URL set for worker ${workerId}: ${databaseUrl.substring(0, 30)}...`); // Test setup log
     }
   }
 };

@@ -2,6 +2,7 @@
 const { checkAcquisition, createSellOrder } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
+const { formatPrice } = ui;
 
 Page({
   data: {
@@ -31,7 +32,6 @@ Page({
       });
 
       const isbn = res.result;
-      console.log('Scanned ISBN:', isbn);
 
       // 显示加载提示
       wx.showLoading({ title: '查询中...', mask: true });
@@ -40,8 +40,6 @@ Page({
         // 调用API检查书籍是否可收购
         const data = await checkAcquisition(isbn);
         wx.hideLoading();
-
-        console.log('API Response:', data);
 
         if (data.acquirableSkus && data.acquirableSkus.length > 0) {
           // 可收购 - 使用第一个SKU
@@ -78,7 +76,6 @@ Page({
         ui.showError(errorMsg);
       }
     } catch (scanError) {
-      console.log('Scan cancelled or failed:', scanError);
       // 用户取消扫码，不显示错误
     }
   },
@@ -127,14 +124,16 @@ Page({
   },
 
   /**
-   * 计算最终总金额
+   * 计算最终总金额（防止NaN显示）
    */
   calculateFinalAmount() {
     const weight = parseFloat(this.data.totalWeight || 0);
     const unitPrice = parseFloat(this.data.unitPriceYuan || 0);
     const amount = weight * unitPrice;
+
+    // 使用 formatPrice 防止 NaN 显示
     this.setData({
-      finalAmount: amount.toFixed(2)
+      finalAmount: formatPrice(amount)
     });
   },
 
@@ -214,11 +213,7 @@ Page({
         notes: `批量收购 - ${acquirableItems.length} 本书籍通过白名单筛选`
       };
 
-      console.log('Submitting sell order:', payload);
-
       const result = await createSellOrder(payload);
-
-      console.log('Sell order created:', result);
 
       wx.showToast({
         title: '收购成功',

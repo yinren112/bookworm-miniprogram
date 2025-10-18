@@ -69,25 +69,6 @@ Page({
     return `${year}-${month}-${day} ${hours}:${minutes}`;
   },
 
-  getStatusText(status) {
-    const statusMap = {
-      'PENDING_PAYMENT': '待支付',
-      'PENDING_PICKUP': '待取货', 
-      'COMPLETED': '已完成',
-      'CANCELLED': '已取消'
-    };
-    return statusMap[status] || status;
-  },
-
-  getConditionText(condition) {
-    const conditionMap = {
-      'NEW': '全新',
-      'GOOD': '良好',
-      'ACCEPTABLE': '可用'
-    };
-    return conditionMap[condition] || condition;
-  },
-
   onRefresh() {
     const pages = getCurrentPages();
     const currentPage = pages[pages.length - 1];

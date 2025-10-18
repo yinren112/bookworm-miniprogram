@@ -1,5 +1,6 @@
 <!-- pages/orders/index.wxml -->
 <wxs src="../../utils/formatter.wxs" module="tools" />
+<wxs module="filters" src="../../utils/filters.wxs"></wxs>
 
 <view class="container">
   <view class="header-title">我的订单</view>
@@ -22,7 +23,7 @@
           <text class="first-book">{{item.orderItem[0].inventoryItem.bookSku.bookMaster.title}}</text>
           <text wx:if="{{item.orderItem.length > 1}}" class="more-books"> 等{{item.orderItem.length}}件商品</text>
         </view>
-        <view class="order-total">¥{{item.total_amount}}</view>
+        <view class="order-total">{{filters.formatCurrency(item.total_amount)}}</view>
       </view>
     </view>
   </view>

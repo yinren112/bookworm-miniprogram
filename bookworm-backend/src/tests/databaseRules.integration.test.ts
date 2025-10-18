@@ -1,8 +1,17 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Prisma, PrismaClient, OrderStatus, OrderType, SettlementType } from "@prisma/client";
 import { getPrismaClientForWorker, createTestUser, createTestInventoryItems } from "./globalSetup";
-import { isPrismaRetryableError } from "../utils/typeGuards";
-import { withTxRetry } from "../services/orderService";
+import { withTxRetry } from "../db/transaction";
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 describe("Database-level Business Rules", () => {
   let prisma: PrismaClient;
@@ -12,48 +21,72 @@ describe("Database-level Business Rules", () => {
   });
 
   describe("withTxRetry", () => {
-    it("should retry and succeed on a P2034 serialization failure", { timeout: 15000 }, async () => {
-      const itemIds = await createTestInventoryItems(1);
-      const itemId = itemIds[0];
+    it("retries deterministically on serialization conflicts", async () => {
+      const [itemId] = await createTestInventoryItems(1);
+      let attempts = 0;
 
-      let attemptCount = 0;
-      let hasInitiallyFailed = false;
+      const lockGate = createDeferred<void>();
+      const lockReady = createDeferred<void>();
 
-      const conflictingFunction = async () => {
-        attemptCount += 1;
+      const lockingTransaction = prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT 1 FROM "inventoryitem" WHERE id = ${itemId} FOR UPDATE`;
+        lockReady.resolve();
+        await lockGate.promise;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-        return prisma.$transaction(async (tx) => {
-          await tx.inventoryItem.findUnique({ where: { id: itemId } });
+      await lockReady.promise;
 
-          if (attemptCount === 1) {
-            prisma.inventoryItem.update({
-              where: { id: itemId },
-              data: { cost: 99 },
-            }).catch(() => undefined);
-            await new Promise((res) => setTimeout(res, 20));
-          }
+      const retriedUpdate = withTxRetry(
+        prisma,
+        async (tx) => {
+          attempts += 1;
+          await tx.$queryRaw`SELECT 1 FROM "inventoryitem" WHERE id = ${itemId} FOR UPDATE NOWAIT`;
+          return tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { cost: 2222 },
+          });
+        },
+        { maxRetries: 3, baseDelayMs: 5, jitter: false },
+      );
 
-          try {
-            return await tx.inventoryItem.update({
-              where: { id: itemId },
-              data: { cost: 101 },
+      setTimeout(() => lockGate.resolve(), 50);
+
+      const [, retryResult] = await Promise.allSettled([lockingTransaction, retriedUpdate]);
+
+      expect(retryResult.status).toBe("fulfilled");
+      expect(attempts).toBeGreaterThan(1);
+
+      const finalRecord = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+      expect(finalRecord).not.toBeNull();
+      expect(Number(finalRecord!.cost)).toBe(2222);
+    });
+
+    it("does not retry for non-retryable errors", async () => {
+      const dupOpenId = `dup-${Date.now()}`;
+      await prisma.user.create({
+        data: {
+          openid: dupOpenId,
+        },
+      });
+
+      let attempts = 0;
+
+      await expect(
+        withTxRetry(
+          prisma,
+          async (tx) => {
+            attempts += 1;
+            await tx.user.create({
+              data: {
+                openid: dupOpenId,
+              },
             });
-          } catch (e) {
-            if (isPrismaRetryableError(e)) {
-              hasInitiallyFailed = true;
-            }
-            throw e;
-          }
-        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-      };
+          },
+          { maxRetries: 3, baseDelayMs: 5, jitter: false },
+        ),
+      ).rejects.toMatchObject({ code: "P2002" });
 
-      await withTxRetry(conflictingFunction);
-
-      expect(hasInitiallyFailed).toBe(true);
-      expect(attemptCount).toBeGreaterThan(1);
-
-      const finalItem = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
-      expect(finalItem?.cost.toNumber()).toBe(101);
+      expect(attempts).toBe(1);
     });
   });
 
@@ -257,8 +290,8 @@ describe("Database-level Business Rules", () => {
           data: {
             sku_id: skuId,
             condition: "GOOD",
-            cost: 20,
-            selling_price: 40,
+            cost: 2000, // 20 yuan = 2000 cents
+            selling_price: 4000, // 40 yuan = 4000 cents
             status: "BULK_ACQUISITION",
             sourceOrderId: purchaseOrder.id,
           },
@@ -293,8 +326,8 @@ describe("Database-level Business Rules", () => {
         data: {
           sku_id: skuId,
           condition: "GOOD",
-          cost: 10,
-          selling_price: 25,
+          cost: 1000, // 10 yuan = 1000 cents
+          selling_price: 2500, // 25 yuan = 2500 cents
           status: "BULK_ACQUISITION",
           sourceOrderId: sellOrder.id,
         },

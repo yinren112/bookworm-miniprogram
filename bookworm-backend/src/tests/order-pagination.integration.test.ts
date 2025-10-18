@@ -17,6 +17,7 @@ describe("Order Cursor Pagination Integration", () => {
     await prisma.inventoryReservation.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.inventoryItem.deleteMany();
+    await prisma.acquisition.deleteMany(); // Delete Acquisition before User
     await prisma.order.deleteMany();
     await prisma.bookSku.deleteMany();
     await prisma.bookMaster.deleteMany();

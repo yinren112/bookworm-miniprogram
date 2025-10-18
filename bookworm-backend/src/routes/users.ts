@@ -2,6 +2,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
 import prisma from "../db";
+import { sanitizeUser } from "../lib/logSanitizer";
 
 const UserResponseSchema = Type.Object({
   id: Type.Integer(),
@@ -24,7 +25,7 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const userId = request.user!.userId;
-      console.log('[DEBUG] /api/users/me - User ID from JWT:', userId);
+      request.log.debug({ userId }, 'Fetching user info from JWT');
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -36,7 +37,11 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      console.log('[DEBUG] /api/users/me - User from database:', user);
+      // 安全日志：脱敏用户数据
+      request.log.debug(
+        { user: sanitizeUser(user || undefined) },
+        'User fetched from database'
+      );
 
       if (!user) {
         return reply.code(404).send({
@@ -52,7 +57,8 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
         phone_number: user.phone_number,
       };
 
-      console.log('[DEBUG] /api/users/me - Response:', response);
+      // 注意：响应数据不需要脱敏（已由 Pino redaction 处理）
+      request.log.debug('User info response prepared');
 
       return reply.send(response);
     }

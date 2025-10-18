@@ -1,4 +1,5 @@
 import { BUSINESS_LIMITS } from "../constants";
+import { log } from "../lib/logger";
 
 /**
  * A simple utility to retry an async function with exponential backoff.
@@ -23,9 +24,7 @@ export async function retryAsync<T>(
       }
       // Wait for an exponentially increasing amount of time.
       const backoffDelay = delay * Math.pow(2, i);
-      console.log(
-        `Attempt ${i + 1}/${attempts} failed. Retrying in ${backoffDelay}ms...`,
-      );
+      log.debug({ attempt: i + 1, attempts, backoffDelay }, `Retry attempt failed, retrying in ${backoffDelay}ms`);
       await new Promise((res) => setTimeout(res, backoffDelay));
     }
   }

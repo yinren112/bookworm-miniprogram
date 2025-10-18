@@ -2,6 +2,7 @@
 const { request, getRecommendations } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
+const { swrFetch } = require('../../utils/cache');
 
 Page({
   data: {
@@ -22,37 +23,51 @@ Page({
 
   onShow() {
     if (this.hasShownOnce) {
-      this.fetchAvailableBooks({ preserveData: true });
-      this.fetchRecommendations(); // Refresh recommendations on page show
+      // 第二次进入：优先返回缓存，后台刷新
+      this.fetchAvailableBooks();
+      this.fetchRecommendations();
     } else {
       this.hasShownOnce = true;
+      // 首次进入：正常加载
       this.fetchAvailableBooks();
-      this.fetchRecommendations(); // Load recommendations on first show
+      this.fetchRecommendations();
     }
   },
 
-  async fetchAvailableBooks({ preserveData = false } = {}) {
-    if (!preserveData) {
-      this.setData({
-        state: {
-          status: 'loading',
-          data: [],
-          error: null,
-        },
-      });
-    } else {
-      this.setData({ 'state.error': null });
-    }
-    let url = `/inventory/available`;
-    if (this.data.searchTerm) {
-      url += `?search=${encodeURIComponent(this.data.searchTerm)}`;
+  async fetchAvailableBooks({ forceRefresh = false } = {}) {
+    // 构建缓存键（包含搜索词，不同搜索词不同缓存）
+    const searchTerm = this.data.searchTerm || '';
+    const cacheKey = `market:list:${searchTerm}`;
+
+    // 显示加载状态（首次加载或强制刷新时）
+    if (forceRefresh || this.data.state.data.length === 0) {
+      this.setData({ 'state.status': 'loading', 'state.error': null });
     }
 
+    let url = `/inventory/available`;
+    if (searchTerm) {
+      url += `?search=${encodeURIComponent(searchTerm)}`;
+    }
+
+    const fetcher = () => request({ url, method: 'GET' });
+
     try {
-      const data = await request({
-        url: url,
-        method: 'GET'
+      const data = await swrFetch(cacheKey, fetcher, {
+        ttlMs: 30000, // 30 秒 TTL
+        forceRefresh,
+        onBackgroundUpdate: (freshData) => {
+          // 后台刷新成功，静默更新 UI
+          this.setData({
+            state: {
+              status: 'success',
+              data: freshData.data,
+              error: null
+            },
+            pageInfo: freshData.meta
+          });
+        }
       });
+
       this.setData({
         state: {
           status: 'success',
@@ -64,10 +79,11 @@ Page({
     } catch (error) {
       console.error('API request failed', error);
       const errorMsg = extractErrorMessage(error, '加载失败');
+      // 失败时不清空旧数据（swrFetch 已降级返回缓存）
       this.setData({
         state: {
           status: 'error',
-          data: [],
+          data: this.data.state.data, // 保留现有数据
           error: errorMsg
         }
       });
@@ -90,15 +106,33 @@ Page({
 
   // Pull down refresh
   async onPullDownRefresh() {
-    await this.fetchAvailableBooks({ preserveData: true });
-    await this.fetchRecommendations();
+    // 下拉刷新强制拉取新数据
+    await Promise.all([
+      this.fetchAvailableBooks({ forceRefresh: true }),
+      this.fetchRecommendations({ forceRefresh: true })
+    ]);
     wx.stopPullDownRefresh();
   },
 
   // Fetch personalized recommendations
-  async fetchRecommendations() {
+  async fetchRecommendations({ forceRefresh = false } = {}) {
+    const cacheKey = 'market:recommendations:v1';
+    const fetcher = () => getRecommendations();
+
     try {
-      const data = await getRecommendations();
+      const data = await swrFetch(cacheKey, fetcher, {
+        ttlMs: 60000, // 60 秒 TTL（推荐更新频率较低）
+        forceRefresh,
+        onBackgroundUpdate: (freshData) => {
+          // 后台刷新成功，静默更新 UI
+          if (freshData && Array.isArray(freshData.recommendations)) {
+            this.setData({
+              recommendations: freshData.recommendations
+            });
+          }
+        }
+      });
+
       // Only update if we got valid recommendations
       if (data && Array.isArray(data.recommendations)) {
         this.setData({
@@ -108,8 +142,7 @@ Page({
     } catch (error) {
       // Silently handle errors - recommendations are optional
       // Don't show error messages to avoid disrupting main page experience
-      console.log('Failed to load recommendations (this is optional):', error);
-      this.setData({ recommendations: [] });
+      // swrFetch 已经降级返回缓存（如果有），这里无需额外处理
     }
   },
 

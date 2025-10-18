@@ -1,4 +1,4 @@
-const config = require('../config');
+const baseRequest = require('./request');
 const tokenUtil = require('./token');
 const ui = require('./ui');
 
@@ -14,31 +14,29 @@ function callWxLogin() {
   });
 }
 
-function exchangeCodeForToken(code, phoneCode) {
-  return new Promise((resolve, reject) => {
-    const requestData = { code };
-    // 只有当 phoneCode 存在时才添加到请求中
-    if (phoneCode) {
-      requestData.phoneCode = phoneCode;
-    }
+async function exchangeCodeForToken(code, phoneCode) {
+  const requestData = { code };
+  // 只有当 phoneCode 存在时才添加到请求中
+  if (phoneCode) {
+    requestData.phoneCode = phoneCode;
+  }
 
-    wx.request({
-      url: config.apiBaseUrl + '/auth/login',
+  try {
+    const data = await baseRequest.request({
+      url: '/auth/login',
       method: 'POST',
       data: requestData,
-      header: {
-        'Content-Type': 'application/json',
-      },
-      success: (res) => {
-        if (res.statusCode >= 200 && res.statusCode < 300 && res.data && res.data.token) {
-          resolve(res.data);
-        } else {
-          reject(new Error((res.data && res.data.message) || '登录失败'));
-        }
-      },
-      fail: () => reject(new Error('登录请求失败')),
+      requireAuth: false, // 登录请求不需要 token
     });
-  });
+
+    if (data && data.token) {
+      return data;
+    } else {
+      throw new Error((data && data.message) || '登录失败');
+    }
+  } catch (error) {
+    throw new Error((error && error.message) || '登录请求失败');
+  }
 }
 
 async function login() {
@@ -61,7 +59,7 @@ async function loginWithPhoneNumber(phoneCode) {
     }
     return data;
   } catch (error) {
-    console.error('Login with phone number failed:', error);
+    console.error('Login with authorization failed:', error);
     throw error;
   }
 }

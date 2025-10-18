@@ -1,0 +1,128 @@
+/**
+ * 价格格式化 WXS 模块
+ * 用于在 WXML 中安全显示价格，防止 NaN
+ *
+ * 支持三种输入格式：
+ * 1. 已格式化的字符串（例如 "14.40"） - 后端已格式化的金额
+ * 2. Decimal 数字（例如 14.40） - 数据库 Decimal 类型，单位为元
+ * 3. 整数 cents（需要手动除以100） - 不推荐，仅用于特殊场景
+ */
+
+/**
+ * 格式化价格
+ * @param {number|string} value - 价格值
+ * @param {number} decimals - 小数位数，默认2
+ * @returns {string} 格式化后的价格
+ */
+var formatPrice = function(value, decimals) {
+  decimals = decimals || 2;
+
+  // 如果是字符串类型，检查是否已经是格式化的价格字符串
+  if (typeof value === 'string') {
+    // 尝试解析为数字
+    var num = parseFloat(value);
+
+    // 如果解析成功，说明是有效的数字字符串
+    if (!isNaN(num) && isFinite(num)) {
+      // 如果字符串中已经包含小数点，说明已经是格式化好的，直接返回
+      if (value.indexOf('.') !== -1) {
+        // 确保小数位数正确（补齐或截断到指定位数）
+        return num.toFixed(decimals);
+      }
+      // 否则按数字处理
+      return num.toFixed(decimals);
+    }
+
+    // 如果解析失败，返回默认零值
+    var zero = '0.';
+    for (var i = 0; i < decimals; i++) {
+      zero += '0';
+    }
+    return zero;
+  }
+
+  // 数字类型：直接格式化
+  var num = parseFloat(value);
+
+  // 检查是否为有效数字
+  if (isNaN(num) || !isFinite(num)) {
+    // 生成指定位数的零值
+    var zero = '0.';
+    for (var i = 0; i < decimals; i++) {
+      zero += '0';
+    }
+    return zero;
+  }
+
+  // 格式化为指定小数位
+  return num.toFixed(decimals);
+}
+
+/**
+ * 格式化价格并添加货币符号
+ * @param {number|string} value - 价格值（元）
+ * @param {string} symbol - 货币符号，默认 '¥'
+ * @returns {string} 带货币符号的价格
+ */
+var formatCurrency = function(value, symbol) {
+  symbol = symbol || '¥';
+  return symbol + formatPrice(value);
+}
+
+/**
+ * 将 cents 转换为元并格式化
+ * @param {number} cents - 价格值（分）
+ * @param {string} symbol - 货币符号，默认 '¥'
+ * @returns {string} 带货币符号的价格
+ */
+var formatCurrencyFromCents = function(cents, symbol) {
+  symbol = symbol || '¥';
+  var yuan = cents / 100;
+  return symbol + formatPrice(yuan);
+}
+
+/**
+ * 订单状态文本映射
+ */
+var ORDER_STATUS_MAP = {
+  'PENDING_PAYMENT': '待支付',
+  'PENDING_PICKUP': '待取货',
+  'COMPLETED': '已完成',
+  'CANCELLED': '已取消',
+  'RETURNED': '已退货'
+};
+
+/**
+ * 书况文本映射
+ */
+var BOOK_CONDITION_MAP = {
+  'NEW': '全新',
+  'GOOD': '良好',
+  'ACCEPTABLE': '可用'
+};
+
+/**
+ * 获取订单状态文本
+ * @param {string} status - 订单状态枚举值
+ * @returns {string} 状态文本
+ */
+var getStatusText = function(status) {
+  return ORDER_STATUS_MAP[status] || status;
+}
+
+/**
+ * 获取书况文本
+ * @param {string} condition - 书况枚举值
+ * @returns {string} 书况文本
+ */
+var getConditionText = function(condition) {
+  return BOOK_CONDITION_MAP[condition] || condition;
+}
+
+module.exports = {
+  formatPrice: formatPrice,
+  formatCurrency: formatCurrency,
+  formatCurrencyFromCents: formatCurrencyFromCents,
+  getStatusText: getStatusText,
+  getConditionText: getConditionText
+}

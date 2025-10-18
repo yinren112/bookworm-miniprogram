@@ -1,0 +1,75 @@
+name: API Contract Tests
+
+on:
+  pull_request:
+    branches: [ main, master, develop ]
+  push:
+    branches: [ main, master, develop ]
+
+jobs:
+  contract-tests:
+    name: Validate API Contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: bookworm-backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: bookworm-backend
+        run: npm ci
+
+      - name: Run API Contract Tests
+        working-directory: bookworm-backend
+        run: |
+          # ⚠️ 重要：不使用 -u 标志，禁止自动更新快照
+          npm run test:integration -- src/tests/contract/api.contract.integration.test.ts
+        env:
+          CI: true
+          NODE_ENV: test
+
+      - name: Check for snapshot changes (防止意外提交快照变更)
+        if: always()
+        run: |
+          if git diff --exit-code bookworm-backend/src/tests/contract/__snapshots__/; then
+            echo "✅ No snapshot changes detected"
+          else
+            echo "❌ SNAPSHOT CHANGES DETECTED!"
+            echo ""
+            echo "快照文件已被修改。这通常意味着："
+            echo "1. API 响应格式发生了变更（需要评审）"
+            echo "2. 测试代码有误（需要修复）"
+            echo ""
+            echo "如果这是有意的 API 变更："
+            echo "1. 在本地运行: npm run test:integration -- src/tests/contract/api.contract.integration.test.ts -u"
+            echo "2. 仔细检查 git diff 中的快照变更"
+            echo "3. 在 PR 中附上破坏性/兼容性说明"
+            echo "4. 提交快照变更并等待评审"
+            echo ""
+            git diff bookworm-backend/src/tests/contract/__snapshots__/
+            exit 1
+          fi
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: bookworm-backend/test-results/
+          retention-days: 7
+
+      - name: Upload contract artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-merge-contracts
+          path: artifacts/post-merge/contracts
+          if-no-files-found: ignore
+          retention-days: 30

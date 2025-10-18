@@ -61,6 +61,9 @@ const schema = Type.Object({
   // API Rate Limiting
   API_LOGIN_RATE_LIMIT_MAX: Type.Number({ default: 10 }),
   API_FULFILL_RATE_LIMIT_MAX: Type.Number({ default: 30 }),
+
+  // Logging Security
+  LOG_EXPOSE_DEBUG: Type.Boolean({ default: false }), // DANGER: 仅在本地调试时设为 true，禁止在生产环境使用
 });
 
 type Schema = Static<typeof schema>;
@@ -117,6 +120,13 @@ if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
     if (!config.WXPAY_NOTIFY_URL) {
       errors.push("WXPAY_NOTIFY_URL must be set in production.");
     }
+  }
+
+  // Logging Security Validation
+  if (config.LOG_EXPOSE_DEBUG) {
+    errors.push(
+      "LOG_EXPOSE_DEBUG must be false in production. This setting exposes sensitive data in logs."
+    );
   }
 
   if (errors.length > 0) {

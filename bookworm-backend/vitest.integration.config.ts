@@ -4,7 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   test: {
-    include: ['src/tests/**/*.integration.test.ts'],
+    include: ['src/tests/**/*.integration.test.ts', 'tests/**/*.test.ts'],
     setupFiles: [path.resolve(__dirname, 'src/tests/integrationSetup.ts')],
     threads: false, // Run integration tests serially to avoid DB conflicts
     maxConcurrency: 1, // Only run one test at a time

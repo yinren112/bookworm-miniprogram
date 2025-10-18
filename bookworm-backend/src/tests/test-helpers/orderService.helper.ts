@@ -16,7 +16,7 @@ export function setupDefaultCreateOrderMocks(
   // Add $connect method to make it recognizable as PrismaClient
   (prismaMock as any).$connect = vi.fn().mockResolvedValue(undefined);
 
-  // Mock事务成功路径的默认行�?  prismaMock.$transaction.mockImplementation(async (callback) => {
+  // Mock事务成功路径的默认行�?  prismaMock.$transaction.mockImplementation(async (callback) => {
     // Mock现有预留商品检查的两次查询
     // 第一次：检查重复项目（返回空，无冲突）
     prismaMock.order.findMany.mockResolvedValueOnce([]);
@@ -26,7 +26,7 @@ export function setupDefaultCreateOrderMocks(
     // Mock库存更新成功
     prismaMock.inventoryItem.updateMany.mockResolvedValue({ count: 1 });
 
-    // Mock订单项创建成�?    prismaMock.orderItem.createMany.mockResolvedValue({ count: 1 });
+    // Mock订单项创建成�?    prismaMock.orderItem.createMany.mockResolvedValue({ count: 1 });
 
     return callback(prismaMock);
   });
@@ -36,11 +36,11 @@ export function setupDefaultCreateOrderMocks(
  * Creates mock inventory items with consistent structure
  */
 export function createMockInventoryItems(
-  items: Array<{ id: number; price: string; status?: string }>,
+  items: Array<{ id: number; price: number; status?: string }>,
 ) {
   return items.map((item) => ({
     id: item.id,
-    selling_price: new Prisma.Decimal(item.price),
+    selling_price: item.price, // price is already in cents (integer)
     status: item.status || "in_stock",
   })) as any;
 }

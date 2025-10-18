@@ -18,21 +18,21 @@ if (process.env.NODE_ENV !== 'production') {
 // --- Graceful Shutdown Logic ---
 
 async function gracefulShutdown(signal: string) {
-  console.log(`[GRACEFUL SHUTDOWN] Received ${signal}. Shutting down gracefully...`);
+  console.error(`[GRACEFUL SHUTDOWN] Received ${signal}. Shutting down gracefully...`);
   try {
     await prisma.$disconnect();
-    console.log('[GRACEFUL SHUTDOWN] Prisma client disconnected successfully.');
+    console.error('[GRACEFUL SHUTDOWN] Prisma client disconnected successfully.');
   } catch (error) {
     console.error('[GRACEFUL SHUTDOWN] Error during Prisma disconnection:', error);
   }
-  console.log('[GRACEFUL SHUTDOWN] Process exiting...');
+  console.error('[GRACEFUL SHUTDOWN] Process exiting...');
   process.exit(0);
 }
 
 // `beforeExit` is a good fallback for when the event loop empties,
 // but it's not called on explicit termination signals.
 process.on('beforeExit', async () => {
-  console.log('beforeExit event triggered. Disconnecting Prisma client...');
+  console.error('beforeExit event triggered. Disconnecting Prisma client...');
   await prisma.$disconnect();
 });
 

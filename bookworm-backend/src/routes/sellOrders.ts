@@ -2,9 +2,10 @@ import { FastifyPluginAsync } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
 import { createAndCompleteSellOrder } from "../services/orderService";
 import prisma from "../db";
+import { PhoneNumberSchema } from "./sharedSchemas";
 
 const CreateSellOrderBodySchema = Type.Object({
-  customerPhoneNumber: Type.String({ minLength: 1, maxLength: 20 }),
+  customerPhoneNumber: PhoneNumberSchema,
   totalWeightKg: Type.Number({ exclusiveMinimum: 0 }),
   unitPrice: Type.Integer({ minimum: 1 }), // Stored in cents
   settlementType: Type.Union([Type.Literal("CASH"), Type.Literal("VOUCHER")]),

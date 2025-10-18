@@ -1,11 +1,19 @@
 {
-  "dependencies": {
-    "axios": "^1.11.0",
-    "dotenv": "^17.2.2",
-    "jsonwebtoken": "^9.0.2",
-    "wechatpay-node-v3": "^2.2.1"
+  "name": "bookworm-miniprogram",
+  "version": "1.0.0",
+  "description": "Bookworm WeChat Mini Program - Campus second-hand textbook marketplace",
+  "scripts": {
+    "lint": "eslint miniprogram --max-warnings 0",
+    "lint:fix": "eslint miniprogram --fix"
   },
+  "keywords": [
+    "wechat",
+    "miniprogram",
+    "bookworm"
+  ],
+  "author": "",
+  "license": "MIT",
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10"
+    "eslint": "^8.57.1"
   }
 }

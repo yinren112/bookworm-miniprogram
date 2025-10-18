@@ -1,4 +1,5 @@
 <!-- pages/acquisition-scan/index.wxml -->
+<wxs module="filters" src="../../utils/filters.wxs"></wxs>
 <view class="container">
   <view class="header">
     <text class="header-title">扫码收购书籍</text>
@@ -92,7 +93,7 @@
     <!-- 最终总金额 -->
     <view class="summary-row total">
       <text class="summary-label">最终总金额:</text>
-      <text class="summary-value highlight">¥{{finalAmount}}</text>
+      <text class="summary-value highlight">{{filters.formatCurrency(finalAmount)}}</text>
     </view>
   </view>
 

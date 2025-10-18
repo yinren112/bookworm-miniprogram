@@ -1,19 +1,9 @@
 // miniprogram/app.js
-const auth = require('./utils/auth');
-const tokenUtil = require('./utils/token');
-
 App({
   onLaunch() {
-    auth.login()
-      .then(res => {
-        console.log('Login successful', res);
-        tokenUtil.setToken(res.token);
-        tokenUtil.setUserId(res.userId);
-        this.checkTermsAgreement();
-      })
-      .catch(err => {
-        console.error('Login failed on launch', err);
-      });
+    // 登录已迁移到 auth-guard.js，由 API 调用时自动触发
+    // 只需检查服务协议
+    this.checkTermsAgreement();
   },
 
   checkTermsAgreement() {

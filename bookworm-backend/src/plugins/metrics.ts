@@ -81,7 +81,7 @@ async function metricsPlugin(fastify: FastifyInstance) {
     reply.header("Content-Type", client.register.contentType);
     reply.send(await client.register.metrics());
   });
-  console.log("Metrics endpoint registered at /metrics");
+  console.error("Metrics endpoint registered at /metrics"); // Startup log
 }
 
 export default fp(metricsPlugin);

@@ -566,8 +566,8 @@ describe("Payment Security Integration Tests", () => {
         data: {
           sku_id: bookSku.id,
           condition: "GOOD",
-          cost: new Prisma.Decimal(10),
-          selling_price: new Prisma.Decimal(50), // 50 yuan = 5000 cents
+          cost: 1000, // 10 yuan = 1000 cents
+          selling_price: 5000, // 50 yuan = 5000 cents
           status: "reserved",
         },
       });
@@ -588,7 +588,7 @@ describe("Payment Security Integration Tests", () => {
         data: {
           order_id: order.id,
           inventory_item_id: inventoryItem.id,
-          price: new Prisma.Decimal(50), // Match inventory selling_price
+          price: 5000, // Match inventory selling_price (in cents)
         },
       });
 

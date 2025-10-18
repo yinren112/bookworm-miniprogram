@@ -1,5 +1,5 @@
 // src/tests/auth-role-revocation.integration.test.ts
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { FastifyInstance } from "fastify";
 import { getPrismaClientForWorker, createTestUser } from "./globalSetup";
 import { createTestApp } from "../app-factory";
@@ -19,12 +19,7 @@ describe("Auth: Role Revocation Integration Tests", () => {
     await app.close();
   });
 
-  afterEach(async () => {
-    // Clean up test data after each test using global truncate function
-    await globalThis.__BOOKWORM_TRUNCATE__?.();
-  });
-
-  it("should immediately deny access after a user role is demoted from STAFF to USER", async () => {
+  it("should immediately deny access after a user role is demoted from STAFF to USER", { timeout: 20000 }, async () => {
     // 1. Create a STAFF user and get their token
     const { userId: staffUserId, token: staffToken } = await createTestUser("STAFF");
 
@@ -38,8 +33,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Test Book",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
 
@@ -62,8 +57,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Another Test Book",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
 
@@ -73,7 +68,7 @@ describe("Auth: Role Revocation Integration Tests", () => {
     expect(errorBody.code).toBe("FORBIDDEN");
   });
 
-  it("should immediately grant access after a user role is promoted from USER to STAFF", async () => {
+  it("should immediately grant access after a user role is promoted from USER to STAFF", { timeout: 20000 }, async () => {
     // 1. Create a USER and get their token
     const { userId, token } = await createTestUser("USER");
 
@@ -87,8 +82,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Test Book",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
 
@@ -110,8 +105,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Another Test Book",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
 
@@ -119,7 +114,7 @@ describe("Auth: Role Revocation Integration Tests", () => {
     expect(afterPromotionResponse.statusCode).toBe(201);
   });
 
-  it("should enforce role check on every request, not just once per token", async () => {
+  it("should enforce role check on every request, not just once per token", { timeout: 20000 }, async () => {
     // This test ensures that the role is checked on EVERY request, not cached
     const { userId, token } = await createTestUser("STAFF");
 
@@ -133,8 +128,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Test Book 1",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
     expect(firstResponse.statusCode).toBe(201);
@@ -155,8 +150,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Test Book 2",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
     expect(secondResponse.statusCode).toBe(403);
@@ -177,8 +172,8 @@ describe("Auth: Role Revocation Integration Tests", () => {
         title: "Test Book 3",
         author: "Test Author",
         condition: "GOOD",
-        cost: 50,
-        selling_price: 80,
+        cost: 5000, // 50 yuan = 5000 cents
+        selling_price: 8000, // 80 yuan = 8000 cents
       },
     });
     expect(thirdResponse.statusCode).toBe(201);

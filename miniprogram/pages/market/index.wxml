@@ -1,4 +1,5 @@
 <!-- pages/market/index.wxml -->
+<wxs module="filters" src="../../utils/filters.wxs"></wxs>
 <import src="../../templates/search-bar.wxml" />
 
 <view class="container">
@@ -25,7 +26,7 @@
           <text class="recommendation-title">{{item.title}}</text>
           <text class="recommendation-author">{{item.author || '作者未知'}}</text>
           <view class="recommendation-meta">
-            <text class="recommendation-price">¥{{item.minPrice / 100}}</text>
+            <text class="recommendation-price">{{filters.formatCurrencyFromCents(item.minPrice)}}</text>
             <text class="recommendation-stock">库存{{item.availableCount}}本</text>
           </view>
         </view>
@@ -53,7 +54,7 @@
             <text>版本: {{item.booksku.edition}}</text>
             <text>品相: {{item.condition}}</text>
           </view>
-          <text class="book-price">¥{{item.selling_price}}</text>
+          <text class="book-price">{{filters.formatCurrency(item.selling_price)}}</text>
         </view>
       </view>
     </navigator>

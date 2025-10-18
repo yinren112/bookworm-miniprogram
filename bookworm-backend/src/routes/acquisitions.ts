@@ -3,6 +3,7 @@ import { FastifyPluginAsync } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
 import prisma from "../db";
 import { createAcquisition, AcquisitionItemInput } from "../services/acquisitionService";
+import { PhoneNumberSchema } from "./sharedSchemas";
 
 const CheckQuerySchema = Type.Object({
   isbn: Type.String({ minLength: 10, maxLength: 17 }),
@@ -22,7 +23,7 @@ const CheckResponseSchema = Type.Object({
 });
 
 const CustomerProfileSchema = Type.Object({
-  phoneNumber: Type.Optional(Type.String({ maxLength: 20 })),
+  phoneNumber: Type.Optional(PhoneNumberSchema),
   enrollmentYear: Type.Optional(Type.Integer({ minimum: 2000, maximum: 2100 })),
   major: Type.Optional(Type.String({ maxLength: 100 })),
   className: Type.Optional(Type.String({ maxLength: 50 })),

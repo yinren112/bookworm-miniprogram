@@ -2,6 +2,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
 import * as crypto from "crypto";
 import { BUSINESS_LIMITS } from "../constants";
+import { log } from "../lib/logger";
 
 export async function processPendingRefunds(
   dbCtx: PrismaClient, // This job should use the global client
@@ -54,7 +55,7 @@ export async function processPendingRefunds(
     });
 
     if (locked.count === 0) {
-      console.log(`Refund record ${record.id} changed state before locking. Skipping.`);
+      log.info(`Refund record ${record.id} changed state before locking. Skipping.`);
       continue;
     }
 

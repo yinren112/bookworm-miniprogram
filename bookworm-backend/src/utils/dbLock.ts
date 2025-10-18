@@ -4,6 +4,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import crypto from "crypto";
 
 import { BUSINESS_LIMITS } from "../constants";
+import { log } from "../lib/logger";
 
 /**
  * Derives a single 32-bit integer lock key from a string lock name.
@@ -42,20 +43,16 @@ export async function withAdvisoryLock<T>(
       const lockAcquired = result[0]?.lock_acquired;
 
       if (!lockAcquired) {
-        console.log(
-          `[AdvisoryLock] Could not acquire lock for "${lockName}". Another instance is likely running.`,
-        );
+        log.info({ lockName }, 'Advisory lock could not be acquired, another instance is likely running');
         return null;
       }
 
-      console.log(
-        `[AdvisoryLock] Lock acquired for "${lockName}". Running task.`,
-      );
+      log.info({ lockName }, 'Advisory lock acquired, running task');
       try {
         return await task();
       } finally {
         await tx.$queryRaw`SELECT pg_advisory_unlock(${lockKey}::integer)`;
-        console.log(`[AdvisoryLock] Lock released for "${lockName}".`);
+        log.debug({ lockName }, 'Advisory lock released');
       }
     },
     {

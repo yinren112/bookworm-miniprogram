@@ -45,10 +45,52 @@ declare module "fastify" {
   }
 }
 
+// Pino redaction paths: 默认脱敏所有敏感字段
+// 参考: https://getpino.io/#/docs/redaction
+const sensitiveFields = [
+  // Authorization headers
+  "headers.authorization",
+  "req.headers.authorization",
+  "res.headers.authorization",
+
+  // User sensitive data
+  "*.phone_number",
+  "*.phoneNumber",
+  "*.customerPhoneNumber",
+  "*.openid",
+  "*.unionid",
+  "*.pickup_code",
+  "*.pickupCode",
+
+  // Request/Response bodies
+  "body.phoneNumber",
+  "body.customerPhoneNumber",
+  "body.phoneCode",
+  "req.body.phoneNumber",
+  "req.body.customerPhoneNumber",
+  "req.body.phoneCode",
+  "res.body.phoneNumber",
+
+  // User objects in logs
+  "user.phone_number",
+  "user.openid",
+  "user.unionid",
+  "order.pickup_code",
+];
+
 const fastify = Fastify({
   logger: {
     level: config.LOG_LEVEL,
-    redact: ["headers.authorization", "req.headers.authorization"],
+    // 仅在开发环境且明确设置 LOG_EXPOSE_DEBUG=true 时禁用 redaction
+    // 生产环境 NEVER 禁用
+    redact: config.LOG_EXPOSE_DEBUG && config.NODE_ENV === "development"
+      ? [] // 调试模式：不脱敏（仅内存输出，见下方配置）
+      : {
+          paths: sensitiveFields,
+          censor: "[REDACTED]",
+        },
+    // 在调试模式下，即使不脱敏，也不应写入文件
+    // Pino 默认输出到 stdout，由部署环境决定是否落盘
   },
   ajv: {
     customOptions: {
@@ -228,7 +270,7 @@ const validateProductionConfig = () => {
     process.exit(1);
   }
 
-  console.log("✅ Production configuration validation passed");
+  console.error("✅ Production configuration validation passed"); // Startup log
 };
 
 const setupApplication = async () => {

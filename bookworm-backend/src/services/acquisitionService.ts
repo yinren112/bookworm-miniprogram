@@ -1,6 +1,6 @@
 import { Prisma, PrismaClient, Acquisition, SettlementType } from "@prisma/client";
 import { ApiError } from "../errors";
-import { withTxRetry } from "./orderService";
+import { withTxRetry } from "../db/transaction";
 import { BUSINESS_LIMITS, ERROR_CODES, ERROR_MESSAGES } from "../constants";
 
 /**
@@ -96,17 +96,52 @@ async function createAcquisitionImpl(
 
   // 如果提供了用户画像信息，则创建或更新 UserProfile
   if (input.customerProfile && input.customerUserId) {
+    // 如果提供了手机号，更新 User 表（单一真相源）
+    if (input.customerProfile.phoneNumber) {
+      // Try-update pattern: 直接尝试更新，捕获唯一约束冲突
+      // 这比 check-then-act 更安全，避免了竞态条件
+      try {
+        await tx.user.update({
+          where: { id: input.customerUserId },
+          data: { phone_number: input.customerProfile.phoneNumber },
+        });
+      } catch (error: unknown) {
+        // 捕获唯一约束违反错误 (P2002)
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          // 手机号被占用，检查是被谁占用
+          const conflictingUser = await tx.user.findUnique({
+            where: { phone_number: input.customerProfile.phoneNumber },
+            select: { id: true },
+          });
+
+          // 如果手机号被其他用户占用，抛出 409 错误
+          if (conflictingUser && conflictingUser.id !== input.customerUserId) {
+            throw new ApiError(
+              409,
+              `手机号 ${input.customerProfile.phoneNumber} 已被其他用户占用`,
+              "PHONE_NUMBER_CONFLICT"
+            );
+          }
+
+          // 如果手机号被当前用户占用（说明手机号没变化），忽略错误继续
+          // 这种情况通常不会发生，因为 update 不会在值相同时触发唯一约束
+        } else {
+          // 其他错误，重新抛出
+          throw error;
+        }
+      }
+    }
+
+    // 更新 UserProfile（不包含 phone_number）
     await tx.userProfile.upsert({
       where: { user_id: input.customerUserId },
       create: {
         user_id: input.customerUserId,
-        phone_number: input.customerProfile.phoneNumber ?? null,
         enrollment_year: input.customerProfile.enrollmentYear ?? null,
         major: input.customerProfile.major ?? null,
         class_name: input.customerProfile.className ?? null,
       },
       update: {
-        phone_number: input.customerProfile.phoneNumber ?? null,
         enrollment_year: input.customerProfile.enrollmentYear ?? null,
         major: input.customerProfile.major ?? null,
         class_name: input.customerProfile.className ?? null,
@@ -121,8 +156,8 @@ async function createAcquisitionImpl(
     data: input.items.map((item) => ({
       sku_id: item.skuId,
       condition: item.condition,
-      cost: item.acquisitionPrice / 100, // 转换为元，Decimal 格式
-      selling_price: item.acquisitionPrice / 100, // 初始售价等于成本价
+      cost: item.acquisitionPrice, // 直接使用分作为单位
+      selling_price: item.acquisitionPrice, // 初始售价等于成本价（单位：分）
       status: "in_stock" as const,
       acquisitionId: acquisition.id,
     })),
@@ -138,15 +173,16 @@ export function createAcquisition(
   dbCtx: PrismaClient,
   input: CreateAcquisitionInput,
 ): Promise<CreateAcquisitionResult> {
-  return withTxRetry(async () => {
-    return dbCtx.$transaction(
-      (tx) => createAcquisitionImpl(tx, input),
-      {
+  return withTxRetry(
+    dbCtx,
+    (tx) => createAcquisitionImpl(tx, input),
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      transactionOptions: {
         timeout: BUSINESS_LIMITS.TRANSACTION_TIMEOUT_MS,
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       },
-    );
-  });
+    },
+  );
 }
 
 /**

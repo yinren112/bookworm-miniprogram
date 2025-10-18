@@ -1,4 +1,5 @@
 <!-- pages/order-detail/index.wxml -->
+<wxs module="filters" src="../../utils/filters.wxs"></wxs>
 <view class="container">
   <!-- Loading State -->
   <view wx:if="{{isLoading}}" class="loading-container">
@@ -16,7 +17,7 @@
     <!-- 履约信息区 -->
     <view class="fulfillment-section">
       <view class="status-header">
-        <view class="status-text">{{getStatusText(order.status)}}</view>
+        <view class="status-text">{{filters.getStatusText(order.status)}}</view>
       </view>
       
       <view wx:if="{{order.status === 'PENDING_PICKUP'}}" class="pickup-info">
@@ -68,11 +69,11 @@
             <view wx:if="{{item.inventoryItem.bookSku.edition}}" class="book-edition">
               版本：{{item.inventoryItem.bookSku.edition}}
             </view>
-            <view class="book-condition">品相：{{getConditionText(item.inventoryItem.condition)}}</view>
+            <view class="book-condition">品相：{{filters.getConditionText(item.inventoryItem.condition)}}</view>
           </view>
           
           <view class="book-price">
-            ¥{{item.price}}
+            {{filters.formatCurrency(item.price)}}
           </view>
         </view>
       </view>
@@ -104,7 +105,7 @@
         </view>
         <view class="info-item total-amount">
           <view class="info-label">订单总额</view>
-          <view class="info-value price">¥{{order.total_amount}}</view>
+          <view class="info-value price">{{filters.formatCurrency(order.total_amount)}}</view>
         </view>
       </view>
     </view>

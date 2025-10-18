@@ -1,4 +1,5 @@
 <!-- pages/book-detail/index.wxml -->
+<wxs module="filters" src="../../utils/filters.wxs"></wxs>
 <view class="container">
   <!-- Skeleton -->
   <skeleton wx:if="{{isLoading}}" type="detail" />
@@ -12,8 +13,8 @@
       <text class="author">{{bookDetail.bookSku.bookMaster.author}}</text>
       
       <view class="price-section">
-        <text class="selling-price">¥{{bookDetail.selling_price}}</text>
-        <text class="original-price" wx:if="{{bookDetail.bookSku.bookMaster.original_price}}">¥{{bookDetail.bookSku.bookMaster.original_price}}</text>
+        <text class="selling-price">{{filters.formatCurrency(bookDetail.selling_price)}}</text>
+        <text class="original-price" wx:if="{{bookDetail.bookSku.bookMaster.original_price}}">{{filters.formatCurrency(bookDetail.bookSku.bookMaster.original_price)}}</text>
       </view>
 
       <view class="specs-card card">

@@ -6,7 +6,7 @@ export interface RecommendedBookResult {
   title: string;
   author: string | null;
   publisher: string | null;
-  originalPrice: number | null; // 单位：元
+  originalPrice: number | null; // 单位：分
   edition: string | null;
   coverImageUrl: string | null;
   availableCount: number; // 当前有库存的数量
@@ -108,8 +108,8 @@ export async function getRecommendedBooks(
     }
 
     // 计算最低售价（单位：分）
-    const minPriceInYuan = Math.min(...sku.inventoryItems.map((item) => Number(item.selling_price)));
-    const minPriceInCents = Math.round(minPriceInYuan * 100);
+    // selling_price 已经是整数"分"，不需要转换
+    const minPriceInCents = Math.min(...sku.inventoryItems.map((item) => Number(item.selling_price)));
 
     results.push({
       skuId: sku.id,
@@ -117,7 +117,7 @@ export async function getRecommendedBooks(
       title: sku.bookMaster.title,
       author: sku.bookMaster.author,
       publisher: sku.bookMaster.publisher,
-      originalPrice: sku.bookMaster.original_price ? Number(sku.bookMaster.original_price) : null,
+      originalPrice: sku.bookMaster.original_price ? Number(sku.bookMaster.original_price) : null, // 已经是分
       edition: sku.edition,
       coverImageUrl: sku.cover_image_url,
       availableCount: sku.inventoryItems.length,
