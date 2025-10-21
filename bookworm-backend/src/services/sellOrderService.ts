@@ -78,27 +78,24 @@ async function createAndCompleteSellOrderImpl(
 
   const now = new Date();
 
-  // Phase 1 of SELL field migration: Dual-write to both Order table and order_sell_details table
+  // Phase 3: Create Order without legacy SELL fields (enforced by CHECK constraint)
   const order = await tx.order.create({
     data: {
       user_id: userId,
       status: ORDER_STATUS.COMPLETED,
       type: ORDER_TYPE.SELL,
       total_amount: baseAmount,
-      voucherFaceValue,
       pickup_code: await generateUniquePickupCode(),
       paymentExpiresAt: now,
       paid_at: now,
       completed_at: now,
-      // Legacy fields (will be deprecated in Phase 3)
-      totalWeightKg: input.totalWeightKg,
-      unitPrice: input.unitPrice,
-      settlementType: input.settlementType,
       notes: input.notes,
+      // Legacy SELL fields removed - now using order_sell_details table exclusively
+      // voucherFaceValue moved to order_sell_details.voucher_face_value
     },
   });
 
-  // Dual-write: Create corresponding OrderSellDetails record
+  // Create OrderSellDetails record with all SELL-specific data
   await tx.orderSellDetails.create({
     data: {
       order_id: order.id,

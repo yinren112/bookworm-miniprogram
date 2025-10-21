@@ -159,85 +159,30 @@ describe("Database-level Business Rules", () => {
       ).rejects.toThrow(/chk_order_type_consistency/i);
     });
 
-    it("should reject a SELL order missing unitPrice", async () => {
+    // Phase 3: Legacy SELL field tests removed
+    // After migrating to order_sell_details table, SELL orders no longer store
+    // data in Order table legacy fields (totalWeightKg, unitPrice, etc.)
+    // Corresponding tests moved to sellOrders.integration.test.ts
+
+    it("should accept a valid SELL order (without legacy fields)", async () => {
       const { userId } = await createTestUser();
 
-      await expect(
-        prisma.order.create({
-          data: {
-            user_id: userId,
-            type: OrderType.SELL,
-            total_amount: 900,
-            pickup_code: uniquePickup("SELMIS"),
-            paymentExpiresAt: futureDate(),
-            totalWeightKg: 6,
-            unitPrice: null,
-            settlementType: SettlementType.CASH,
-          },
-        })
-      ).rejects.toThrow(/chk_order_type_consistency/i);
-    });
-
-    it("should reject a VOUCHER sell order without voucherFaceValue", async () => {
-      const { userId } = await createTestUser();
-
-      await expect(
-        prisma.order.create({
-          data: {
-            user_id: userId,
-            type: OrderType.SELL,
-            total_amount: 1000,
-            pickup_code: uniquePickup("SELVCH"),
-            paymentExpiresAt: futureDate(),
-            totalWeightKg: 4,
-            unitPrice: 200,
-            settlementType: SettlementType.VOUCHER,
-            voucherFaceValue: null,
-          },
-        })
-      ).rejects.toThrow(/chk_order_type_consistency/i);
-    });
-
-    it("should accept a valid SELL order for CASH settlement", async () => {
-      const { userId } = await createTestUser();
-
+      // Phase 3: SELL orders now only store basic order info in Order table
       const order = await prisma.order.create({
         data: {
           user_id: userId,
           type: OrderType.SELL,
           total_amount: 1200,
-          pickup_code: uniquePickup("SELCASH"),
+          pickup_code: uniquePickup("SELOK"),
           paymentExpiresAt: futureDate(),
-          totalWeightKg: 6,
-          unitPrice: 200,
-          settlementType: SettlementType.CASH,
-          voucherFaceValue: null,
+          // Legacy SELL fields must be NULL (enforced by chk_order_type_consistency)
         },
       });
 
       expect(order).toBeDefined();
-
-      await prisma.order.delete({ where: { id: order.id } });
-    });
-
-    it("should accept a valid SELL order for VOUCHER settlement", async () => {
-      const { userId } = await createTestUser();
-
-      const order = await prisma.order.create({
-        data: {
-          user_id: userId,
-          type: OrderType.SELL,
-          total_amount: 800,
-          pickup_code: uniquePickup("SELVOUCH"),
-          paymentExpiresAt: futureDate(),
-          totalWeightKg: 4,
-          unitPrice: 200,
-          settlementType: SettlementType.VOUCHER,
-          voucherFaceValue: 1600,
-        },
-      });
-
-      expect(order.voucherFaceValue).toBe(1600);
+      expect(order.type).toBe(OrderType.SELL);
+      expect(order.totalWeightKg).toBeNull();
+      expect(order.unitPrice).toBeNull();
 
       await prisma.order.delete({ where: { id: order.id } });
     });
@@ -305,6 +250,7 @@ describe("Database-level Business Rules", () => {
 
     it("should allow an inventory item referencing a SELL order", async () => {
       const { userId } = await createTestUser();
+      // Phase 3: Create SELL order without legacy fields
       const sellOrder = await prisma.order.create({
         data: {
           user_id: userId,
@@ -313,10 +259,7 @@ describe("Database-level Business Rules", () => {
           total_amount: 600,
           pickup_code: randomPickupCode("SELLTRG"),
           paymentExpiresAt: oneHourLater(),
-          totalWeightKg: 3,
-          unitPrice: 200,
-          settlementType: SettlementType.CASH,
-          voucherFaceValue: null,
+          // Legacy SELL fields removed (now in order_sell_details table)
         },
       });
 
