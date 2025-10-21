@@ -1,0 +1,42 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Every Monday at midnight
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: |
+          cd bookworm-backend
+          npm ci
+
+      - name: Run npm audit
+        run: |
+          cd bookworm-backend
+          npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Snyk Security Scan (optional)
+        if: ${{ secrets.SNYK_TOKEN != '' }}
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: test --severity-threshold=medium

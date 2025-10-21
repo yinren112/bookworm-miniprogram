@@ -6,6 +6,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { ApiError } from "../../errors";
 import { orderSelectPublic } from "../../db/views/orderView";
 import { inventorySelectBasic } from "../../db/views/inventoryView";
+import { userRoleView, orderWithItemsInclude } from "../../db/views";
 
 /**
  * Fetches orders for a specific user with cursor-based pagination
@@ -112,7 +113,7 @@ export async function getOrderById(
   // Get user role for authorization
   const userWithRole = await dbCtx.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: userRoleView,
   });
 
   if (!userWithRole) {
@@ -170,9 +171,7 @@ export async function getPendingPickupOrders(
   // Step 1: Fetch all pending pickup orders with orderItems (shallow include)
   const ordersWithItems = await dbCtx.order.findMany({
     where: { status: "PENDING_PICKUP" },
-    include: {
-      orderItem: true, // Only include one level to avoid deep nesting
-    },
+    include: orderWithItemsInclude,
     orderBy: { paid_at: "asc" },
   });
 

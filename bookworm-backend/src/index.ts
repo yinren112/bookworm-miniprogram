@@ -6,7 +6,7 @@ import { ApiError, ServiceError } from "./errors";
 import config from "./config";
 import { verifyDatabaseConstraints } from "./utils/dbVerifier";
 import prisma from "./db";
-import { ERROR_CODES, ERROR_MESSAGES, HTTP_STATUS } from "./constants";
+import { ERROR_CODES, ERROR_MESSAGES } from "./constants";
 import * as fs from "fs";
 import {
   isFastifyHttpError,

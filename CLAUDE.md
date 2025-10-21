@@ -177,6 +177,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     *   **事实**: 本地开发和测试环境由 `docker-compose.yml` 和 **Testcontainers** 严格定义，实现了开发环境的一致性和可重复性。数据库连接池通过 `globalThis` 单例和优雅关闭钩子进行管理，杜绝了资源泄漏。
     *   **指令**: 不要提出任何需要手动配置本地环境的解决方案。所有环境依赖必须在代码中声明。
 
+5.  **保留你的经验**
+    *   **经验保存**: 当你经过很多努力解决某个困难问题，且如果你失去记忆在以后一些任务也会导致你的阻塞的情况下，你需要更新CLAUDE.me的末尾部分，新增加一个SOP章节说明如何解决项目容易遇到的某种问题。
 ## Project Overview
 
 **Bookworm** is a campus second-hand textbook marketplace consisting of:
@@ -655,3 +657,6 @@ docker-compose -f docker-compose.staging.yml up -d
 - Review and adjust rate limiting configuration
 - Configure database transaction retry parameters
 - Set PAYMENT_TIMESTAMP_TOLERANCE_SECONDS appropriately
+
+## 历史经验SOP:
+(暂时为空）

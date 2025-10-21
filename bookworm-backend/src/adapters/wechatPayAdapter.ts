@@ -95,10 +95,12 @@ export interface CreateRefundResponse {
 // --- ADAPTER CLASS ---
 
 export class WechatPayAdapter {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly payInstance: any; // Keep 'any' confined to this private field
 
   constructor(config: WechatPayConfig) {
     // This is the ONLY place where we use 'as any' - confined to initialization
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     this.payInstance = new WechatPay({
       appid: config.appid,
       mchid: config.mchid,
@@ -106,6 +108,7 @@ export class WechatPayAdapter {
       serial_no: config.serial_no,
       key: config.key,
     } as any) as any;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
   /**

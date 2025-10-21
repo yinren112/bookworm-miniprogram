@@ -144,6 +144,7 @@ export async function getAvailableBooks(
 
   const [totalResult, items] = await Promise.all([
     prisma.$queryRaw<{ count: bigint }[]>(countQuery),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prisma.$queryRaw<any[]>(dataQuery),
   ]);
 

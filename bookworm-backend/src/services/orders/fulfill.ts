@@ -6,6 +6,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { ApiError } from "../../errors";
 import { metrics } from "../../plugins/metrics";
 import { INVENTORY_STATUS } from "../../constants";
+import { orderIdStatusView, orderItemInventoryIdView, orderWithItemsInclude } from "../../db/views";
 
 /**
  * Internal implementation of order fulfillment (runs in transaction)
@@ -46,7 +47,7 @@ async function fulfillOrderImpl(
     // Either order doesn't exist or is not in PENDING_PICKUP state
     const order = await tx.order.findUnique({
       where: { pickup_code: pickupCode },
-      select: { id: true, status: true },
+      select: orderIdStatusView,
     });
 
     if (!order) {
@@ -69,7 +70,7 @@ async function fulfillOrderImpl(
     where: {
       Order: { pickup_code: pickupCode },
     },
-    select: { inventory_item_id: true },
+    select: orderItemInventoryIdView,
   });
 
   const inventoryItemIds = orderItems.map((item) => item.inventory_item_id);
@@ -88,7 +89,7 @@ async function fulfillOrderImpl(
   // Return the updated order data
   const completedOrder = await tx.order.findUnique({
     where: { pickup_code: pickupCode },
-    include: { orderItem: true },
+    include: orderWithItemsInclude,
   });
 
   // Track fulfillment duration if both timestamps exist

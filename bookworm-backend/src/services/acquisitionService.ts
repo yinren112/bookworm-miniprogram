@@ -1,7 +1,8 @@
-import { Prisma, PrismaClient, Acquisition, SettlementType } from "@prisma/client";
+import { Prisma, PrismaClient, SettlementType } from "@prisma/client";
 import { ApiError } from "../errors";
 import { withTxRetry } from "../db/transaction";
-import { BUSINESS_LIMITS, ERROR_CODES, ERROR_MESSAGES } from "../constants";
+import { BUSINESS_LIMITS } from "../constants";
+import { userIdOnlyView, acquisitionDetailInclude, acquisitionListInclude } from "../db/views";
 
 /**
  * 单个待收购书籍的信息
@@ -111,7 +112,7 @@ async function createAcquisitionImpl(
           // 手机号被占用，检查是被谁占用
           const conflictingUser = await tx.user.findUnique({
             where: { phone_number: input.customerProfile.phoneNumber },
-            select: { id: true },
+            select: userIdOnlyView,
           });
 
           // 如果手机号被其他用户占用，抛出 409 错误
@@ -194,23 +195,7 @@ export async function getAcquisitionById(
 ) {
   const acquisition = await dbCtx.acquisition.findUnique({
     where: { id: acquisitionId },
-    include: {
-      StaffUser: {
-        select: { id: true, nickname: true, role: true },
-      },
-      CustomerUser: {
-        select: { id: true, nickname: true },
-      },
-      items: {
-        include: {
-          bookSku: {
-            include: {
-              bookMaster: true,
-            },
-          },
-        },
-      },
-    },
+    include: acquisitionDetailInclude,
   });
 
   if (!acquisition) {
@@ -231,11 +216,7 @@ export async function getAcquisitionsByStaff(
 ) {
   const acquisitions = await dbCtx.acquisition.findMany({
     where: { staff_user_id: staffUserId },
-    include: {
-      CustomerUser: {
-        select: { id: true, nickname: true },
-      },
-    },
+    include: acquisitionListInclude,
     orderBy: { created_at: "desc" },
     take: limit,
     skip: offset,

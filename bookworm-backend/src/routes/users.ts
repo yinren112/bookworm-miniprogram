@@ -1,8 +1,9 @@
 // src/routes/users.ts
 import { FastifyPluginAsync } from "fastify";
-import { Type, Static } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 import prisma from "../db";
 import { sanitizeUser } from "../lib/logSanitizer";
+import { userPublicView } from "../db/views";
 
 const UserResponseSchema = Type.Object({
   id: Type.Integer(),
@@ -29,12 +30,7 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: {
-          id: true,
-          role: true,
-          created_at: true,
-          phone_number: true,
-        },
+        select: userPublicView,
       });
 
       // 安全日志：脱敏用户数据

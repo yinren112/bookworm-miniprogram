@@ -74,16 +74,44 @@ const config = envSchema<Schema>({
   dotenv: true,
 });
 
+// Strong secret validation helper
+function validateSecretStrength(name: string, value: string): string[] {
+  const errors: string[] = [];
+  const weakPatterns = ['secret', 'password', 'changeme', '123456', 'jwtsecret', 'default'];
+
+  if (value.length < 32) {
+    errors.push(`${name} must be at least 32 characters long (current: ${value.length})`);
+  }
+
+  const hasLower = /[a-z]/.test(value);
+  const hasUpper = /[A-Z]/.test(value);
+  const hasDigit = /\d/.test(value);
+  const hasSpecial = /[^A-Za-z0-9]/.test(value);
+
+  if (!(hasLower && hasUpper && hasDigit && hasSpecial)) {
+    errors.push(`${name} must contain lowercase, uppercase, digits, and special characters`);
+  }
+
+  const lowerValue = value.toLowerCase();
+  for (const pattern of weakPatterns) {
+    if (lowerValue.includes(pattern)) {
+      errors.push(`${name} contains weak pattern: "${pattern}"`);
+      break;
+    }
+  }
+
+  return errors;
+}
+
 // Production validation
 if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
   const errors: string[] = [];
 
-  // JWT Configuration
+  // JWT Configuration with strength validation
   if (!config.JWT_SECRET || config.JWT_SECRET === "default-secret-for-dev") {
     errors.push("JWT_SECRET must be set to a strong secret in production.");
-  }
-  if (config.JWT_SECRET && config.JWT_SECRET.length < 32) {
-    errors.push("JWT_SECRET must be at least 32 characters long.");
+  } else {
+    errors.push(...validateSecretStrength('JWT_SECRET', config.JWT_SECRET));
   }
 
   // Database Configuration

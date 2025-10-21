@@ -1,6 +1,6 @@
 // src/utils/dbLock.ts
 
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
 
 import { BUSINESS_LIMITS } from "../constants";

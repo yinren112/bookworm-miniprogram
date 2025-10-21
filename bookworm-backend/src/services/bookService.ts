@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { userProfileRecommendationView, recommendedBookListView, bookSkuRecommendationInclude } from "../db/views";
 
 export interface RecommendedBookResult {
   skuId: number;
@@ -29,10 +30,7 @@ export async function getRecommendedBooks(
   // Step 1: 获取用户画像
   const userProfile = await dbCtx.userProfile.findUnique({
     where: { user_id: userId },
-    select: {
-      enrollment_year: true,
-      major: true,
-    },
+    select: userProfileRecommendationView,
   });
 
   // 如果用户没有画像信息，返回空数组
@@ -48,14 +46,7 @@ export async function getRecommendedBooks(
         major: userProfile.major,
       },
     },
-    select: {
-      id: true,
-      items: {
-        select: {
-          sku_id: true,
-        },
-      },
-    },
+    select: recommendedBookListView,
   });
 
   // 如果没有找到对应的推荐列表，返回空数组
@@ -71,26 +62,7 @@ export async function getRecommendedBooks(
     where: {
       id: { in: skuIds },
     },
-    include: {
-      bookMaster: {
-        select: {
-          isbn13: true,
-          title: true,
-          author: true,
-          publisher: true,
-          original_price: true,
-        },
-      },
-      inventoryItems: {
-        where: {
-          status: "in_stock",
-        },
-        select: {
-          id: true,
-          selling_price: true,
-        },
-      },
-    },
+    include: bookSkuRecommendationInclude,
     orderBy: {
       bookMaster: {
         title: "asc",

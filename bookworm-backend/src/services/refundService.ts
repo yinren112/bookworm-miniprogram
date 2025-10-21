@@ -3,6 +3,7 @@ import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
 import * as crypto from "crypto";
 import { BUSINESS_LIMITS } from "../constants";
 import { log } from "../lib/logger";
+import { paymentRecordRefundProcessView } from "../db/views";
 
 export async function processPendingRefunds(
   dbCtx: PrismaClient, // This job should use the global client
@@ -61,12 +62,7 @@ export async function processPendingRefunds(
 
     const refreshedRecord = await dbCtx.paymentRecord.findUnique({
       where: { id: record.id },
-      select: {
-        id: true,
-        out_trade_no: true,
-        amount_total: true,
-        refund_attempts: true,
-      },
+      select: paymentRecordRefundProcessView,
     });
 
     if (!refreshedRecord) {

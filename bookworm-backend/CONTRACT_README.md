@@ -45,11 +45,34 @@ bookworm-backend/
 - `GET /api/users/me` - 获取当前用户信息
 
 ### 错误响应 (Error Responses)
-- `401 Unauthorized` - 缺少认证令牌
-- `403 Forbidden` - 权限不足
-- `404 Not Found` - 资源不存在
-- `400 Bad Request` - 验证错误
-- `409 Conflict` - 业务冲突
+
+#### HTTP 状态码语义契约
+
+本项目严格遵循以下 HTTP 状态码语义，确保前后端对错误的理解一致：
+
+- **401 Unauthorized** - 未认证
+  - **触发条件**：缺少 `Authorization` header，或 token 无效/过期/格式错误
+  - **响应格式**：`{ "code": "UNAUTHORIZED", "message": "..." }`
+  - **客户端行为**：应跳转到登录页面或触发重新登录流程
+  - **示例场景**：访问 `/api/users/me` 时未携带 token
+
+- **403 Forbidden** - 已认证但无权限
+  - **触发条件**：token 有效（用户已登录），但角色不足以访问该资源
+  - **响应格式**：`{ "code": "FORBIDDEN", "message": "..." }`
+  - **客户端行为**：显示"权限不足"提示，**不应**跳转到登录页面
+  - **示例场景**：普通用户（role=USER）访问 `/api/orders/fulfill`（需要 role=STAFF）
+
+- **404 Not Found** - 资源不存在
+  - **响应格式**：`{ "code": "NOT_FOUND", "message": "..." }`
+
+- **400 Bad Request** - 请求参数验证失败
+  - **响应格式**：`{ "code": "BAD_REQUEST", "message": "...", "details": [...] }`
+
+- **409 Conflict** - 业务规则冲突
+  - **响应格式**：`{ "code": "CONFLICT", "message": "..." }`
+  - **示例场景**：用户已有待支付订单，无法创建新订单
+
+**重要提醒**：前端必须区分 401 和 403，不要将两者混为一谈。401 是身份问题（需要重新登录），403 是权限问题（已登录但无权访问）。
 
 ---
 

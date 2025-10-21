@@ -1,7 +1,6 @@
 import fp from 'fastify-plugin';
 import { createVerifier } from 'fast-jwt';
 import config from '../config';
-import prisma from '../db';
 import { FastifyRequest, FastifyReply } from 'fastify';
 
 export default fp(async (fastify) => {
@@ -18,6 +17,7 @@ export default fp(async (fastify) => {
       req.user = {
         userId: payload.userId,
         openid: payload.openid,
+        role: payload.role,
       };
     } catch (err: unknown) {
       fastify.log.warn({ err }, 'Authentication failed');
@@ -27,37 +27,32 @@ export default fp(async (fastify) => {
 
   fastify.decorate('requireRole', (role: 'USER' | 'STAFF') => {
     return async (req: FastifyRequest, reply: FastifyReply) => {
+      // 未认证 → 401 (req.user 不存在意味着 authenticate 未执行或失败)
       if (!req.user) {
         return reply.code(401).send({ code: 'UNAUTHORIZED', message: 'Unauthorized' });
       }
 
-      try {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: req.user.userId },
-          select: { role: true },
-        });
+      // Role is now encoded in JWT - no database lookup needed
+      // NOTE: If role changes require immediate effect, consider implementing:
+      // - JWT blacklist (Redis) or short TTL (1h) + refresh token
 
-        if (!dbUser) {
-          return reply.code(401).send({ code: 'UNAUTHORIZED', message: 'User not found' });
-        }
+      // 已认证但无权限（无 role 或 role 不匹配）→ 403
+      // 修复：缺少 role 字段是权限问题，不是认证问题
+      if (!req.user.role) {
+        return reply.code(403).send({ code: 'FORBIDDEN', message: 'Role required' });
+      }
 
-        req.user.role = dbUser.role;
+      if (req.user.role !== role) {
+        return reply.code(403).send({ code: 'FORBIDDEN', message: 'Forbidden' });
+      }
 
-        if (dbUser.role !== role) {
-          return reply.code(403).send({ code: 'FORBIDDEN', message: 'Forbidden' });
-        }
-
-        if (process.env.NODE_ENV === 'test') {
-          fastify.log.info({
-            userId: req.user.userId,
-            userRole: dbUser.role,
-            requiredRole: role,
-            source: 'db_lookup',
-          }, 'Role check debug');
-        }
-      } catch (err) {
-        fastify.log.error({ err, userId: req.user.userId }, 'Role verification failed');
-        return reply.code(500).send({ code: 'INTERNAL_ERROR', message: 'Failed to verify role' });
+      if (process.env.NODE_ENV === 'test') {
+        fastify.log.info({
+          userId: req.user.userId,
+          userRole: req.user.role,
+          requiredRole: role,
+          source: 'jwt_payload',
+        }, 'Role check debug');
       }
     };
   });

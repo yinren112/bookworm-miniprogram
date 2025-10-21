@@ -33,9 +33,20 @@ jobs:
         working-directory: bookworm-backend
         run: npm ci
 
-      - name: Run backend ESLint
+      - name: Run backend TypeScript check
         working-directory: bookworm-backend
-        run: npm run lint
+        run: npx tsc --noEmit
+
+      - name: Run backend ESLint (zero warnings)
+        working-directory: bookworm-backend
+        run: npx eslint . --ext .ts,.js --max-warnings=0
+
+      - name: Run npm audit (official registry)
+        working-directory: bookworm-backend
+        run: |
+          npm config set registry https://registry.npmjs.org
+          npm audit --audit-level=moderate
+        continue-on-error: false
 
       # ============================================
       # 前端 Lint (需要先安装 eslint)

@@ -1,6 +1,8 @@
 // src/utils/typeGuards.ts
 // Type guards for safe error handling without 'as any'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Prisma } from "@prisma/client";
 import { ApiError } from "../errors";
 

@@ -10,6 +10,7 @@ import { isPickupCodeConstraintError } from "../../utils/typeGuards";
 import { INVENTORY_STATUS } from "../../constants";
 import { withTxRetry } from "../../db/transaction";
 import { generateUniquePickupCode } from "../../domain/orders/utils";
+import { orderCountInclude } from "../../db/views";
 
 /**
  * Validates and normalizes order input
@@ -100,7 +101,7 @@ async function validateInventoryAndReservations(
   // Check for total reserved items (now safe from race conditions)
   const existingReservedItems = await tx.order.findMany({
     where: { user_id: userId, status: "PENDING_PAYMENT" },
-    include: { _count: { select: { orderItem: true } } },
+    include: orderCountInclude,
   });
 
   const totalReservedCount = existingReservedItems.reduce(

@@ -10,7 +10,6 @@ import {
   updateOrderStatus,
   formatCentsToYuanString,
 } from "../services/orderService";
-import { ApiError } from "../errors";
 import config from "../config";
 import prisma from "../db";
 
@@ -35,11 +34,13 @@ const OrderListQuerySchema = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const presentOrderAmount = (order: any) => ({
   ...order,
   total_amount: formatCentsToYuanString(order.total_amount),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const presentOrderList = (orders: any[]) => orders.map(presentOrderAmount);
 
 const ordersRoutes: FastifyPluginAsync = async function (fastify) {

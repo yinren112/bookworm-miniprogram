@@ -15,6 +15,7 @@ import { metrics } from "../../plugins/metrics";
 import { retryAsync } from "../../utils/retry";
 import { log } from "../../lib/logger";
 import { ERROR_MESSAGES } from "../../constants";
+import { userOpenidView, orderItemPaymentView } from "../../db/views";
 
 /**
  * Payment intent context for WeChat Pay order creation
@@ -76,27 +77,12 @@ export async function preparePaymentIntent(
 
     const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { openid: true },
+      select: userOpenidView,
     });
 
     const orderItems = await tx.orderItem.findMany({
       where: { order_id: orderId },
-      select: {
-        price: true,
-        inventoryItem: {
-          select: {
-            bookSku: {
-              select: {
-                bookMaster: {
-                  select: {
-                    title: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      select: orderItemPaymentView,
     });
 
     // CRITICAL: Amount integrity check

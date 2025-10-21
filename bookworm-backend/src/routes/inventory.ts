@@ -8,7 +8,6 @@ import {
 } from "../services/inventoryService";
 import { getBookMetadata } from "../services/bookMetadataService";
 import { ApiError } from "../errors";
-import config from "../config";
 import prisma from "../db";
 
 const ListAvailableQuery = Type.Object({
@@ -42,9 +41,20 @@ const AddBookBody = Type.Object({
 });
 
 const inventoryRoutes: FastifyPluginAsync = async function (fastify) {
+  // PUBLIC ENDPOINT: Intentionally unauthenticated for guest browsing
+  // Rate-limited to prevent abuse
   fastify.get<{ Querystring: Static<typeof ListAvailableQuery> }>(
     "/api/inventory/available",
-    { schema: { querystring: ListAvailableQuery } },
+    {
+      schema: { querystring: ListAvailableQuery },
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '1 minute',
+          keyGenerator: (req) => req.ip,
+        }
+      }
+    },
     async (request, reply) => {
       const { search, page, limit } = request.query;
       const books = await getAvailableBooks(prisma, { searchTerm: search, page, limit });

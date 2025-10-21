@@ -1,0 +1,61 @@
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\scripts\generate-loadtest-tokens.js
+  1:14  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:26  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  4:16  warning  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\scripts\smoke-test.js
+    7:15  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    8:12  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+    9:14  warning  A `require()` style import is forbidden                @typescript-eslint/no-require-imports
+   24:7   warning  'testPhoneNumber' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  239:11  warning  'paymentGenerated' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\routes\acquisitions.ts
+  84:9  error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\routes\users.ts
+  33:9  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\acquisitionService.ts
+  114:13  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  197:5   error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+  234:5   error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\bookService.ts
+  32:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  51:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  74:5  error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\inventoryService.ts
+  168:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\create.ts
+  103:5  error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\fulfill.ts
+  49:7  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  72:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  91:5  error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\management.ts
+  57:5  error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\payments.ts
+  79:7  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+  84:7  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\orders\queries.ts
+   73:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  115:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  128:7  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  137:7  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+  173:5  error  禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+  194:5  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。   no-restricted-syntax
+
+C:\Users\wapadil\WeChatProjects\miniprogram-13\bookworm-backend\src\services\refundService.ts
+  64:7  error  禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。  no-restricted-syntax
+
+✖ 32 problems (23 errors, 9 warnings)
+

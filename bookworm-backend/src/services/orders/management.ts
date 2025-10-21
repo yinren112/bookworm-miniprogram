@@ -6,6 +6,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { ApiError } from "../../errors";
 import { metrics } from "../../plugins/metrics";
 import { INVENTORY_STATUS } from "../../constants";
+import { orderWithItemsInclude } from "../../db/views";
 
 /**
  * Internal implementation of order status update (runs in transaction)
@@ -54,13 +55,7 @@ async function updateOrderStatusImpl(
   // Get current order with items
   const currentOrder = await tx.order.findUnique({
     where: { id: orderId },
-    include: {
-      orderItem: {
-        include: {
-          inventoryItem: true,
-        },
-      },
-    },
+    include: orderWithItemsInclude,
   });
 
   if (!currentOrder) {

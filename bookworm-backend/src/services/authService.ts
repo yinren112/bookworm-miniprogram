@@ -137,6 +137,7 @@ async function findAndMergePreRegisteredUser(
       OR: [
         { openid },
         unionid ? { unionid } : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ].filter(Boolean) as any,
       status: 'REGISTERED',
     },
@@ -248,7 +249,7 @@ async function findAndMergePreRegisteredUser(
   return mergedUser;
 }
 
-export function generateJwtToken(user: { id: number; openid: string }) {
+export function generateJwtToken(user: { id: number; openid: string; role: string }) {
   const signer = createSigner({
     key: config.JWT_SECRET,
     expiresIn: config.JWT_EXPIRES_IN,
@@ -257,6 +258,7 @@ export function generateJwtToken(user: { id: number; openid: string }) {
   return signer({
     userId: user.id,
     openid: user.openid,
+    role: user.role,
   });
 }
 

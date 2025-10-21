@@ -123,7 +123,12 @@ describe("Payment Security Integration Tests", () => {
     };
 
     const mockEncryptedPayload = {
+      id: "test-notification-id",
+      create_time: new Date().toISOString(),
+      resource_type: "encrypt-resource",
+      event_type: "TRANSACTION.SUCCESS",
       resource: {
+        algorithm: "AEAD_AES_256_GCM",
         ciphertext: "mock-ciphertext",
         associated_data: "mock-associated-data",
         nonce: "mock-nonce",
@@ -230,7 +235,12 @@ describe("Payment Security Integration Tests", () => {
     };
 
     const mockEncryptedPayload = {
+      id: "test-notification-id",
+      create_time: new Date().toISOString(),
+      resource_type: "encrypt-resource",
+      event_type: "TRANSACTION.SUCCESS",
       resource: {
+        algorithm: "AEAD_AES_256_GCM",
         ciphertext: "mock-ciphertext",
         associated_data: "mock-associated-data",
         nonce: "mock-nonce",

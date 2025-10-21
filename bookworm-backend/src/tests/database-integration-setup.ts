@@ -114,6 +114,7 @@ export async function createTestUser(
   const userPayload = {
     userId: user.id,
     openid,
+    role, // Include role in JWT payload for proper authorization
   };
   const token = await signer(userPayload);
 

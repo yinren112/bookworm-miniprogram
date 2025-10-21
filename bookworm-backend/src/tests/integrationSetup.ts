@@ -8,7 +8,6 @@ const RESET_MODE = process.env.TEST_DB_RESET ?? "strict";
 let prismaClient: PrismaClient | null = null;
 
 declare global {
-  // eslint-disable-next-line no-interface-overtype
   interface Number {
     toNumber: () => number;
   }

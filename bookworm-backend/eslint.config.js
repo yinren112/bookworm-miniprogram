@@ -2,6 +2,7 @@
 import eslint from '@eslint/js';
 import typescriptEslint from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
+import localRules from './tools/eslint-rules/index.js';
 
 export default [
   // Base config for all files
@@ -30,6 +31,7 @@ export default [
     },
     plugins: {
       '@typescript-eslint': typescriptEslint,
+      'local-rules': localRules,
     },
     rules: {
       ...eslint.configs.recommended.rules,
@@ -47,24 +49,15 @@ export default [
 
       // 护栏：禁止在非视图文件中使用 Prisma select/include 字面量
       // 所有 Prisma 查询的 select/include 必须通过 src/db/views/* 出口
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'CallExpression[callee.property.name=/^(findMany|findFirst|findUnique|findUniqueOrThrow)$/] > ObjectExpression > Property[key.name="select"]',
-          message: '禁止直接使用 Prisma select 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。',
-        },
-        {
-          selector: 'CallExpression[callee.property.name=/^(findMany|findFirst|findUnique|findUniqueOrThrow)$/] > ObjectExpression > Property[key.name="include"]',
-          message: '禁止直接使用 Prisma include 字面量。请改用 src/db/views/* 中定义的视图选择器。这确保了数据访问的一致性和可维护性。',
-        },
-      ],
+      // 新规则允许 Identifier (userRoleView) 或 MemberExpression (views.user.role)
+      'local-rules/no-prisma-raw-select': 'error',
     },
   },
   // Special config for database view definitions (允许 select/include)
   {
     files: ['src/db/views/**/*.ts', 'src/db/**/*.ts'],
     rules: {
-      'no-restricted-syntax': 'off', // 视图定义文件中允许使用 select/include
+      'local-rules/no-prisma-raw-select': 'off', // 视图定义文件中允许使用 select/include
     },
   },
   // Special config for test files
@@ -89,7 +82,7 @@ export default [
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-console': 'off', // Allow console.log in tests for debugging
-      'no-restricted-syntax': 'off', // 测试中允许直接使用 Prisma select/include
+      'local-rules/no-prisma-raw-select': 'off', // 测试中允许直接使用 Prisma select/include
     },
   },
   // Special config for mock files
@@ -105,7 +98,7 @@ export default [
     files: ['src/scripts/**/*.ts', 'src/jobs/**/*.ts', 'prisma/**/*.ts', 'scripts/**/*.{ts,js}', 'update-*.ts', 'upgrade-*.ts'],
     rules: {
       'no-console': 'off', // Allow console in scripts and background jobs
-      'no-restricted-syntax': 'off', // Allow Prisma select/include in scripts
+      'local-rules/no-prisma-raw-select': 'off', // Allow Prisma select/include in scripts
     },
   },
   // Ignore patterns

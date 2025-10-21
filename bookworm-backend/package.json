@@ -13,7 +13,6 @@
     "db:migrate:test:reset": "dotenv -e .env.test -- npx prisma migrate reset --force",
     "seed": "prisma db seed",
     "job:cancel-orders": "npx ts-node src/jobs/cancelExpiredOrders.ts",
-    "postinstall": "cp node_modules/@zxing/library/umd/index.min.js public/zxing.min.js",
     "test:integration": "dotenv -e .env.test -- vitest run --config vitest.integration.config.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix"
@@ -53,6 +52,7 @@
     "dotenv-cli": "^10.0.0",
     "eslint": "^9.35.0",
     "nodemon": "^3.1.2",
+    "pino-pretty": "^13.1.2",
     "prisma": "^6.16.2",
     "sqlite3": "^5.1.7",
     "supertest": "^7.1.4",

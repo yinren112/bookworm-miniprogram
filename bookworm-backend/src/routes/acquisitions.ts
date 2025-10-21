@@ -2,8 +2,9 @@
 import { FastifyPluginAsync } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
 import prisma from "../db";
-import { createAcquisition, AcquisitionItemInput } from "../services/acquisitionService";
+import { createAcquisition } from "../services/acquisitionService";
 import { PhoneNumberSchema } from "./sharedSchemas";
+import { bookSkuWithMasterInclude } from "../db/views";
 
 const CheckQuerySchema = Type.Object({
   isbn: Type.String({ minLength: 10, maxLength: 17 }),
@@ -48,6 +49,8 @@ const CreateAcquisitionBodySchema = Type.Object({
 type CreateAcquisitionBody = Static<typeof CreateAcquisitionBodySchema>;
 
 const acquisitionsRoutes: FastifyPluginAsync = async (fastify) => {
+  // PUBLIC ENDPOINT: Allows customers to check acquisition eligibility
+  // Rate-limited to prevent ISBN enumeration attacks
   fastify.get<{
     Querystring: Static<typeof CheckQuerySchema>;
   }>(
@@ -59,6 +62,13 @@ const acquisitionsRoutes: FastifyPluginAsync = async (fastify) => {
           200: CheckResponseSchema,
         },
       },
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+          keyGenerator: (req) => req.ip,
+        }
+      }
     },
     async (request) => {
       const rawIsbn = request.query.isbn;
@@ -71,15 +81,7 @@ const acquisitionsRoutes: FastifyPluginAsync = async (fastify) => {
             isbn13: normalizedIsbn,
           },
         },
-        include: {
-          bookMaster: {
-            select: {
-              title: true,
-              author: true,
-              original_price: true,
-            },
-          },
-        },
+        include: bookSkuWithMasterInclude,
         orderBy: {
           id: "asc",
         },

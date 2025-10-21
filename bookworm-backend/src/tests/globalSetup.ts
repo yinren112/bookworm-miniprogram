@@ -15,7 +15,6 @@ const prismaClients: Record<number, PrismaClient> = {};
 const connectionUrls: Record<number, string> = {};
 
 declare global {
-  // eslint-disable-next-line no-var
   var __BOOKWORM_TRUNCATE__: ((workerId?: number) => Promise<void>) | undefined;
 }
 
@@ -139,6 +138,7 @@ export async function createTestUser(
   const userPayload = {
     userId: user.id,
     openid,
+    role, // Include role in JWT payload for proper authorization
   };
   const token = await signer(userPayload);
 
