@@ -17,11 +17,12 @@ export const orderListView = {
   paid_at: true,
   completed_at: true,
   pickup_code: true,
+  sellDetails: true, // Phase 2: Include SELL order details
 } as const satisfies Prisma.OrderSelect;
 
 /**
  * Order detail with items
- * Used by: GET /api/orders/:id, POST /api/orders/create
+ * Used by: GET /api/orders/:id, POST /api/orders/create, POST /api/sell-orders
  */
 export const orderDetailInclude = {
   orderItem: {
@@ -43,6 +44,7 @@ export const orderDetailInclude = {
       },
     },
   },
+  sellDetails: true, // Phase 2: Include SELL order details for type='SELL' orders
 } as const satisfies Prisma.OrderInclude;
 
 /**

@@ -9,6 +9,7 @@ import {
 } from "../constants";
 import { generateUniquePickupCode } from "./purchaseOrderService";
 import { withTxRetry } from "../db/transaction";
+import { orderDetailInclude } from "../db/views/orderViews";
 
 export interface CreateAndCompleteSellOrderInput {
   customerPhoneNumber: string;
@@ -19,7 +20,7 @@ export interface CreateAndCompleteSellOrderInput {
 }
 
 export interface CreateAndCompleteSellOrderResult {
-  order: Order;
+  order: Prisma.OrderGetPayload<{ include: typeof orderDetailInclude }>;
   inventoryItem: InventoryItem;
 }
 
@@ -123,7 +124,13 @@ async function createAndCompleteSellOrderImpl(
     // 预留钩子：后续在此调用发券服务并写入审计日志
   }
 
-  return { order, inventoryItem };
+  // Phase 2: Refetch with sellDetails to prepare for legacy field removal
+  const orderWithDetails = await tx.order.findUniqueOrThrow({
+    where: { id: order.id },
+    include: orderDetailInclude,
+  });
+
+  return { order: orderWithDetails, inventoryItem };
 }
 
 export function createAndCompleteSellOrder(

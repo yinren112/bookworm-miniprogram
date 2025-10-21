@@ -48,9 +48,12 @@ describe("Sell Orders API", () => {
     expect(order.status).toBe("COMPLETED");
     expect(order.type).toBe("SELL");
     expect(order.total_amount).toBe(800);
-    expect(order.settlementType).toBe("CASH");
-    expect(order.totalWeightKg).toBeCloseTo(3.2);
-    expect(order.unitPrice).toBe(250);
+
+    // Phase 2: Read from sellDetails instead of Order legacy fields
+    expect(order.sellDetails).toBeDefined();
+    expect(order.sellDetails.settlement_type).toBe("CASH");
+    expect(order.sellDetails.total_weight_kg).toBeCloseTo(3.2);
+    expect(order.sellDetails.unit_price).toBe(250);
 
     expect(inventoryItem.status).toBe("BULK_ACQUISITION");
     expect(inventoryItem.sourceOrderId).toBe(order.id);
