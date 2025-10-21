@@ -77,6 +77,7 @@ async function createAndCompleteSellOrderImpl(
 
   const now = new Date();
 
+  // Phase 1 of SELL field migration: Dual-write to both Order table and order_sell_details table
   const order = await tx.order.create({
     data: {
       user_id: userId,
@@ -88,10 +89,22 @@ async function createAndCompleteSellOrderImpl(
       paymentExpiresAt: now,
       paid_at: now,
       completed_at: now,
+      // Legacy fields (will be deprecated in Phase 3)
       totalWeightKg: input.totalWeightKg,
       unitPrice: input.unitPrice,
       settlementType: input.settlementType,
       notes: input.notes,
+    },
+  });
+
+  // Dual-write: Create corresponding OrderSellDetails record
+  await tx.orderSellDetails.create({
+    data: {
+      order_id: order.id,
+      total_weight_kg: input.totalWeightKg,
+      unit_price: input.unitPrice,
+      settlement_type: input.settlementType,
+      voucher_face_value: voucherFaceValue,
     },
   });
 

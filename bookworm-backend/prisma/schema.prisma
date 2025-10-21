@@ -31,6 +31,7 @@ model Order {
   reservations     InventoryReservation[]
   pendingGuard     PendingPaymentOrder?
   sourcedInventory InventoryItem[]        @relation("SourceOrder")
+  sellDetails      OrderSellDetails?
 
   @@index([user_id, status], map: "idx_order_user_id_status")
   @@index([createdAt], map: "idx_order_created_at")
@@ -47,6 +48,20 @@ model PendingPaymentOrder {
 
   @@unique([user_id], map: "uniq_order_pending_per_user")
   @@map("pending_payment_order")
+}
+
+model OrderSellDetails {
+  order_id          Int             @id
+  total_weight_kg   Float
+  unit_price        Int
+  settlement_type   SettlementType
+  voucher_face_value Int?
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+
+  Order Order @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_order_sell_details_order")
+
+  @@index([order_id], map: "order_sell_details_order_id_idx")
+  @@map("order_sell_details")
 }
 
 model User {
