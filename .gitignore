@@ -88,3 +88,34 @@ scripts/
 # bookworm-backend/附件*.xlsx
 *.xls
 *.xlsx
+# 大文件与临时文件(2025-10-22添加)
+bin/
+k6-v0.49.0-windows-amd64/
+k6-v0.49.0-windows-amd64.zip
+server-out.log
+server-err.log
+backend-dev.log
+k6-*.log
+nul
+C:/
+bookworm-backend/server-out.log
+bookworm-backend/server-err.log
+bookworm-backend/embedded-postgres.log
+bookworm-backend/test-output.txt
+bookworm-backend/test_output.txt
+
+# 大文件与临时文件(2025-10-22添加)
+bin/
+k6-v0.49.0-windows-amd64/
+k6-v0.49.0-windows-amd64.zip
+server-out.log
+server-err.log
+backend-dev.log
+k6-*.log
+nul
+C:/
+bookworm-backend/server-out.log
+bookworm-backend/server-err.log
+bookworm-backend/embedded-postgres.log
+bookworm-backend/test-output.txt
+bookworm-backend/test_output.txt
