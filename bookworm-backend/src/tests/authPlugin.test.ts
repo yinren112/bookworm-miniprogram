@@ -214,35 +214,22 @@ describe("Auth Plugin", () => {
       expect(response.statusCode).toBe(401);
     });
 
-    it("returns 401 when req.user is missing even with token", async () => {
-      prismaMock.user.findUnique.mockResolvedValue(null);
-
-      const response = await server.inject({
-        method: "GET",
-        url: "/staff-only",
-        headers: { authorization: `Bearer ${validToken}` },
-      });
-
-      expect(response.statusCode).toBe(401);
-      const payload = JSON.parse(response.payload);
-      expect(payload.code).toBe("UNAUTHORIZED");
-    });
-
     it("returns 403 when user has wrong role", async () => {
-      // Mock user with USER role trying to access STAFF endpoint
-      prismaMock.user.findUnique.mockResolvedValue({
-        id: userPayload.userId,
-        role: "USER",
+      // Create token with USER role trying to access STAFF endpoint
+      const signer = createSigner({
+        key: "test-jwt-secret-for-plugin",
+        expiresIn: "1h",
+      });
+      const userToken = await signer({
+        userId: userPayload.userId,
         openid: userPayload.openid,
-        unionid: null,
-        created_at: new Date(),
-        updated_at: new Date(),
+        role: "USER" // Include USER role in JWT
       });
 
       const response = await server.inject({
         method: "GET",
         url: "/staff-only",
-        headers: { authorization: `Bearer ${validToken}` },
+        headers: { authorization: `Bearer ${userToken}` },
       });
 
       expect(response.statusCode).toBe(403);
@@ -317,33 +304,18 @@ describe("Auth Plugin", () => {
       });
     });
 
-    it("returns 500 when database lookup fails", async () => {
-      prismaMock.user.findUnique.mockRejectedValue(new Error("Database error"));
-
+    it("returns 403 when token has no role field", async () => {
+      // validToken from beforeEach has no role field
       const response = await server.inject({
         method: "GET",
         url: "/staff-only",
         headers: { authorization: `Bearer ${validToken}` },
       });
 
-      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).toBe(403);
       const payload = JSON.parse(response.payload);
-      expect(payload.code).toBe("INTERNAL_ERROR");
-    });
-
-    it("returns 401 when user not found in database", async () => {
-      prismaMock.user.findUnique.mockResolvedValue(null);
-
-      const response = await server.inject({
-        method: "GET",
-        url: "/staff-only",
-        headers: { authorization: `Bearer ${validToken}` },
-      });
-
-      expect(response.statusCode).toBe(401);
-      const payload = JSON.parse(response.payload);
-      expect(payload.code).toBe("UNAUTHORIZED");
-      expect(payload.message).toBe("User not found");
+      expect(payload.code).toBe("FORBIDDEN");
+      expect(payload.message).toBe("Role required");
     });
   });
 });

@@ -93,9 +93,7 @@ export async function preparePaymentIntent(
     const storedTotalCents = order.total_amount;
 
     if (calculatedTotalCents !== storedTotalCents) {
-      // TODO: Inject Fastify logger from request context for proper structured logging
-      // For now, use console.error to log at highest severity level
-      console.error(
+      log.error(
         {
           orderId: orderId,
           storedAmount: storedTotalCents,
@@ -295,7 +293,7 @@ export async function processPaymentNotification(
     // Reject future timestamps (allow reasonable clock skew)
     const CLOCK_SKEW_TOLERANCE = 60; // Allow 60 seconds clock skew
     if (notificationTimestamp > currentTimestamp + CLOCK_SKEW_TOLERANCE) {
-      console.warn(
+      log.warn(
         `Payment notification with future timestamp rejected for ${out_trade_no}. Notification: ${notificationTimestamp}, Current: ${currentTimestamp}, Tolerance: ${CLOCK_SKEW_TOLERANCE}s`,
       );
       metrics.paymentsProcessed
@@ -309,7 +307,7 @@ export async function processPaymentNotification(
       currentTimestamp - notificationTimestamp >
       config.PAYMENT_TIMESTAMP_TOLERANCE_SECONDS
     ) {
-      console.warn(
+      log.warn(
         `Payment notification timestamp validation failed for ${out_trade_no}. Age: ${currentTimestamp - notificationTimestamp}s`,
       );
       metrics.paymentsProcessed
@@ -332,7 +330,7 @@ export async function processPaymentNotification(
     });
 
     if (!isSignatureValid) {
-      console.error(
+      log.error(
         `Payment notification signature validation failed for ${out_trade_no}`,
       );
       metrics.paymentsProcessed
@@ -353,7 +351,7 @@ export async function processPaymentNotification(
     });
 
     if (!initialPaymentRecord) {
-      console.warn(
+      log.warn(
         `Payment notification for unknown out_trade_no ${out_trade_no} received. Ignoring.`,
       );
       metrics.paymentsProcessed
@@ -399,13 +397,13 @@ export async function processPaymentNotification(
 
       if (failed.count > 0) {
         if (logMessage) {
-          console.warn(logMessage);
+          log.warn(logMessage);
         }
         metrics.paymentsProcessed
           .labels({ status: "failed", result: "failed" })
           .inc();
       } else if (logMessage) {
-        console.warn(
+        log.warn(
           `${logMessage} (skipped because payment record was already processed for ${out_trade_no}).`,
         );
       }
@@ -424,7 +422,7 @@ export async function processPaymentNotification(
         200, // initial delay ms
       );
     } catch (queryError) {
-      console.error(
+      log.error(
         `Failed to query transaction ${out_trade_no} from WeChat Pay API after retries.`,
         queryError,
       );
@@ -475,7 +473,7 @@ export async function processPaymentNotification(
       appid !== config.WX_APP_ID ||
       amount.total !== initialPaymentRecord.amount_total
     ) {
-      console.error(
+      log.error(
         `CRITICAL: Payment data mismatch for ${out_trade_no}. Marking as FAILED.`,
         {
           expected: {
@@ -554,7 +552,7 @@ export async function processPaymentNotification(
             notified_at: new Date(),
           },
         });
-        console.error(
+        log.error(
           `CRITICAL: Payment succeeded for an order (${paymentRecord.order_id}) that was not PENDING_PAYMENT (likely cancelled). Marked for refund.`,
         );
         metrics.paymentsProcessed

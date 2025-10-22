@@ -4,6 +4,7 @@ import axios from "axios";
 import config from "../config";
 import { ServiceError } from "../errors";
 import { API_CONSTANTS, DEFAULT_VALUES } from "../constants";
+import { log } from "../lib/logger";
 
 interface TanshuBookData {
   title: string;
@@ -43,7 +44,7 @@ export async function getBookMetadata(
   isbn: string,
 ): Promise<BookMetadata | null> {
   if (!config.TANSHU_API_KEY) {
-    console.warn(
+    log.warn(
       "!!! WARNING: TANSHU_API_KEY is not configured in .env. Book metadata feature is disabled.",
     );
     return null;
@@ -57,7 +58,7 @@ export async function getBookMetadata(
     });
 
     if (response.status !== 200 || response.data.code !== 1) {
-      console.error(
+      log.error(
         `Tanshu API Error for ISBN ${isbn}: Status ${response.status}, code: ${response.data.code}, msg: ${response.data.msg}`,
       );
       return null;
@@ -73,7 +74,7 @@ export async function getBookMetadata(
           priceValue = parseFloat(priceMatch[1]);
         }
       } catch (error) {
-        console.warn(`Could not parse price for ${data.title}: ${data.price}`, error);
+        log.warn(`Could not parse price for ${data.title}: ${data.price}`, error);
       }
     }
 
@@ -88,7 +89,7 @@ export async function getBookMetadata(
     };
   } catch (error) {
     const errorMessage = (error as Error).message;
-    console.error(
+    log.error(
       `Network error calling Tanshu API for ISBN ${isbn}:`,
       errorMessage,
     );

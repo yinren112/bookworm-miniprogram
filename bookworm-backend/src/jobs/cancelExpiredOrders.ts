@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { cancelExpiredOrders } from "../services/orderService";
 import prisma from "../db";
+import { log } from "../lib/logger";
 
 const LOCK_NAMESPACE_JOBS = 100;
 const LOCK_JOB_CANCEL_EXPIRED = 1;
@@ -30,7 +31,7 @@ async function main() {
     }
 
   } catch (error) {
-    console.error("Job failed:", error);
+    log.error("Job failed:", error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
