@@ -2,6 +2,7 @@
 const baseRequest = require('./request');
 const tokenUtil = require('./token');
 const ui = require('./ui');
+const logger = require('./logger');
 
 // 单例 Promise，避免并发登录
 let loginInFlight = null;
@@ -133,7 +134,7 @@ async function loginWithPhoneNumber(phoneCode) {
     }
     return data;
   } catch (error) {
-    console.error('Login with authorization failed:', error);
+    logger.error('Login with authorization failed:', error);
     throw error;
   }
 }

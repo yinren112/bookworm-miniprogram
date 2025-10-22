@@ -1,5 +1,6 @@
 const { request } = require('../../utils/api');
 const { extractErrorMessage } = require('../../utils/error');
+const logger = require('../../utils/logger');
 
 Page({
   data: {
@@ -55,7 +56,7 @@ Page({
         isLoading: false
       });
     } catch (error) {
-      console.error('Content load failed', error);
+      logger.error('Content load failed', error);
       this.setData({
         isLoading: false,
         errorMsg: extractErrorMessage(error, '内容加载失败')

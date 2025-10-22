@@ -1,4 +1,6 @@
 // miniprogram/config.js
+// NOTE: Cannot require('./utils/logger') here to avoid circular dependency
+// config.js is loaded by logger.js, so we use inline logging
 
 /**
  * Dynamically select API base URL based on mini program environment
@@ -17,7 +19,8 @@ function getApiBaseUrl() {
 
     return urls[envVersion] || urls.develop;
   } catch (e) {
-    console.warn('Failed to get environment, using default:', e);
+    // Inline warn to avoid circular dependency with logger.js
+    console.warn('[WARN] Failed to get environment, using default:', e);
     return 'http://localhost:8080/api';
   }
 }

@@ -2,6 +2,7 @@
 const { getCurrentUser } = require('../../utils/api');
 const authGuard = require('../../utils/auth-guard');
 const ui = require('../../utils/ui');
+const logger = require('../../utils/logger');
 
 Page({
   data: {
@@ -28,7 +29,7 @@ Page({
         hasPhoneNumber: !!userData.phone_number
       });
     } catch (error) {
-      console.error('Failed to fetch user info:', error);
+      logger.error('Failed to fetch user info:', error);
       // 静默失败，保持默认USER角色
     }
   },
@@ -74,7 +75,7 @@ Page({
       }
     } catch (error) {
       wx.hideLoading();
-      console.error('Authorization failed:', error);
+      logger.error('Authorization failed:', error);
       ui.showError(error.message || '授权失败，请稍后重试');
     }
   },

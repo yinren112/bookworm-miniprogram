@@ -3,6 +3,7 @@ const { request, getRecommendations } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
 const { swrFetch } = require('../../utils/cache');
+const logger = require('../../utils/logger');
 
 Page({
   data: {
@@ -77,7 +78,7 @@ Page({
         pageInfo: data.meta
       });
     } catch (error) {
-      console.error('API request failed', error);
+      logger.error('API request failed', error);
       const errorMsg = extractErrorMessage(error, '加载失败');
       // 失败时不清空旧数据（swrFetch 已降级返回缓存）
       this.setData({

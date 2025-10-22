@@ -2,6 +2,7 @@
 const { checkAcquisition, createSellOrder } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
+const logger = require('../../utils/logger');
 const { formatPrice } = ui;
 
 Page({
@@ -71,7 +72,7 @@ Page({
         }
       } catch (error) {
         wx.hideLoading();
-        console.error('Check acquisition failed:', error);
+        logger.error('Check acquisition failed:', error);
         const errorMsg = extractErrorMessage(error, '查询失败');
         ui.showError(errorMsg);
       }
@@ -235,7 +236,7 @@ Page({
       }, 2000);
 
     } catch (error) {
-      console.error('Create sell order failed:', error);
+      logger.error('Create sell order failed:', error);
       const errorMsg = extractErrorMessage(error, '提交失败');
       ui.showError(errorMsg);
       this.setData({ submitting: false });
