@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "▶ Running pre-commit checks..."
+
+# Backend ESLint
+echo "  → Backend ESLint..."
+cd bookworm-backend && npx eslint . || exit 1
+cd ..
+
+# Frontend ESLint (includes no-console rule)
+echo "  → Frontend ESLint..."
+cd miniprogram && npx eslint . --ext .js || exit 1
+cd ..
+
+# Console.* guard for miniprogram (except whitelisted files)
+echo "  → Console.* guard..."
+if grep -R --line-number --binary-files=without-match -E "console\.(log|error|warn|info|debug)" miniprogram | grep -v "miniprogram/utils/logger.js" | grep -v "miniprogram/config.js" | grep -v "eslint-disable no-console"; then
+  echo "❌ ERROR: Found forbidden console.* usage in miniprogram (except logger.js and config.js)"
+  echo "   Please use logger.debug/info/warn/error instead."
+  exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"
