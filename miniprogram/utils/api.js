@@ -36,13 +36,9 @@ async function request({ url, method = 'GET', data = {}, requireAuth = true, ret
     // 401 处理：清除 token 并重新登录，然后重试一次
     if (error.statusCode === 401 && requireAuth && retry) {
       tokenUtil.clearToken();
-      try {
-        await authGuard.ensureLoggedIn({ silent: false }); // 弹 toast 提示用户
-        // 重试请求（只重试一次，防止无限循环）
-        return await request({ url, method, data, requireAuth, retry: false });
-      } catch (loginError) {
-        throw loginError;
-      }
+      await authGuard.ensureLoggedIn({ silent: false }); // 弹 toast 提示用户
+      // 重试请求（只重试一次，防止无限循环）
+      return await request({ url, method, data, requireAuth, retry: false });
     }
 
     // 其他错误直接抛出

@@ -1,7 +1,7 @@
 ================================================================================
 BOOKWORM PROJECT - CODE REVIEW v3 (ULTRA-COMPRESSED)
 ================================================================================
-Generated on: 2025-10-19 00:22:28
+Generated on: 2025-10-22 12:41:13
 Strategy: Absolute core only (<100k tokens target)
 Philosophy: Maximum information density, zero noise
 
@@ -232,6 +232,8 @@ Compression methods:   Remove tests, docs, frontend, comments, empty lines
     *   **事实**: 本地开发和测试环境由 `docker-compose.yml` 和 **Testcontainers** 严格定义，实现了开发环境的一致性和可重复性。数据库连接池通过 `globalThis` 单例和优雅关闭钩子进行管理，杜绝了资源泄漏。
     *   **指令**: 不要提出任何需要手动配置本地环境的解决方案。所有环境依赖必须在代码中声明。
 
+5.  **保留你的经验**
+    *   **经验保存**: 当你经过很多努力解决某个困难问题，且如果你失去记忆在以后一些任务也会导致你的阻塞的情况下，你需要更新CLAUDE.me的末尾部分，新增加一个SOP章节说明如何解决项目容易遇到的某种问题。
 ## Project Overview
 
 **Bookworm** is a campus second-hand textbook marketplace consisting of:
@@ -412,7 +414,7 @@ model Order {
   id               Int                    @id @default(autoincrement())
   user_id          Int
   status           OrderStatus            @default(PENDING_PAYMENT)
-  total_amount     Int                     @db.Integer
+  total_amount     Int                    @db.Integer
   pickup_code      String                 @unique @db.VarChar(16)
   createdAt        DateTime               @default(now()) @db.Timestamptz(6)
   paymentExpiresAt DateTime               @db.Timestamptz(6)
@@ -432,6 +434,7 @@ model Order {
   reservations     InventoryReservation[]
   pendingGuard     PendingPaymentOrder?
   sourcedInventory InventoryItem[]        @relation("SourceOrder")
+  sellDetails      OrderSellDetails?
 
   @@index([user_id, status], map: "idx_order_user_id_status")
   @@index([createdAt], map: "idx_order_created_at")
@@ -448,6 +451,20 @@ model PendingPaymentOrder {
 
   @@unique([user_id], map: "uniq_order_pending_per_user")
   @@map("pending_payment_order")
+}
+
+model OrderSellDetails {
+  order_id          Int             @id
+  total_weight_kg   Float
+  unit_price        Int
+  settlement_type   SettlementType
+  voucher_face_value Int?
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+
+  Order Order @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_order_sell_details_order")
+
+  @@index([order_id], map: "order_sell_details_order_id_idx")
+  @@map("order_sell_details")
 }
 
 model User {
@@ -487,17 +504,17 @@ model BookMaster {
 }
 
 model BookSku {
-  id                     Int                   @id @default(autoincrement())
-  master_id              Int
-  edition                String?               @db.VarChar(50)
-  description            String?
-  cover_image_url        String?               @db.VarChar(255)
-  created_at             DateTime              @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime              @updatedAt @db.Timestamptz(6)
-  is_acquirable          Boolean               @default(false)
-  bookMaster             BookMaster            @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
-  inventoryItems         InventoryItem[]
-  recommendedBookItems   RecommendedBookItem[]
+  id                   Int                   @id @default(autoincrement())
+  master_id            Int
+  edition              String?               @db.VarChar(50)
+  description          String?
+  cover_image_url      String?               @db.VarChar(255)
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime              @updatedAt @db.Timestamptz(6)
+  is_acquirable        Boolean               @default(false)
+  bookMaster           BookMaster            @relation(fields: [master_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_master")
+  inventoryItems       InventoryItem[]
+  recommendedBookItems RecommendedBookItem[]
 
   @@unique([master_id, edition])
   @@index([is_acquirable], map: "booksku_is_acquirable_idx")
@@ -575,8 +592,8 @@ model PaymentRecord {
   mchid           String?       @db.VarChar(100)
   createdAt       DateTime      @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @db.Timestamptz(6)
-  notified_at     DateTime?       @db.Timestamptz(6)
-  refunded_at     DateTime?       @db.Timestamptz(6)
+  notified_at     DateTime?     @db.Timestamptz(6)
+  refunded_at     DateTime?     @db.Timestamptz(6)
   refund_id       String?       @unique @db.VarChar(100)
   refund_attempts Int           @default(0)
   Order           Order         @relation(fields: [order_id], references: [id])
@@ -688,6 +705,16 @@ model RecommendedBookItem {
   @@index([sku_id])
 }
 
+model WebhookEvent {
+  id          String   @id @db.VarChar(64)
+  event_type  String   @db.VarChar(50)
+  received_at DateTime @default(now()) @db.Timestamptz(6)
+  processed   Boolean  @default(false)
+
+  @@index([received_at])
+  @@map("webhook_events")
+}
+
 
 ================================================================================
 ### FILE: bookworm-backend/src/adapters/wechatPayAdapter.ts
@@ -788,6 +815,7 @@ export class WechatPayAdapter {
   private readonly payInstance: any; // Keep 'any' confined to this private field
 
   constructor(config: WechatPayConfig) {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     this.payInstance = new WechatPay({
       appid: config.appid,
       mchid: config.mchid,
@@ -795,6 +823,7 @@ export class WechatPayAdapter {
       serial_no: config.serial_no,
       key: config.key,
     } as any) as any;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
   /**
@@ -1128,7 +1157,6 @@ export class ServiceError extends Error {
 import fp from 'fastify-plugin';
 import { createVerifier } from 'fast-jwt';
 import config from '../config';
-import prisma from '../db';
 import { FastifyRequest, FastifyReply } from 'fastify';
 
 export default fp(async (fastify) => {
@@ -1145,6 +1173,7 @@ export default fp(async (fastify) => {
       req.user = {
         userId: payload.userId,
         openid: payload.openid,
+        role: payload.role,
       };
     } catch (err: unknown) {
       fastify.log.warn({ err }, 'Authentication failed');
@@ -1158,33 +1187,23 @@ export default fp(async (fastify) => {
         return reply.code(401).send({ code: 'UNAUTHORIZED', message: 'Unauthorized' });
       }
 
-      try {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: req.user.userId },
-          select: { role: true },
-        });
+      // NOTE: If role changes require immediate effect, consider implementing:
 
-        if (!dbUser) {
-          return reply.code(401).send({ code: 'UNAUTHORIZED', message: 'User not found' });
-        }
+      if (!req.user.role) {
+        return reply.code(403).send({ code: 'FORBIDDEN', message: 'Role required' });
+      }
 
-        req.user.role = dbUser.role;
+      if (req.user.role !== role) {
+        return reply.code(403).send({ code: 'FORBIDDEN', message: 'Forbidden' });
+      }
 
-        if (dbUser.role !== role) {
-          return reply.code(403).send({ code: 'FORBIDDEN', message: 'Forbidden' });
-        }
-
-        if (process.env.NODE_ENV === 'test') {
-          fastify.log.info({
-            userId: req.user.userId,
-            userRole: dbUser.role,
-            requiredRole: role,
-            source: 'db_lookup',
-          }, 'Role check debug');
-        }
-      } catch (err) {
-        fastify.log.error({ err, userId: req.user.userId }, 'Role verification failed');
-        return reply.code(500).send({ code: 'INTERNAL_ERROR', message: 'Failed to verify role' });
+      if (process.env.NODE_ENV === 'test') {
+        fastify.log.info({
+          userId: req.user.userId,
+          userRole: req.user.role,
+          requiredRole: role,
+          source: 'jwt_payload',
+        }, 'Role check debug');
       }
     };
   });
@@ -1278,7 +1297,6 @@ import {
 } from "../services/inventoryService";
 import { getBookMetadata } from "../services/bookMetadataService";
 import { ApiError } from "../errors";
-import config from "../config";
 import prisma from "../db";
 
 const ListAvailableQuery = Type.Object({
@@ -1308,7 +1326,16 @@ const AddBookBody = Type.Object({
 const inventoryRoutes: FastifyPluginAsync = async function (fastify) {
   fastify.get<{ Querystring: Static<typeof ListAvailableQuery> }>(
     "/api/inventory/available",
-    { schema: { querystring: ListAvailableQuery } },
+    {
+      schema: { querystring: ListAvailableQuery },
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '1 minute',
+          keyGenerator: (req) => req.ip,
+        }
+      }
+    },
     async (request, reply) => {
       const { search, page, limit } = request.query;
       const books = await getAvailableBooks(prisma, { searchTerm: search, page, limit });
@@ -1370,7 +1397,6 @@ import {
   updateOrderStatus,
   formatCentsToYuanString,
 } from "../services/orderService";
-import { ApiError } from "../errors";
 import config from "../config";
 import prisma from "../db";
 
@@ -1541,11 +1567,12 @@ export default ordersRoutes;
 
 import axios from "axios";
 import { createSigner } from "fast-jwt";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient, Prisma, User } from "@prisma/client";
 import config from "../config";
 import { metrics } from "../plugins/metrics";
 import { WECHAT_CONSTANTS } from "../constants";
-import { maskOpenId, maskPhoneNumber } from "../lib/logSanitizer";
+import { findPreRegisteredUserByPhone, findConflictingRegisteredUser, findUserByUnionId as findUserByUnionIdQuery, findUserByOpenId as findUserByOpenIdQuery } from "./auth/userQueries";
+import { upgradePreRegisteredUser, resolveConflictAndMerge, updateUserOpenId as updateUserOpenIdOp, updateUserUnionId as updateUserUnionIdOp, createUser as createUserOp } from "./auth/userOperations";
 import { log } from "../lib/logger";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
@@ -1573,43 +1600,18 @@ interface WxPhoneNumberResponse {
 }
 
 let accessTokenCache: { token: string; expiresAt: number } | null = null;
+let accessTokenPromise: Promise<string> | null = null;
 
 
-async function findUserByUnionId(dbCtx: DbCtx, unionid: string) {
-  return await dbCtx.user.findUnique({ where: { unionid } });
-}
 
-async function findUserByOpenId(dbCtx: DbCtx, openid: string) {
-  return await dbCtx.user.findUnique({ where: { openid } });
-}
-
-async function updateUserOpenId(dbCtx: DbCtx, userId: number, openid: string) {
-  return await dbCtx.user.update({
-    where: { id: userId },
-    data: { openid },
-  });
-}
-
-async function updateUserUnionId(dbCtx: DbCtx, userId: number, unionid: string) {
-  return await dbCtx.user.update({
-    where: { id: userId },
-    data: { unionid },
-  });
-}
-
-async function createUser(dbCtx: DbCtx, openid: string, unionid?: string, phoneNumber?: string) {
-  const user = await dbCtx.user.create({
-    data: {
-      openid,
-      unionid,
-      phone_number: phoneNumber,
-    },
-  });
-
+const findUserByUnionId = findUserByUnionIdQuery;
+const findUserByOpenId = findUserByOpenIdQuery;
+const updateUserOpenId = updateUserOpenIdOp;
+const updateUserUnionId = updateUserUnionIdOp;
+const createUser = (dbCtx: DbCtx, openid: string, unionid?: string, phoneNumber?: string) => {
   metrics.usersLoggedInTotal.inc();
-
-  return user;
-}
+  return createUserOp(dbCtx, openid, unionid, phoneNumber);
+};
 
 async function ensureUserWithUnionId(dbCtx: DbCtx, openid: string, unionid: string, phoneNumber?: string) {
   const userByUnionId = await findUserByUnionId(dbCtx, unionid);
@@ -1648,112 +1650,23 @@ async function findAndMergePreRegisteredUser(
   phoneNumber: string,
   openid: string,
   unionid?: string,
-) {
-  const preRegisteredUser = await dbCtx.user.findFirst({
-    where: {
-      phone_number: phoneNumber,
-      status: 'PRE_REGISTERED',
-    },
-  });
+): Promise<User | null> {
+  const preRegUser = await findPreRegisteredUserByPhone(dbCtx, phoneNumber);
 
-  if (!preRegisteredUser) {
-    return null;
+  if (!preRegUser) {
+    return null; // No pre-registered user found
   }
 
-  const conflictingUser = await dbCtx.user.findFirst({
-    where: {
-      OR: [
-        { openid },
-        unionid ? { unionid } : undefined,
-      ].filter(Boolean) as any,
-      status: 'REGISTERED',
-    },
-  });
+  const conflictUser = await findConflictingRegisteredUser(dbCtx, openid, unionid);
 
-  if (conflictingUser) {
-
-    log.info(
-      {
-        preRegisteredUserId: preRegisteredUser.id,
-        conflictingUserId: conflictingUser.id,
-        phone: maskPhoneNumber(phoneNumber),
-        openid: maskOpenId(openid)
-      },
-      'Merge conflict: PRE_REGISTERED user conflicts with existing REGISTERED user, merging into REGISTERED user'
-    );
-
-
-    await dbCtx.order.updateMany({
-      where: { user_id: preRegisteredUser.id },
-      data: { user_id: conflictingUser.id },
-    });
-
-    await dbCtx.pendingPaymentOrder.updateMany({
-      where: { user_id: preRegisteredUser.id },
-      data: { user_id: conflictingUser.id },
-    });
-
-    await dbCtx.acquisition.updateMany({
-      where: { customer_user_id: preRegisteredUser.id },
-      data: { customer_user_id: conflictingUser.id },
-    });
-
-    const preRegProfile = await dbCtx.userProfile.findUnique({
-      where: { user_id: preRegisteredUser.id },
-    });
-    const conflictingProfile = await dbCtx.userProfile.findUnique({
-      where: { user_id: conflictingUser.id },
-    });
-
-    if (preRegProfile && !conflictingProfile) {
-      await dbCtx.userProfile.update({
-        where: { user_id: preRegisteredUser.id },
-        data: { user_id: conflictingUser.id },
-      });
-    } else if (preRegProfile && conflictingProfile) {
-      await dbCtx.userProfile.delete({
-        where: { user_id: preRegisteredUser.id },
-      });
-    }
-
-    await dbCtx.user.delete({
-      where: { id: preRegisteredUser.id },
-    });
-
-    if (!conflictingUser.phone_number) {
-      await dbCtx.user.update({
-        where: { id: conflictingUser.id },
-        data: { phone_number: phoneNumber },
-      });
-    }
-
-    log.info(
-      { preRegisteredUserId: preRegisteredUser.id, registeredUserId: conflictingUser.id },
-      'Merge complete: Transferred data from PRE_REGISTERED user to REGISTERED user and deleted placeholder'
-    );
-
-    return await dbCtx.user.findUniqueOrThrow({
-      where: { id: conflictingUser.id },
-    });
+  if (conflictUser) {
+    return await resolveConflictAndMerge(dbCtx, preRegUser, conflictUser, phoneNumber);
   }
 
-  const mergedUser = await dbCtx.user.update({
-    where: { id: preRegisteredUser.id },
-    data: {
-      openid,
-      unionid,
-      status: 'REGISTERED',
-    },
-  });
-
-  log.info(
-    { userId: preRegisteredUser.id, openid: maskOpenId(openid) },
-    'Merge: PRE_REGISTERED user upgraded to REGISTERED'
-  );
-  return mergedUser;
+  return await upgradePreRegisteredUser(dbCtx, preRegUser, openid, unionid);
 }
 
-export function generateJwtToken(user: { id: number; openid: string }) {
+export function generateJwtToken(user: { id: number; openid: string; role: string }) {
   const signer = createSigner({
     key: config.JWT_SECRET,
     expiresIn: config.JWT_EXPIRES_IN,
@@ -1762,6 +1675,7 @@ export function generateJwtToken(user: { id: number; openid: string }) {
   return signer({
     userId: user.id,
     openid: user.openid,
+    role: user.role,
   });
 }
 
@@ -1787,28 +1701,40 @@ export async function requestWxSession(code: string): Promise<WxSession> {
 }
 
 async function getAccessToken(): Promise<string> {
+  if (accessTokenPromise) {
+    return accessTokenPromise;
+  }
+
   const now = Date.now();
   if (accessTokenCache && accessTokenCache.expiresAt > now) {
     return accessTokenCache.token;
   }
 
-  const url = `${WECHAT_CONSTANTS.GET_ACCESS_TOKEN_URL}?grant_type=client_credential&appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}`;
-  const { data } = await axios.get<WxAccessTokenResponse>(url);
+  accessTokenPromise = (async () => {
+    try {
+      const url = `${WECHAT_CONSTANTS.GET_ACCESS_TOKEN_URL}?grant_type=client_credential&appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}`;
+      const { data } = await axios.get<WxAccessTokenResponse>(url);
 
-  if (data.errcode || !data.access_token || !data.expires_in) {
-    throw new Error(`WeChat Access Token Error: ${data.errmsg || 'Invalid response'}`);
-  }
+      if (data.errcode || !data.access_token || !data.expires_in) {
+        throw new Error(`WeChat Access Token Error: ${data.errmsg || 'Invalid response'}`);
+      }
 
-  const accessToken = data.access_token;
-  const expiresIn = data.expires_in;
+      const accessToken = data.access_token;
+      const expiresIn = data.expires_in;
 
-  const expiresAt = now + (expiresIn - 300) * 1000;
-  accessTokenCache = {
-    token: accessToken,
-    expiresAt,
-  };
+      const expiresAt = now + (expiresIn - 300) * 1000;
+      accessTokenCache = {
+        token: accessToken,
+        expiresAt,
+      };
 
-  return accessToken;
+      return accessToken;
+    } finally {
+      accessTokenPromise = null;
+    }
+  })();
+
+  return accessTokenPromise;
 }
 
 export async function requestWxPhoneNumber(phoneCode: string): Promise<string | null> {
@@ -1829,13 +1755,13 @@ export async function requestWxPhoneNumber(phoneCode: string): Promise<string | 
     });
 
     if (data.errcode !== 0) {
-      console.warn(`Failed to get phone number from WeChat: ${data.errmsg}`);
+      log.warn(`Failed to get phone number from WeChat: ${data.errmsg}`);
       return null;
     }
 
     return data.phone_info?.purePhoneNumber || null;
   } catch (error) {
-    console.error("Error fetching WeChat phone number:", error);
+    log.error("Error fetching WeChat phone number:", error);
     return null;
   }
 }
@@ -2060,6 +1986,8 @@ export { withTxRetry } from "../db/transaction";
 ================================================================================
 ### FILE: bookworm-backend/src/utils/typeGuards.ts
 ================================================================================
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Prisma } from "@prisma/client";
 import { ApiError } from "../errors";

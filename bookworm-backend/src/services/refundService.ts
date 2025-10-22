@@ -66,7 +66,7 @@ export async function processPendingRefunds(
     });
 
     if (!refreshedRecord) {
-      console.warn(`Refund record ${record.id} missing after lock acquisition. Skipping.`);
+      log.warn(`Refund record ${record.id} missing after lock acquisition. Skipping.`);
       continue;
     }
 
@@ -109,7 +109,7 @@ export async function processPendingRefunds(
       successCount++;
     } catch (error) {
       const outTradeNo = lockedRecord.out_trade_no;
-      console.error(`Failed to process refund for out_trade_no: ${outTradeNo}`, error);
+      log.error(`Failed to process refund for out_trade_no: ${outTradeNo}`, error);
       failureCount++;
       const failureReason = error instanceof Error ? error.message : 'Unknown refund failure';
       failures.push({ id: lockedRecord.id, outTradeNo, reason: failureReason });
@@ -124,12 +124,12 @@ export async function processPendingRefunds(
           },
         });
         if (reachedLimit) {
-          console.error(
+          log.error(
             `Refund permanently failed after ${BUSINESS_LIMITS.MAX_REFUND_ATTEMPTS} attempts for out_trade_no: ${outTradeNo}`,
           );
         }
       } catch (updateError) {
-        console.error(
+        log.error(
           `Failed to update status after refund failure for out_trade_no: ${outTradeNo}`,
           updateError,
         );
@@ -161,7 +161,7 @@ export async function markPaymentForRefund(
   });
 
   if (updated.count === 0) {
-    console.warn(`No successful payment record found for out_trade_no: ${outTradeNo} - it may have already been refunded or is not in SUCCESS state`);
+    log.warn(`No successful payment record found for out_trade_no: ${outTradeNo} - it may have already been refunded or is not in SUCCESS state`);
     // Don't throw error - this is expected behavior for idempotent refund requests
   }
 }

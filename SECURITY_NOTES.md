@@ -235,7 +235,7 @@ api.js → 401 → invokeLoginProvider → auth.ensureLoggedIn
 
 ### 可选
 
-- [ ] 废弃旧的 `miniprogram/utils/auth.js`（保留作为参考，或删除）
+- [x] 废弃旧的 `miniprogram/utils/auth.js`（**已删除，2025-10-22**。请统一使用 `auth-guard.js`）
 - [ ] 添加集成测试验证登录守卫机制
 
 ## 安全考虑
@@ -278,6 +278,51 @@ api.js → 401 → invokeLoginProvider → auth.ensureLoggedIn
 **排查：**
 1. 检查 `loginInFlight` 单例是否正确实现
 2. 检查 `ensureLoggedIn` 中的 `if (loginInFlight)` 判断
+
+## 已知限制与权衡
+
+### 1. Role 变更延迟生效
+
+**现象：** 用户的 `role` 字段（USER/STAFF）存储在 JWT payload 中。当后端修改用户角色后，客户端需要等待 token 过期或手动登出重登才能获得新权限。
+
+**影响：**
+- 默认 JWT 过期时间为 7 天（`JWT_EXPIRES_IN=7d`）
+- 新提升为 STAFF 的用户可能需要等待最多 7 天才能访问 STAFF 功能
+
+**缓解方案：**
+- 生产环境建议配置短 TTL（例如 1 小时：`JWT_EXPIRES_IN=1h`）
+- 实现 refresh token 机制，允许用户在不重新登录的情况下刷新 token
+- 实现 JWT 黑名单（如使用 Redis），在角色变更时主动使旧 token 失效
+
+### 2. 并发登录窗口
+
+**现象：** `loginInFlight` 单例 Promise 仅在**单个小程序实例**内生效。
+
+**影响：**
+- 用户在多个设备（手机、平板）同时打开小程序时，每个设备会独立触发登录
+- 每个设备会生成独立的 JWT token
+- 这是正常且预期的行为（每个设备独立会话）
+
+**非问题场景：**
+- 同一设备上的并发 API 请求会共享同一个 `loginInFlight` Promise
+- 单设备内不会出现重复登录
+
+### 3. 401 重试策略：仅重试一次
+
+**现象：** API 层的 401 处理逻辑（`api.js:36-46`）仅会重试**一次**。如果第二次请求仍然返回 401，直接抛出错误。
+
+**设计原因：**
+- 防止无限重试循环（如 token 永久失效、后端鉴权服务故障）
+- 避免用户体验卡死（无限 loading）
+
+**用户体验：**
+- 第一次 401：静默清除 token → 自动重新登录 → 重试请求
+- 第二次 401：弹出错误提示，引导用户手动操作（重新打开小程序、检查网络）
+
+**边界情况处理：**
+- 如果用户在 token 即将过期的瞬间发起大量请求，部分请求可能在 token 过期后到达后端，触发 401
+- 由于 `loginInFlight` 单例，所有失败的请求会等待同一个登录 Promise
+- 登录成功后，所有请求会使用新 token 重试，预期全部成功
 
 ## 参考
 

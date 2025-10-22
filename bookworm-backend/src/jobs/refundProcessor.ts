@@ -1,6 +1,7 @@
 // src/jobs/refundProcessor.ts
 import db from '../db';
 import config from '../config';
+import { log } from "../lib/logger";
 import { processPendingRefunds } from '../services/refundService';
 import { createWechatPayAdapter } from '../adapters/wechatPayAdapter';
 import * as fs from 'fs';
@@ -26,7 +27,7 @@ export async function processRefundQueue(): Promise<void> {
       const keyPath = path.resolve(config.WXPAY_PRIVATE_KEY_PATH);
       privateKeyBuffer = fs.readFileSync(keyPath);
     } catch (error) {
-      console.error('Failed to read WeChat Pay private key file:', error);
+      log.error('Failed to read WeChat Pay private key file:', error);
       return;
     }
 
@@ -47,11 +48,11 @@ export async function processRefundQueue(): Promise<void> {
       `${result.failureCount} failed`);
 
     if (result.failureCount > 0) {
-      console.warn(`${result.failureCount} refunds failed. Reasons:`, result.failures);
+      log.warn(`${result.failureCount} refunds failed. Reasons:`, result.failures);
     }
 
   } catch (error) {
-    console.error('Refund processing job failed:', error);
+    log.error('Refund processing job failed:', error);
     // Don't re-throw to prevent job scheduler from crashing
   }
 }

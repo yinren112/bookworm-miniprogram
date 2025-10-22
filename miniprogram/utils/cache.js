@@ -1,4 +1,5 @@
 // miniprogram/utils/cache.js - SWR (stale-while-revalidate) 缓存工具
+const logger = require('./logger');
 
 /**
  * 从本地存储获取缓存项
@@ -11,7 +12,7 @@ function get(key) {
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (error) {
-    console.error('[cache] get failed', key, error);
+    logger.error('[cache] get failed', key, error);
     return null;
   }
 }
@@ -33,11 +34,11 @@ function setWithTTL(key, data, ttlMs) {
       key,
       data: JSON.stringify(item),
       fail: (err) => {
-        console.error('[cache] setStorage failed', key, err);
+        logger.error('[cache] setStorage failed', key, err);
       }
     });
   } catch (error) {
-    console.error('[cache] setWithTTL failed', key, error);
+    logger.error('[cache] setWithTTL failed', key, error);
   }
 }
 
@@ -122,7 +123,7 @@ function remove(key) {
   try {
     wx.removeStorageSync(key);
   } catch (error) {
-    console.error('[cache] remove failed', key, error);
+    logger.error('[cache] remove failed', key, error);
   }
 }
 
@@ -133,7 +134,7 @@ function clear() {
   try {
     wx.clearStorageSync();
   } catch (error) {
-    console.error('[cache] clear failed', error);
+    logger.error('[cache] clear failed', error);
   }
 }
 

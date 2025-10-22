@@ -1,6 +1,6 @@
 {
   "name": "bookworm-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -14,8 +14,8 @@
     "seed": "prisma db seed",
     "job:cancel-orders": "npx ts-node src/jobs/cancelExpiredOrders.ts",
     "test:integration": "dotenv -e .env.test -- vitest run --config vitest.integration.config.ts",
-    "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

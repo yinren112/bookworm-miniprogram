@@ -39,7 +39,11 @@ jobs:
 
       - name: Run backend ESLint (zero warnings)
         working-directory: bookworm-backend
-        run: npx eslint . --ext .ts,.js --max-warnings=0
+        run: npx eslint . --max-warnings=0
+
+      - name: Run backend tests
+        working-directory: bookworm-backend
+        run: npm test
 
       - name: Run npm audit (official registry)
         working-directory: bookworm-backend
@@ -49,13 +53,21 @@ jobs:
         continue-on-error: false
 
       # ============================================
-      # 前端 Lint (需要先安装 eslint)
+      # 前端 Lint & Console 守门
       # ============================================
       - name: Install root dependencies for frontend lint
         run: npm install --save-dev eslint@8
 
-      - name: Run frontend ESLint
-        run: npx eslint miniprogram --ext .js,.wxs --config .eslintrc.js
+      - name: Run frontend ESLint (includes no-console rule)
+        run: |
+          cd miniprogram
+          npx eslint . --ext .js
+
+      - name: "Guard: disallow console.* in miniprogram (except logger.js and config.js)"
+        if: always()
+        run: |
+          ! grep -R --line-number --binary-files=without-match -E "console\.(log|error|warn|info|debug)" \
+            miniprogram | grep -v "miniprogram/utils/logger.js" | grep -v "miniprogram/config.js" | grep -v "eslint-disable no-console"
 
       # ============================================
       # 护栏扫描脚本

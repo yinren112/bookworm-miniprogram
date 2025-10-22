@@ -3,6 +3,7 @@ const { request } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { safeCreateOrderAndPay } = require('../../utils/payment');
 const { extractErrorMessage } = require('../../utils/error');
+const logger = require('../../utils/logger');
 
 Page({
   data: {
@@ -50,7 +51,7 @@ Page({
         this.setData({ bookDetail: data });
       }
     } catch (error) {
-      console.error('API request failed', error);
+      logger.error('API request failed', error);
       const errorMsg = extractErrorMessage(error, '加载失败');
       this.setData({ error: errorMsg });
       ui.showError(errorMsg);

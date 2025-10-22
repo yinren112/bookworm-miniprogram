@@ -7,6 +7,7 @@ import { ApiError } from "../../errors";
 import { orderSelectPublic } from "../../db/views/orderView";
 import { inventorySelectBasic } from "../../db/views/inventoryView";
 import { userRoleView, orderWithItemsInclude } from "../../db/views";
+import { log } from "../../lib/logger";
 
 /**
  * Fetches orders for a specific user with cursor-based pagination
@@ -207,7 +208,7 @@ export async function getPendingPickupOrders(
         // CRITICAL: If inventoryItem is missing, this indicates a database integrity violation
         // Foreign key constraints should prevent this, but we check anyway
         if (!inventoryItem) {
-          console.error(
+          log.error(
             `[DATA INTEGRITY ERROR] Order ${order.id} references missing InventoryItem ${item.inventory_item_id}. ` +
               `This should never happen if foreign key constraints are working correctly. ` +
               `Filtering out this item from the response.`,

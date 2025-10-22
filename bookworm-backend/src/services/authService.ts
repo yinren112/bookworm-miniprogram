@@ -1,11 +1,12 @@
 // src/services/authService.ts
 import axios from "axios";
 import { createSigner } from "fast-jwt";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient, Prisma, User } from "@prisma/client";
 import config from "../config";
 import { metrics } from "../plugins/metrics";
 import { WECHAT_CONSTANTS } from "../constants";
-import { maskOpenId, maskPhoneNumber } from "../lib/logSanitizer";
+import { findPreRegisteredUserByPhone, findConflictingRegisteredUser, findUserByUnionId as findUserByUnionIdQuery, findUserByOpenId as findUserByOpenIdQuery } from "./auth/userQueries";
+import { upgradePreRegisteredUser, resolveConflictAndMerge, updateUserOpenId as updateUserOpenIdOp, updateUserUnionId as updateUserUnionIdOp, createUser as createUserOp } from "./auth/userOperations";
 import { log } from "../lib/logger";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
@@ -34,44 +35,22 @@ interface WxPhoneNumberResponse {
 
 // Simple in-memory cache for access_token
 let accessTokenCache: { token: string; expiresAt: number } | null = null;
+// Promise-based request deduplication to prevent concurrent WeChat API calls
+let accessTokenPromise: Promise<string> | null = null;
 
 // Helper functions for user management - each with single responsibility
 
-async function findUserByUnionId(dbCtx: DbCtx, unionid: string) {
-  return await dbCtx.user.findUnique({ where: { unionid } });
-}
 
-async function findUserByOpenId(dbCtx: DbCtx, openid: string) {
-  return await dbCtx.user.findUnique({ where: { openid } });
-}
+// Wrapper functions that use the new modularized code
 
-async function updateUserOpenId(dbCtx: DbCtx, userId: number, openid: string) {
-  return await dbCtx.user.update({
-    where: { id: userId },
-    data: { openid },
-  });
-}
-
-async function updateUserUnionId(dbCtx: DbCtx, userId: number, unionid: string) {
-  return await dbCtx.user.update({
-    where: { id: userId },
-    data: { unionid },
-  });
-}
-
-async function createUser(dbCtx: DbCtx, openid: string, unionid?: string, phoneNumber?: string) {
-  const user = await dbCtx.user.create({
-    data: {
-      openid,
-      unionid,
-      phone_number: phoneNumber,
-    },
-  });
-
+const findUserByUnionId = findUserByUnionIdQuery;
+const findUserByOpenId = findUserByOpenIdQuery;
+const updateUserOpenId = updateUserOpenIdOp;
+const updateUserUnionId = updateUserUnionIdOp;
+const createUser = (dbCtx: DbCtx, openid: string, unionid?: string, phoneNumber?: string) => {
   metrics.usersLoggedInTotal.inc();
-
-  return user;
-}
+  return createUserOp(dbCtx, openid, unionid, phoneNumber);
+};
 
 async function ensureUserWithUnionId(dbCtx: DbCtx, openid: string, unionid: string, phoneNumber?: string) {
   // Try to find by unionid first (most reliable identifier)
@@ -117,136 +96,24 @@ async function findAndMergePreRegisteredUser(
   phoneNumber: string,
   openid: string,
   unionid?: string,
-) {
-  // STEP 1: Look for PRE_REGISTERED user with matching phone number
-  const preRegisteredUser = await dbCtx.user.findFirst({
-    where: {
-      phone_number: phoneNumber,
-      status: 'PRE_REGISTERED',
-    },
-  });
+): Promise<User | null> {
+  // Step 1: Look for PRE_REGISTERED user with matching phone number
+  const preRegUser = await findPreRegisteredUserByPhone(dbCtx, phoneNumber);
 
-  if (!preRegisteredUser) {
-    return null;
+  if (!preRegUser) {
+    return null; // No pre-registered user found
   }
 
-  // STEP 2: CRITICAL - Check if this openid/unionid is already in use by a REGISTERED user
-  // This prevents violating UNIQUE constraints and data corruption
-  const conflictingUser = await dbCtx.user.findFirst({
-    where: {
-      OR: [
-        { openid },
-        unionid ? { unionid } : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ].filter(Boolean) as any,
-      status: 'REGISTERED',
-    },
-  });
+  // Step 2: Check if WeChat credentials are already in use by another REGISTERED user
+  const conflictUser = await findConflictingRegisteredUser(dbCtx, openid, unionid);
 
-  if (conflictingUser) {
-    // CONFLICT RESOLUTION:
-    // The openid/unionid already belongs to an existing REGISTERED user.
-    // This means the phone number owner has ALREADY logged in via WeChat before.
-    // We should:
-    // 1. Transfer the phone_number to the existing REGISTERED user (if missing)
-    // 2. Delete the placeholder PRE_REGISTERED user
-    // 3. Transfer any associated data (e.g., sell orders) to the REGISTERED user
-
-    log.info(
-      {
-        preRegisteredUserId: preRegisteredUser.id,
-        conflictingUserId: conflictingUser.id,
-        phone: maskPhoneNumber(phoneNumber),
-        openid: maskOpenId(openid)
-      },
-      'Merge conflict: PRE_REGISTERED user conflicts with existing REGISTERED user, merging into REGISTERED user'
-    );
-
-    // CRITICAL: Transfer ALL associated records BEFORE deleting placeholder user
-    // This prevents foreign key constraint violations and preserves data integrity
-
-    // Step 1: Transfer all orders from PRE_REGISTERED to REGISTERED user
-    await dbCtx.order.updateMany({
-      where: { user_id: preRegisteredUser.id },
-      data: { user_id: conflictingUser.id },
-    });
-
-    // Step 2: Transfer all pending payment orders
-    await dbCtx.pendingPaymentOrder.updateMany({
-      where: { user_id: preRegisteredUser.id },
-      data: { user_id: conflictingUser.id },
-    });
-
-    // Step 3: Transfer acquisition records (as customer)
-    await dbCtx.acquisition.updateMany({
-      where: { customer_user_id: preRegisteredUser.id },
-      data: { customer_user_id: conflictingUser.id },
-    });
-
-    // Step 4: Handle UserProfile migration
-    // Check if both users have profiles
-    const preRegProfile = await dbCtx.userProfile.findUnique({
-      where: { user_id: preRegisteredUser.id },
-    });
-    const conflictingProfile = await dbCtx.userProfile.findUnique({
-      where: { user_id: conflictingUser.id },
-    });
-
-    if (preRegProfile && !conflictingProfile) {
-      // PRE_REGISTERED has profile but REGISTERED doesn't - transfer it
-      await dbCtx.userProfile.update({
-        where: { user_id: preRegisteredUser.id },
-        data: { user_id: conflictingUser.id },
-      });
-    } else if (preRegProfile && conflictingProfile) {
-      // Both have profiles - delete PRE_REGISTERED profile (keep REGISTERED one)
-      await dbCtx.userProfile.delete({
-        where: { user_id: preRegisteredUser.id },
-      });
-    }
-    // If only conflictingUser has profile or neither has profile, nothing to do
-
-    // Step 5: Delete the PRE_REGISTERED placeholder (releases phone_number)
-    await dbCtx.user.delete({
-      where: { id: preRegisteredUser.id },
-    });
-
-    // Step 6: Update REGISTERED user with phone number (if not already set)
-    // This is now safe because PRE_REGISTERED user is deleted
-    if (!conflictingUser.phone_number) {
-      await dbCtx.user.update({
-        where: { id: conflictingUser.id },
-        data: { phone_number: phoneNumber },
-      });
-    }
-
-    log.info(
-      { preRegisteredUserId: preRegisteredUser.id, registeredUserId: conflictingUser.id },
-      'Merge complete: Transferred data from PRE_REGISTERED user to REGISTERED user and deleted placeholder'
-    );
-
-    // Return the updated REGISTERED user
-    return await dbCtx.user.findUniqueOrThrow({
-      where: { id: conflictingUser.id },
-    });
+  if (conflictUser) {
+    // Conflict case: Merge PRE_REGISTERED data into existing REGISTERED user
+    return await resolveConflictAndMerge(dbCtx, preRegUser, conflictUser, phoneNumber);
   }
 
-  // STEP 3: No conflict - safe to merge
-  // Update the PRE_REGISTERED placeholder with real WeChat credentials
-  const mergedUser = await dbCtx.user.update({
-    where: { id: preRegisteredUser.id },
-    data: {
-      openid,
-      unionid,
-      status: 'REGISTERED',
-    },
-  });
-
-  log.info(
-    { userId: preRegisteredUser.id, openid: maskOpenId(openid) },
-    'Merge: PRE_REGISTERED user upgraded to REGISTERED'
-  );
-  return mergedUser;
+  // No conflict case: Simply upgrade PRE_REGISTERED to REGISTERED
+  return await upgradePreRegisteredUser(dbCtx, preRegUser, openid, unionid);
 }
 
 export function generateJwtToken(user: { id: number; openid: string; role: string }) {
@@ -286,32 +153,47 @@ export async function requestWxSession(code: string): Promise<WxSession> {
 }
 
 async function getAccessToken(): Promise<string> {
+  // If there's already a fetch in progress, wait for it
+  if (accessTokenPromise) {
+    return accessTokenPromise;
+  }
+
   // Check if we have a valid cached token
   const now = Date.now();
   if (accessTokenCache && accessTokenCache.expiresAt > now) {
     return accessTokenCache.token;
   }
 
-  // Fetch new access_token from WeChat
-  const url = `${WECHAT_CONSTANTS.GET_ACCESS_TOKEN_URL}?grant_type=client_credential&appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}`;
-  const { data } = await axios.get<WxAccessTokenResponse>(url);
+  // Create new fetch promise with automatic cleanup
+  accessTokenPromise = (async () => {
+    try {
+      // Fetch new access_token from WeChat
+      const url = `${WECHAT_CONSTANTS.GET_ACCESS_TOKEN_URL}?grant_type=client_credential&appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}`;
+      const { data } = await axios.get<WxAccessTokenResponse>(url);
 
-  if (data.errcode || !data.access_token || !data.expires_in) {
-    throw new Error(`WeChat Access Token Error: ${data.errmsg || 'Invalid response'}`);
-  }
+      if (data.errcode || !data.access_token || !data.expires_in) {
+        throw new Error(`WeChat Access Token Error: ${data.errmsg || 'Invalid response'}`);
+      }
 
-  // After validation, we know access_token and expires_in are defined
-  const accessToken = data.access_token;
-  const expiresIn = data.expires_in;
+      // After validation, we know access_token and expires_in are defined
+      const accessToken = data.access_token;
+      const expiresIn = data.expires_in;
 
-  // Cache the token with 5-minute buffer before expiry (WeChat tokens expire in 7200s)
-  const expiresAt = now + (expiresIn - 300) * 1000;
-  accessTokenCache = {
-    token: accessToken,
-    expiresAt,
-  };
+      // Cache the token with 5-minute buffer before expiry (WeChat tokens expire in 7200s)
+      const expiresAt = now + (expiresIn - 300) * 1000;
+      accessTokenCache = {
+        token: accessToken,
+        expiresAt,
+      };
 
-  return accessToken;
+      return accessToken;
+    } finally {
+      // Clear the promise reference after completion (success or failure)
+      accessTokenPromise = null;
+    }
+  })();
+
+  return accessTokenPromise;
 }
 
 export async function requestWxPhoneNumber(phoneCode: string): Promise<string | null> {
@@ -333,13 +215,13 @@ export async function requestWxPhoneNumber(phoneCode: string): Promise<string | 
     });
 
     if (data.errcode !== 0) {
-      console.warn(`Failed to get phone number from WeChat: ${data.errmsg}`);
+      log.warn(`Failed to get phone number from WeChat: ${data.errmsg}`);
       return null;
     }
 
     return data.phone_info?.purePhoneNumber || null;
   } catch (error) {
-    console.error("Error fetching WeChat phone number:", error);
+    log.error("Error fetching WeChat phone number:", error);
     return null;
   }
 }
