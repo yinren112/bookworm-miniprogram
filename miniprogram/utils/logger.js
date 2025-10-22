@@ -1,4 +1,5 @@
 // miniprogram/utils/logger.js - Unified logging utility
+/* eslint-disable no-console */
 const config = (() => {
   try {
     return require('../config');

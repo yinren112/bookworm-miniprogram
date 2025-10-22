@@ -214,7 +214,7 @@ Page({
         notes: `批量收购 - ${acquirableItems.length} 本书籍通过白名单筛选`
       };
 
-      const result = await createSellOrder(payload);
+      await createSellOrder(payload);
 
       wx.showToast({
         title: '收购成功',

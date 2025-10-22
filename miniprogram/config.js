@@ -1,6 +1,7 @@
 // miniprogram/config.js
 // NOTE: Cannot require('./utils/logger') here to avoid circular dependency
 // config.js is loaded by logger.js, so we use inline logging
+/* eslint-disable no-console */
 
 /**
  * Dynamically select API base URL based on mini program environment

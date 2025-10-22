@@ -1,0 +1,22 @@
+{
+  "env": {
+    "es6": true,
+    "browser": true,
+    "node": true
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "script"
+  },
+  "globals": {
+    "wx": "readonly",
+    "getApp": "readonly",
+    "Page": "readonly",
+    "Component": "readonly",
+    "App": "readonly"
+  },
+  "rules": {
+    "no-console": "error"
+  }
+}
