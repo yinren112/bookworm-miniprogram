@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, Order, InventoryItem } from "@prisma/client";
+import { Prisma, PrismaClient, InventoryItem } from "@prisma/client";
 
 import { ApiError } from "../errors";
 import {
