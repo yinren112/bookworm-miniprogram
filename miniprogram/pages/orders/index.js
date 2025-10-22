@@ -1,5 +1,4 @@
 // pages/orders/index.js
-const auth = require('../../utils/auth');
 const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
 const tokenUtil = require('../../utils/token');
