@@ -1,6 +1,7 @@
-module.exports = {
+import noPrismaRawSelect from './no-prisma-raw-select.js';
+
+export default {
   rules: {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    'no-prisma-raw-select': require('./no-prisma-raw-select'),
+    'no-prisma-raw-select': noPrismaRawSelect,
   },
 };

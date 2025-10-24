@@ -3,7 +3,7 @@
  * Allowed:  select: Ident / MemberExpr (e.g. userRoleView or views.user.role)
  * Disallowed: ObjectExpression / ArrayExpression literals.
  */
-module.exports = {
+export default {
   meta: {
     type: 'problem',
     docs: {
