@@ -1,6 +1,7 @@
 // pages/order-detail/index.js
 const { request } = require('../../utils/api');
 const { extractErrorMessage } = require('../../utils/error');
+const { applyCoverProxy } = require('../../utils/image');
 
 Page({
   data: {
@@ -45,6 +46,7 @@ Page({
         url: `/orders/${orderId}`,
         method: 'GET'
       });
+      applyCoverProxy(data);
       this.setData({ 
         order: data,
         isLoading: false 
@@ -93,3 +95,4 @@ Page({
     }
   }
 });
+

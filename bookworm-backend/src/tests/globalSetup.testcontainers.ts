@@ -1,6 +1,4 @@
-// Simple global setup that uses existing docker-compose postgres container
-// instead of Testcontainers (for environments where Testcontainers doesn't work)
-
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'path';
@@ -8,77 +6,69 @@ import { PrismaClient } from '@prisma/client';
 import { resetDatabase } from './utils/resetDb';
 
 const execAsync = promisify(exec);
+
 const prismaBinary = path.join(__dirname, '..', '..', 'node_modules', '.bin', 'prisma');
 
+// This object will hold a mapping from worker ID to its dedicated container instance.
+const containers: Record<number, StartedPostgreSqlContainer> = {};
 const prismaClients: Record<number, PrismaClient> = {};
-let globalDatabaseUrl: string = '';
+const connectionUrls: Record<number, string> = {};
 
 declare global {
   var __BOOKWORM_TRUNCATE__: ((workerId?: number) => Promise<void>) | undefined;
 }
 
 export async function setup(config: any) {
-  console.log('[Simple Setup] Using existing DATABASE_URL from .env.test');
+  const workers = config.workers || 1; // Get the number of parallel workers, default to 1
 
-  // Get DATABASE_URL from environment (set by dotenv in package.json script)
-  const databaseUrl = process.env.DATABASE_URL || process.env.TEST_DATABASE_URL;
+  for (let i = 1; i <= workers; i++) {
+    console.log(`[Worker ${i}] Starting a dedicated PostgreSQL container...`);
+    const container = await new PostgreSqlContainer('postgres:15').start();
+    containers[i] = container;
 
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL or TEST_DATABASE_URL must be set in .env.test');
-  }
+    const databaseUrl = container.getConnectionUri();
+    connectionUrls[i] = databaseUrl;
+    console.log(`[Worker ${i}] Container started. Applying migrations...`);
 
-  globalDatabaseUrl = databaseUrl;
-
-  console.log('[Simple Setup] Database URL configured');
-  console.log('[Simple Setup] Applying migrations...');
-
-  // Apply migrations to the test database
-  try {
     await execAsync(`${prismaBinary} migrate deploy`, {
       env: { ...process.env, DATABASE_URL: databaseUrl },
     });
-    console.log('[Simple Setup] Migrations applied successfully');
-  } catch (error) {
-    console.error('[Simple Setup] Migration failed:', error);
-    throw error;
+    console.log(`[Worker ${i}] Migrations applied.`);
+
+    // Store a Prisma Client instance for this worker
+    prismaClients[i] = new PrismaClient({
+      datasources: {
+        db: {
+          url: databaseUrl,
+        },
+      },
+    });
+
+    await resetDatabase(prismaClients[i]);
   }
 
-  // Create Prisma Client for worker 1 (single worker mode)
-  const workerId = 1;
-  prismaClients[workerId] = new PrismaClient({
-    datasources: {
-      db: {
-        url: databaseUrl,
-      },
-    },
-  });
+  // Pass the container details to the test environment
+  process.env.TEST_CONTAINERS = JSON.stringify(connectionUrls);
 
-  // Reset database to clean state
-  console.log('[Simple Setup] Resetting database...');
-  await resetDatabase(prismaClients[workerId]);
-  console.log('[Simple Setup] Database reset complete');
-
-  // Store connection URL in global scope
-  (global as any).TEST_DATABASE_URL = databaseUrl;
-
-  // Provide a truncate function for tests
-  global.__BOOKWORM_TRUNCATE__ = async (workerId: number = 1) => {
-    const client = prismaClients[workerId] ?? getPrismaClientForWorker();
+  globalThis.__BOOKWORM_TRUNCATE__ = async (workerId?: number) => {
+    const resolvedWorkerId = workerId ?? parseInt(process.env.VITEST_WORKER_ID || '1', 10);
+    const client = prismaClients[resolvedWorkerId] ?? getPrismaClientForWorker();
     await resetDatabase(client);
   };
-
-  console.log('[Simple Setup] Setup complete');
 }
 
 export async function teardown() {
-  console.log('[Simple Setup] Tearing down...');
-
-  // Disconnect all Prisma clients
-  for (const client of Object.values(prismaClients)) {
-    await client.$disconnect();
-  }
-
-  console.log('[Simple Setup] Teardown complete');
+  console.log('Tearing down all test containers...');
+  await Promise.all(
+    Object.values(containers).map(async (container) => {
+      try {
+        await container.stop();
+      } catch (error) {
+        console.warn('Failed to stop test container cleanly:', error);
+      }
+    })
+  );
+  console.log('All containers stopped.');
 }
 
 // Helper to get the Prisma Client for the current worker
@@ -88,29 +78,37 @@ export function getPrismaClientForWorker(): PrismaClient {
   // Try to get the stored client first
   let client = prismaClients[workerId];
 
-  // If not found, create a new client using the global database URL
+  // If not found, try to create a new client using the container URL from environment
   if (!client) {
-    const databaseUrl = globalDatabaseUrl || process.env.DATABASE_URL || process.env.TEST_DATABASE_URL;
+    const testContainers = process.env.TEST_CONTAINERS;
+    if (testContainers) {
+      const containers = JSON.parse(testContainers);
+      const databaseUrl = containers[workerId] || containers['1']; // Fallback to worker 1 if current worker not found
 
-    if (databaseUrl) {
-      console.log(`[Simple Setup] Creating new Prisma client for worker ${workerId}`);
-      client = new PrismaClient({
-        datasources: {
-          db: {
-            url: databaseUrl,
+      if (databaseUrl) {
+        console.log(`Creating new Prisma client for worker ${workerId} with URL: ${databaseUrl.substring(0, 30)}...`);
+        client = new PrismaClient({
+          datasources: {
+            db: {
+              url: databaseUrl,
+            },
           },
-        },
-      });
+        });
 
-      // Store it for future use
-      prismaClients[workerId] = client;
+        // Store it for future use
+        prismaClients[workerId] = client;
+      }
     }
   }
 
   if (!client) {
-    throw new Error(`No Prisma client available for worker ${workerId}. Available workers: ${Object.keys(prismaClients).join(', ')}`);
+    throw new Error(`No Prisma client available for worker ${workerId}. Available workers: ${Object.keys(prismaClients).join(', ')}, TEST_CONTAINERS: ${process.env.TEST_CONTAINERS}`);
   }
   return client;
+}
+
+async function truncateAllTables(prisma: PrismaClient) {
+  await resetDatabase(prisma);
 }
 
 // Helper functions that use the worker's Prisma client

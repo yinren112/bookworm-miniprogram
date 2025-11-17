@@ -1,9 +1,10 @@
-// pages/book-detail/index.js
+﻿// pages/book-detail/index.js
 const { request } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { safeCreateOrderAndPay } = require('../../utils/payment');
 const { extractErrorMessage } = require('../../utils/error');
 const logger = require('../../utils/logger');
+const { applyCoverProxy } = require('../../utils/image');
 
 Page({
   data: {
@@ -48,6 +49,7 @@ Page({
       if (!data) {
         this.setData({ error: '书籍信息不存在' });
       } else {
+        applyCoverProxy(data);
         this.setData({ bookDetail: data });
       }
     } catch (error) {

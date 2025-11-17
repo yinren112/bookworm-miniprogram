@@ -55,7 +55,7 @@ A robust backend API server for the Bookworm campus textbook marketplace, built 
    npm run dev
    ```
 
-The API server will be available at `http://localhost:3000`
+The API server will be available at `http://localhost:8080`
 
 ## Database Management
 
@@ -107,7 +107,9 @@ npx prisma generate  # Regenerate Prisma client after schema changes
 ### Testing
 ```bash
 npm test                    # Run unit tests
+docker-compose --profile test up -d postgres_test  # Ensure test DB is running
 npm run test:integration    # Run integration tests with real database
+# Windows: use ./run-integration-tests.ps1 to automate the above steps
 npm run test:all           # Run all tests with coverage
 ```
 
@@ -233,7 +235,7 @@ Structured JSON logging via Fastify with:
 docker build -t bookworm-backend .
 
 # Run with environment file
-docker run -p 3000:3000 --env-file .env bookworm-backend
+docker run -p 8080:8080 --env-file .env bookworm-backend
 ```
 
 ### Configuration Validation
@@ -266,7 +268,7 @@ docker volume prune
 
 ### Port Conflicts
 The setup uses these ports:
-- `3000` - API server
+- `8080` - API server
 - `5432` - PostgreSQL (development)
 - `5433` - PostgreSQL (test)
 

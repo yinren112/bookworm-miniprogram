@@ -89,6 +89,29 @@ const booksToSeed = [
   },
 ];
 
+const contentToSeed = [
+  {
+    slug: 'terms-of-service',
+    title: '用户服务协议',
+    body: `
+      <h2>用户服务协议</h2>
+      <p>本服务面向校内二手教材流转，仅供注册用户在授权范围内使用。请您在下单、收货与售卖前确认所填信息真实、合法，不发布侵权或违法信息。</p>
+      <p>当订单进入待取货或已售出状态时，请按通知时间前往约定地点完成交接；若需取消，请在支付前或支付后联系客服处理。平台对现金交易外的纠纷保留追责与冻结账户的权利。</p>
+      <p>如您为工作人员账户，请遵守学校与平台的岗位要求，妥善保管取货码、付款凭证与仓库权限。</p>
+    `,
+  },
+  {
+    slug: 'privacy-policy',
+    title: '隐私政策',
+    body: `
+      <h2>隐私政策</h2>
+      <p>我们收集的必要信息包括：微信登录标识（openid）、手机号（用于账户合并与通知）、订单与库存记录。收集用途仅限于完成下单、支付、取货、售后与风控。</p>
+      <p>我们不会公开展示您的手机号，所有日志默认进行脱敏处理。涉及支付的通知与证书将按最小权限保存在受控目录，并遵循学校及平台的合规要求。</p>
+      <p>如需注销或导出账户数据，请联系客服，处理后将清除与您相关的个人标识与授权信息，但法律法规要求的记录除外。</p>
+    `,
+  },
+];
+
 async function main() {
   console.log('Start seeding...');
 
@@ -140,6 +163,19 @@ async function main() {
       }
     });
     console.log(`Seeded book: ${book.master.title}`);
+  }
+
+  // Seed basic content pages (idempotent)
+  for (const content of contentToSeed) {
+    await prisma.content.upsert({
+      where: { slug: content.slug },
+      update: {
+        title: content.title,
+        body: content.body,
+      },
+      create: content,
+    });
+    console.log(`Seeded content: ${content.slug}`);
   }
 
   console.log('Seeding finished.');

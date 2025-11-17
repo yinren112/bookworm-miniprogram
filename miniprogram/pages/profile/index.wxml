@@ -16,20 +16,6 @@
     >
       授权手机号（关联卖书记录）
     </button>
-
-    <!-- Development Mode: Manual Phone Input (Remove in production) -->
-    <button
-      wx:if="{{!hasPhoneNumber}}"
-      class="auth-phone-button-dev"
-      bindtap="onManualPhoneInput"
-    >
-      [开发测试] 手动输入手机号
-    </button>
-
-    <!-- DEBUG: Display user role -->
-    <view style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 8px;">
-      <text style="color: #ff0000; font-size: 14px;">Debug: User Role is [{{userInfo.role}}]</text>
-    </view>
   </view>
 
   <!-- Staff Operations Section - Only visible for STAFF role -->

@@ -75,6 +75,7 @@ npm run migrate:dev
 
 # （可选）填充种子数据
 npm run seed
+# 种子同时写入默认内容页（terms-of-service / privacy-policy），确保小程序内容页可用
 
 # 启动开发服务器（热重载）
 npm run dev
@@ -91,6 +92,8 @@ cd ..
 # 使用微信开发者工具打开 miniprogram/ 目录
 # 配置 API 端点：编辑 miniprogram/utils/config.js
 # 修改 apiBaseUrl 为后端地址（开发环境：http://localhost:8080）
+# 体验版/正式版已预设为 https://api-staging.lailinkeji.com/api 与 https://api.lailinkeji.com/api，
+# 请保证相应域名已在微信「业务域名」中备案并指向 Nginx 反向代理 8080 端口。
 ```
 
 ### 测试
@@ -102,7 +105,9 @@ cd bookworm-backend
 npm test
 
 # 集成测试（使用 Testcontainers）
+docker compose --profile test up -d postgres_test
 npm run test:integration
+# Windows 用户可运行 `bookworm-backend/run-integration-tests.ps1` 自动完成以上步骤
 
 # 代码检查
 npm run lint
@@ -194,6 +199,8 @@ docker build -f Dockerfile.prod -t bookworm-backend:latest .
 cd ../ops/docker
 docker-compose -f docker-compose.staging.yml up -d
 ```
+
+更多部署细节（环境变量、证书挂载、监控与回滚）见 `docs/DEPLOYMENT_RUNBOOK.md`。
 
 ### 环境变量配置
 

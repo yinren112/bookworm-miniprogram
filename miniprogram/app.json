@@ -14,8 +14,11 @@
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#2c5f2d",
-    "navigationBarTitleText": "校园书",
-    "navigationBarTextStyle": "white"
+    "navigationBarTitleText": "\u6821\u56ed\u4e66\u5e02",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f8f9fa",
+    "backgroundColorTop": "#2c5f2d",
+    "backgroundColorBottom": "#f8f9fa"
   },
   "tabBar": {
     "color": "#6b6b6b",
@@ -25,19 +28,19 @@
     "list": [
       {
         "pagePath": "pages/market/index",
-        "text": "市场",
+        "text": "\u5e02\u573a",
         "iconPath": "images/tabs/marketplace.png",
         "selectedIconPath": "images/tabs/marketplace-active.png"
       },
       {
         "pagePath": "pages/orders/index",
-        "text": "订单",
+        "text": "\u8ba2\u5355",
         "iconPath": "images/tabs/orders.png",
         "selectedIconPath": "images/tabs/orders-active.png"
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "我的",
+        "text": "\u6211\u7684",
         "iconPath": "images/tabs/profile.png",
         "selectedIconPath": "images/tabs/profile-active.png"
       }

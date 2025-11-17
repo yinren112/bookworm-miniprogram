@@ -85,7 +85,7 @@ Import completed successfully
    ```bash
    # 需要用户有UserProfile且匹配某个推荐列表
    curl -H "Authorization: Bearer <user_token>" \
-        http://localhost:3000/api/books/recommendations
+        http://localhost:8080/api/books/recommendations
    ```
 
 3. **小程序测试：**

@@ -28,12 +28,20 @@ services:
       - JWT_EXPIRES_IN=7d
       - WX_APP_ID=${WX_APP_ID:-test-app-id}
       - WX_APP_SECRET=${WX_APP_SECRET:-test-app-secret}
+      - WXPAY_MCHID=${WXPAY_MCHID:-}
+      - WXPAY_PRIVATE_KEY_PATH=/secrets/wechatpay/apiclient_key.pem
+      - WXPAY_CERT_SERIAL_NO=${WXPAY_CERT_SERIAL_NO:-}
+      - WXPAY_API_V3_KEY=${WXPAY_API_V3_KEY:-}
+      - WXPAY_NOTIFY_URL=${WXPAY_NOTIFY_URL:-}
+      - WXPAY_ACK_STRICT=${WXPAY_ACK_STRICT:-false}
       - ORDER_PAYMENT_TTL_MINUTES=15
       - MAX_ITEMS_PER_ORDER=10
       - API_RATE_LIMIT_MAX=500
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ../secrets/wechatpay/apiclient_key.pem:/secrets/wechatpay/apiclient_key.pem:ro
 
   db:
     image: postgres:15

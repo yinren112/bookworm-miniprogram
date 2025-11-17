@@ -44,7 +44,7 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/public ./public
 
 # Expose the port the app runs on
-EXPOSE 3000
+EXPOSE 8080
 
 # The command to run the application
 # Note: We run the compiled JS file, not the TS source

@@ -1,21 +1,24 @@
-// pages/orders/index.js
+﻿// pages/orders/index.js
 const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
 const tokenUtil = require('../../utils/token');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
+const { applyCoverProxy } = require('../../utils/image');
 
 Page({
   data: {
     state: {
-      status: 'loading', // 'loading', 'success', 'error'
+      status: 'loading',
       data: [],
       error: null
     },
     statusMap: ORDER_STATUS,
-    pageInfo: null // For pagination metadata
+    pageInfo: null
   },
-  onShow() { this.fetchUserOrders(); },
+  onShow() {
+    this.fetchUserOrders();
+  },
   navigateToDetail(event) {
     const orderId = event.currentTarget.dataset.orderId;
     if (orderId) {
@@ -26,7 +29,9 @@ Page({
   },
   async fetchUserOrders({ preserveData = false } = {}) {
     const userId = tokenUtil.getUserId();
-    if (!userId) { return; }
+    if (!userId) {
+      return;
+    }
     if (!preserveData) {
       this.setData({
         state: {
@@ -44,6 +49,7 @@ Page({
         url: `/orders/my`,
         method: 'GET'
       });
+      applyCoverProxy(data);
       this.setData({
         state: {
           status: 'success',
@@ -65,7 +71,6 @@ Page({
     }
   },
 
-  // Pull down refresh
   async onPullDownRefresh() {
     await this.fetchUserOrders({ preserveData: true });
     wx.stopPullDownRefresh();

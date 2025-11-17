@@ -15,8 +15,10 @@ import { getPrismaClientForWorker } from './globalSetup';
 import config from "../config";
 import { Prisma } from "@prisma/client";
 import WechatPay from "wechatpay-node-v3";
-import { preparePaymentIntent } from "../services/orderService";
+import * as orderService from "../services/orderService";
 import { metrics } from "../plugins/metrics";
+import { ApiError } from "../errors";
+import { WECHAT_CONSTANTS } from "../constants";
 
 // --- Mocks ---
 // Mock WechatPayAdapter to control its behavior during tests
@@ -543,6 +545,111 @@ describe("Payment Security Integration Tests", () => {
     });
   });
 
+  describe("Webhook Idempotency & Error Classification", () => {
+    const validHeaders = {
+      "wechatpay-timestamp": Math.floor(Date.now() / 1000).toString(),
+      "wechatpay-nonce": "test-nonce",
+      "wechatpay-signature": "valid-signature",
+      "wechatpay-serial": "test-serial",
+      "content-type": "application/json",
+    };
+
+    const basePayload = {
+      create_time: new Date().toISOString(),
+      resource_type: "encrypt-resource",
+      event_type: "TRANSACTION.SUCCESS",
+      resource: {
+        algorithm: "AEAD_AES_256_GCM",
+        ciphertext: "mock-ciphertext",
+        associated_data: "mock-associated-data",
+        nonce: "mock-nonce",
+      },
+    };
+
+    it("should short-circuit duplicate webhook IDs and avoid re-processing", async () => {
+      const webhookId = `dup-${Date.now()}`;
+      const payload = { ...basePayload, id: webhookId };
+
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
+        JSON.stringify({
+          out_trade_no: "BOOKWORM_1",
+          trade_state: "SUCCESS",
+        }),
+      );
+
+      const processSpy = vi
+        .spyOn(orderService, "processPaymentNotification")
+        .mockResolvedValue(undefined);
+
+      const firstResponse = await request(app.server)
+        .post("/api/payment/notify")
+        .set(validHeaders)
+        .send(payload);
+
+      expect(firstResponse.status).toBe(200);
+      expect(firstResponse.body.code).toBe(WECHAT_CONSTANTS.SUCCESS_CODE);
+      expect(processSpy).toHaveBeenCalledTimes(1);
+
+      const savedEvent = await prisma.webhookEvent.findUnique({
+        where: { id: webhookId },
+      });
+      expect(savedEvent?.processed).toBe(true);
+
+      const secondResponse = await request(app.server)
+        .post("/api/payment/notify")
+        .set(validHeaders)
+        .send(payload);
+
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.body.code).toBe(WECHAT_CONSTANTS.SUCCESS_CODE);
+      expect(processSpy).toHaveBeenCalledTimes(1); // No reprocessing
+
+      const eventCount = await prisma.webhookEvent.count({
+        where: { id: webhookId },
+      });
+      expect(eventCount).toBe(1);
+
+      await prisma.webhookEvent.deleteMany({ where: { id: webhookId } });
+    });
+
+    it("should return FAIL/503 when payment processing is transient", async () => {
+      const webhookId = `transient-${Date.now()}`;
+      const payload = { ...basePayload, id: webhookId };
+
+      mockWechatPayAdapter.decryptNotificationData.mockReturnValue(
+        JSON.stringify({
+          out_trade_no: "BOOKWORM_TRANSIENT",
+          trade_state: "USERPAYING",
+        }),
+      );
+
+      const transientError = new ApiError(
+        503,
+        "transient",
+        "PAY_TRANSIENT_STATE",
+      );
+      const processSpy = vi
+        .spyOn(orderService, "processPaymentNotification")
+        .mockRejectedValue(transientError);
+
+      const response = await request(app.server)
+        .post("/api/payment/notify")
+        .set(validHeaders)
+        .send(payload);
+
+      expect(response.status).toBe(503);
+      expect(response.body.code).toBe(WECHAT_CONSTANTS.FAIL_CODE);
+      expect(response.body.message).toBe(WECHAT_CONSTANTS.RETRY_MESSAGE);
+      expect(processSpy).toHaveBeenCalledTimes(1);
+
+      // Transaction should roll back, not persisting webhookEvent
+      const savedEvent = await prisma.webhookEvent.findUnique({
+        where: { id: webhookId },
+      });
+      expect(savedEvent).toBeNull();
+    });
+  });
+
   describe("Amount Mismatch Alert Mechanism", () => {
     it("should trigger an amount mismatch alert if order total is inconsistent", async () => {
       // 1. Create test user
@@ -613,7 +720,7 @@ describe("Payment Security Integration Tests", () => {
 
       try {
         // 8. Act: Call preparePaymentIntent which performs the check
-        await preparePaymentIntent(prisma, order.id, testUser.id);
+        await orderService.preparePaymentIntent(prisma, order.id, testUser.id);
 
         // Should not reach here
         expect.fail("Expected preparePaymentIntent to throw AMOUNT_MISMATCH_FATAL error");

@@ -1,8 +1,19 @@
 // miniprogram/app.js
 App({
+  TERMS_COPY: {
+    title: '服务协议与隐私政策',
+    content: '欢迎使用！为保障您的权益，请在使用前仔细阅读并同意《用户服务协议》和《隐私政策》。您可在“我的-设置”中随时查看。',
+    confirmText: '同意',
+    cancelText: '拒绝',
+    rejectToast: '您需要同意协议才能使用本服务'
+  },
+
   onLaunch() {
-    // 登录已迁移到 auth-guard.js，由 API 调用时自动触发
-    // 只需检查服务协议
+    wx.setBackgroundColor({
+      backgroundColor: '#f8f9fa',
+      backgroundColorTop: '#2c5f2d',
+      backgroundColorBottom: '#f8f9fa'
+    });
     this.checkTermsAgreement();
   },
 
@@ -10,34 +21,28 @@ App({
     const hasAgreed = wx.getStorageSync('hasAgreedToTerms');
     if (!hasAgreed) {
       wx.showModal({
-        title: '服务协议与隐私政策',
-        content: '欢迎使用！为了保障您的权益，请在使用前仔细阅读并同意我们的《用户服务协议》与《隐私政策》。您可以在"我的-设置"中随时查看。',
-        confirmText: '同意',
-        cancelText: '拒绝',
+        title: this.TERMS_COPY.title,
+        content: this.TERMS_COPY.content,
+        confirmText: this.TERMS_COPY.confirmText,
+        cancelText: this.TERMS_COPY.cancelText,
         success: (res) => {
           if (res.confirm) {
             wx.setStorageSync('hasAgreedToTerms', true);
           } else if (res.cancel) {
-            // 用户拒绝，可以引导退出或提示无法使用
             wx.showToast({
-              title: '您需要同意协议才能使用本服务',
+              title: this.TERMS_COPY.rejectToast,
               icon: 'none',
               duration: 3000
             });
-            // 简单处理，可以让用户无法进行核心操作
           }
         }
       });
     }
   },
 
-  // 增加一个全局方法，方便其他页面调用
   showTerms() {
-    wx.showModal({
-      title: '服务协议与隐私政策',
-      content: '这里是完整的《用户服务协议》与《隐私政策》内容...（此处应从服务器获取或本地预置长文本）',
-      showCancel: false,
-      confirmText: '我已知晓',
+    wx.navigateTo({
+      url: '/pages/webview/index?slug=terms-of-service'
     });
   }
 });

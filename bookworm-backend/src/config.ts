@@ -1,6 +1,7 @@
 // src/config.ts
 import { envSchema } from "env-schema";
 import { Static, Type } from "@sinclair/typebox";
+import * as fs from "fs";
 
 
 const schema = Type.Object({
@@ -138,6 +139,10 @@ if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
     }
     if (!config.WXPAY_PRIVATE_KEY_PATH) {
       errors.push("WXPAY_PRIVATE_KEY_PATH must be set in production.");
+    } else if (!fs.existsSync(config.WXPAY_PRIVATE_KEY_PATH)) {
+      errors.push(
+        `WXPAY_PRIVATE_KEY_PATH does not exist: ${config.WXPAY_PRIVATE_KEY_PATH}`,
+      );
     }
     if (!config.WXPAY_CERT_SERIAL_NO) {
       errors.push("WXPAY_CERT_SERIAL_NO must be set in production.");

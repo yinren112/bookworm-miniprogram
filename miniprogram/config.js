@@ -14,8 +14,8 @@ function getApiBaseUrl() {
 
     const urls = {
       'develop': 'http://localhost:8080/api',
-      'trial': 'https://staging.bookworm.com/api',
-      'release': 'https://api.bookworm.com/api'
+      'trial': 'https://api-staging.lailinkeji.com/api',
+      'release': 'https://api.lailinkeji.com/api'
     };
 
     return urls[envVersion] || urls.develop;
