@@ -362,6 +362,138 @@
   opacity: 0.9;
 }
 
+/* 模式切换Tab */
+.mode-switcher {
+  display: flex;
+  margin-bottom: var(--space-m);
+  background-color: #f5f5f5;
+  border-radius: 8rpx;
+  padding: 4rpx;
+}
+
+.mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: var(--space-s) var(--space-m);
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+  border-radius: 6rpx;
+  transition: all 0.2s;
+}
+
+.mode-tab.active {
+  background-color: white;
+  color: var(--primary-color);
+  font-weight: var(--font-weight-bold);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* 学生信息分隔线 */
+.section-divider {
+  margin: var(--space-l) 0 var(--space-m) 0;
+  padding-bottom: var(--space-s);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.divider-text {
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 年份选择器 */
+.year-picker {
+  flex: 1;
+  padding: var(--space-s) var(--space-m);
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 8rpx;
+}
+
+.picker-display {
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+/* 精确模式定价区域 */
+.individual-pricing {
+  margin-top: var(--space-m);
+}
+
+.pricing-header {
+  margin-bottom: var(--space-m);
+}
+
+.pricing-hint {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.pricing-item {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: var(--space-m);
+  margin-bottom: var(--space-s);
+  border: 1px solid var(--border-color);
+}
+
+.pricing-book-info {
+  margin-bottom: var(--space-s);
+}
+
+.pricing-book-title {
+  display: block;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: 4rpx;
+}
+
+.pricing-book-author {
+  display: block;
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+.pricing-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+}
+
+.condition-picker {
+  flex: 1;
+  padding: var(--space-s);
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 8rpx;
+  font-size: var(--font-size-caption);
+}
+
+.price-input-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 8rpx;
+  padding: var(--space-s);
+}
+
+.price-prefix {
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+  margin-right: 4rpx;
+}
+
+.price-input {
+  flex: 1;
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+  background-color: transparent;
+  border: none;
+}
+
 .submit-button[disabled] {
   background-color: #cccccc;
   color: #666666;

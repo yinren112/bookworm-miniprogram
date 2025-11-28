@@ -51,6 +51,23 @@
 
   <!-- 结算信息 -->
   <view wx:if="{{summary.count > 0}}" class="summary-section">
+
+    <!-- 定价模式切换 -->
+    <view class="mode-switcher">
+      <view
+        class="mode-tab {{pricingMode === 'bulk' ? 'active' : ''}}"
+        bindtap="onSwitchMode"
+        data-mode="bulk">
+        快速模式
+      </view>
+      <view
+        class="mode-tab {{pricingMode === 'individual' ? 'active' : ''}}"
+        bindtap="onSwitchMode"
+        data-mode="individual">
+        精确模式
+      </view>
+    </view>
+
     <view class="summary-row">
       <text class="summary-label">可收购数量:</text>
       <text class="summary-value">{{summary.count}} 本</text>
@@ -68,26 +85,120 @@
         maxlength="11" />
     </view>
 
-    <!-- 总重量 -->
-    <view class="input-row">
-      <text class="input-label">总重量 (kg):</text>
-      <input
-        class="number-input"
-        type="digit"
-        value="{{totalWeight}}"
-        bindinput="onWeightInput"
-        placeholder="0.00" />
+    <!-- 快速模式：按重量计价 -->
+    <view wx:if="{{pricingMode === 'bulk'}}">
+      <!-- 总重量 -->
+      <view class="input-row">
+        <text class="input-label">总重量 (kg):</text>
+        <input
+          class="number-input"
+          type="digit"
+          value="{{totalWeight}}"
+          bindinput="onWeightInput"
+          placeholder="0.00" />
+      </view>
+
+      <!-- 单价 -->
+      <view class="input-row">
+        <text class="input-label">单价 (元/kg):</text>
+        <input
+          class="number-input"
+          type="digit"
+          value="{{unitPriceYuan}}"
+          bindinput="onUnitPriceInput"
+          placeholder="0.00" />
+      </view>
     </view>
 
-    <!-- 单价 -->
+    <!-- 精确模式：逐本定价 -->
+    <view wx:if="{{pricingMode === 'individual'}}" class="individual-pricing">
+      <view class="pricing-header">
+        <text class="pricing-hint">为每本书设置品相和价格</text>
+      </view>
+
+      <view
+        class="pricing-item"
+        wx:for="{{scannedItems}}"
+        wx:for-item="book"
+        wx:key="index"
+        wx:if="{{book.status === 'acquirable'}}">
+
+        <view class="pricing-book-info">
+          <text class="pricing-book-title">{{book.skuInfo.title}}</text>
+          <text class="pricing-book-author">{{book.skuInfo.author}}</text>
+        </view>
+
+        <view class="pricing-controls">
+          <!-- 品相选择器 -->
+          <picker
+            class="condition-picker"
+            mode="selector"
+            range="{{['全新', '良好', '可接受']}}"
+            value="{{book.conditionIndex || 1}}"
+            data-index="{{index}}"
+            bindchange="onConditionChange">
+            <view class="picker-display">
+              {{['全新', '良好', '可接受'][book.conditionIndex || 1]}}
+            </view>
+          </picker>
+
+          <!-- 价格输入 -->
+          <view class="price-input-wrapper">
+            <text class="price-prefix">¥</text>
+            <input
+              class="price-input"
+              type="digit"
+              value="{{book.individualPrice}}"
+              data-index="{{index}}"
+              bindinput="onIndividualPriceInput"
+              placeholder="0.00" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 学生信息(可选) -->
+    <view class="section-divider">
+      <text class="divider-text">学生信息（可选，用于个性化推荐）</text>
+    </view>
+
+    <!-- 入学年份 -->
     <view class="input-row">
-      <text class="input-label">单价 (元/kg):</text>
+      <text class="input-label">入学年份:</text>
+      <picker
+        class="year-picker"
+        mode="selector"
+        range="{{yearRange}}"
+        value="{{enrollmentYearIndex}}"
+        bindchange="onYearChange">
+        <view class="picker-display">
+          {{enrollmentYear || '请选择'}}
+        </view>
+      </picker>
+    </view>
+
+    <!-- 专业 -->
+    <view class="input-row">
+      <text class="input-label">专业:</text>
       <input
-        class="number-input"
-        type="digit"
-        value="{{unitPriceYuan}}"
-        bindinput="onUnitPriceInput"
-        placeholder="0.00" />
+        class="text-input"
+        type="text"
+        value="{{major}}"
+        bindinput="onMajorInput"
+        placeholder="如：计算机科学与技术"
+        maxlength="100" />
+    </view>
+
+    <!-- 班级 -->
+    <view class="input-row">
+      <text class="input-label">班级:</text>
+      <input
+        class="text-input"
+        type="text"
+        value="{{className}}"
+        bindinput="onClassNameInput"
+        placeholder="如：1班"
+        maxlength="50" />
     </view>
 
     <!-- 最终总金额 -->
