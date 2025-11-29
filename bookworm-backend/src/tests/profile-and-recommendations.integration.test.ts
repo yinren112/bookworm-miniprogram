@@ -259,6 +259,207 @@ describe("User Profile & Recommendations Integration Tests", () => {
       const error = JSON.parse(response.payload);
       expect(error.code).toBe("FORBIDDEN");
     });
+
+    it("应该拒绝手机号被其他用户占用的收购", async () => {
+      // 创建两个用户和一个员工
+      const { userId: userA } = await createTestUser("USER");
+      const { userId: userB } = await createTestUser("USER");
+      const { token: staffToken } = await createTestUser("STAFF");
+
+      // 用户A先占用手机号13700137000
+      await prisma.user.update({
+        where: { id: userA },
+        data: { phone_number: "13700137000" },
+      });
+
+      // 创建可收购 SKU
+      const bookMaster = await prisma.bookMaster.create({
+        data: {
+          isbn13: "9780000000005",
+          title: "手机号冲突测试",
+        },
+      });
+
+      const bookSku = await prisma.bookSku.create({
+        data: {
+          master_id: bookMaster.id,
+          edition: "第一版",
+          is_acquirable: true,
+        },
+      });
+
+      // 尝试为用户B使用已被用户A占用的手机号
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/acquisitions",
+        headers: {
+          authorization: `Bearer ${staffToken}`,
+        },
+        payload: {
+          customerUserId: userB,
+          items: [{ skuId: bookSku.id, condition: "GOOD", acquisitionPrice: 1000 }],
+          settlementType: "CASH",
+          customerProfile: { phoneNumber: "13700137000" },
+        },
+      });
+
+      // 验证：返回409冲突
+      expect(response.statusCode).toBe(409);
+      const error = JSON.parse(response.payload);
+      expect(error.code).toBe("PHONE_NUMBER_CONFLICT");
+
+      // 验证：用户B的手机号未被修改
+      const userBAfter = await prisma.user.findUnique({ where: { id: userB } });
+      expect(userBAfter!.phone_number).toBeNull();
+    });
+
+    it("应该在快速模式下平均分配价格", async () => {
+      // 创建员工和顾客用户
+      const { userId: customerId } = await createTestUser("USER");
+      const { token: staffToken } = await createTestUser("STAFF");
+
+      // 创建3本可收购的书（模拟快速模式：2kg × 10元/kg = 20元 = 2000分，平均每本666分）
+      const bookMasters = await Promise.all([
+        prisma.bookMaster.create({ data: { isbn13: "9780000000006", title: "快速模式测试书1" } }),
+        prisma.bookMaster.create({ data: { isbn13: "9780000000007", title: "快速模式测试书2" } }),
+        prisma.bookMaster.create({ data: { isbn13: "9780000000008", title: "快速模式测试书3" } }),
+      ]);
+
+      const bookSkus = await Promise.all(
+        bookMasters.map((master) =>
+          prisma.bookSku.create({
+            data: {
+              master_id: master.id,
+              edition: "第一版",
+              is_acquirable: true,
+            },
+          })
+        )
+      );
+
+      // 快速模式收购（总价2000分，3本书，每本666分）
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/acquisitions",
+        headers: {
+          authorization: `Bearer ${staffToken}`,
+        },
+        payload: {
+          customerUserId: customerId,
+          items: bookSkus.map((sku) => ({
+            skuId: sku.id,
+            condition: "GOOD",
+            acquisitionPrice: 666, // 2000 ÷ 3 ≈ 666分/本
+          })),
+          settlementType: "CASH",
+          notes: "快速模式 - 3本 (总重2.0kg, 单价¥10/kg)",
+          customerProfile: {
+            phoneNumber: "13800138888",
+            enrollmentYear: 2023,
+            major: "计算机科学与技术",
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const acquisition = JSON.parse(response.payload);
+
+      // 验证总价值
+      expect(acquisition.total_value).toBe(1998); // 666 × 3 = 1998
+      expect(acquisition.item_count).toBe(3);
+
+      // 验证每本书的价格和品相
+      const inventoryItems = await prisma.inventoryItem.findMany({
+        where: { acquisitionId: acquisition.id },
+        select: { cost: true, selling_price: true, condition: true },
+      });
+
+      expect(inventoryItems).toHaveLength(3);
+      inventoryItems.forEach((item) => {
+        expect(item.cost).toBe(666);
+        expect(item.selling_price).toBe(666);
+        expect(item.condition).toBe("GOOD");
+      });
+
+      // 验证用户画像已创建
+      const profile = await prisma.userProfile.findUnique({
+        where: { user_id: customerId },
+      });
+      expect(profile).not.toBeNull();
+      expect(profile!.enrollment_year).toBe(2023);
+      expect(profile!.major).toBe("计算机科学与技术");
+    });
+
+    it("应该在精确模式下支持逐本定价和不同品相", async () => {
+      // 创建员工和顾客用户
+      const { userId: customerId } = await createTestUser("USER");
+      const { token: staffToken } = await createTestUser("STAFF");
+
+      // 创建3本可收购的书
+      const bookMasters = await Promise.all([
+        prisma.bookMaster.create({ data: { isbn13: "9780000000009", title: "精确模式测试书1" } }),
+        prisma.bookMaster.create({ data: { isbn13: "9780000000010", title: "精确模式测试书2" } }),
+        prisma.bookMaster.create({ data: { isbn13: "9780000000011", title: "精确模式测试书3" } }),
+      ]);
+
+      const bookSkus = await Promise.all(
+        bookMasters.map((master) =>
+          prisma.bookSku.create({
+            data: {
+              master_id: master.id,
+              edition: "第一版",
+              is_acquirable: true,
+            },
+          })
+        )
+      );
+
+      // 精确模式收购（每本书不同价格和品相）
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/acquisitions",
+        headers: {
+          authorization: `Bearer ${staffToken}`,
+        },
+        payload: {
+          customerUserId: customerId,
+          items: [
+            { skuId: bookSkus[0].id, condition: "NEW", acquisitionPrice: 1200 },
+            { skuId: bookSkus[1].id, condition: "GOOD", acquisitionPrice: 800 },
+            { skuId: bookSkus[2].id, condition: "ACCEPTABLE", acquisitionPrice: 500 },
+          ],
+          settlementType: "CASH",
+          notes: "精确模式 - 3本",
+          customerProfile: { phoneNumber: "13900139999" },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const acquisition = JSON.parse(response.payload);
+
+      // 验证总价值
+      expect(acquisition.total_value).toBe(2500); // 1200 + 800 + 500
+      expect(acquisition.item_count).toBe(3);
+
+      // 验证品相和价格（按价格降序排列）
+      const inventoryItems = await prisma.inventoryItem.findMany({
+        where: { acquisitionId: acquisition.id },
+        orderBy: { cost: "desc" },
+      });
+
+      expect(inventoryItems).toHaveLength(3);
+      expect(inventoryItems[0].condition).toBe("NEW");
+      expect(inventoryItems[0].cost).toBe(1200);
+      expect(inventoryItems[0].selling_price).toBe(1200);
+
+      expect(inventoryItems[1].condition).toBe("GOOD");
+      expect(inventoryItems[1].cost).toBe(800);
+      expect(inventoryItems[1].selling_price).toBe(800);
+
+      expect(inventoryItems[2].condition).toBe("ACCEPTABLE");
+      expect(inventoryItems[2].cost).toBe(500);
+      expect(inventoryItems[2].selling_price).toBe(500);
+    });
   });
 
   describe("GET /api/books/recommendations - Personalized Recommendations", () => {

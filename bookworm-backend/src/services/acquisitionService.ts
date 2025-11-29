@@ -56,6 +56,7 @@ export interface CreateAcquisitionResult {
  */
 async function createAcquisitionImpl(
   tx: Prisma.TransactionClient,
+  dbCtx: PrismaClient,
   input: CreateAcquisitionInput,
 ): Promise<CreateAcquisitionResult> {
   // 验证输入
@@ -110,7 +111,8 @@ async function createAcquisitionImpl(
         // 捕获唯一约束违反错误 (P2002)
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
           // 手机号被占用，检查是被谁占用
-          const conflictingUser = await tx.user.findUnique({
+          // 注意：不能使用失败的事务对象（tx），必须使用独立的dbCtx
+          const conflictingUser = await dbCtx.user.findUnique({
             where: { phone_number: input.customerProfile.phoneNumber },
             select: userIdOnlyView,
           });
@@ -176,7 +178,7 @@ export function createAcquisition(
 ): Promise<CreateAcquisitionResult> {
   return withTxRetry(
     dbCtx,
-    (tx) => createAcquisitionImpl(tx, input),
+    (tx) => createAcquisitionImpl(tx, dbCtx, input),
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       transactionOptions: {
