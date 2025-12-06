@@ -14,7 +14,8 @@ Page({
       wechatId: 'your_service_wechat_id',
       time: '工作日 9:00 - 18:00'
     },
-    hasPhoneNumber: false // 是否已授权手机号
+    hasPhoneNumber: false, // 是否已授权手机号
+    isLinking: false       // 防止重复点击
   },
 
   onShow() {
@@ -35,16 +36,20 @@ Page({
   },
 
   async onGetPhoneNumber(e) {
+    // 防止重复点击
+    if (this.data.isLinking) return;
+
     // 检查用户是否拒绝授权
     if (!e.detail || !e.detail.code) {
       const errorMsg = e.detail && e.detail.errMsg
-        ? `授权失败: ${e.detail.errMsg}`
+        ? '授权失败，请重试'  // 不暴露原始错误信息
         : '需要授权手机号才能关联卖书记录';
       ui.showError(errorMsg);
       return;
     }
 
     const phoneCode = e.detail.code;
+    this.setData({ isLinking: true });
 
     try {
       wx.showLoading({ title: '正在关联账户...' });
@@ -76,7 +81,9 @@ Page({
     } catch (error) {
       wx.hideLoading();
       logger.error('Authorization failed:', error);
-      ui.showError(error.message || '授权失败，请稍后重试');
+      ui.showError('授权失败，请稍后重试');
+    } finally {
+      this.setData({ isLinking: false });
     }
   },
   copyWechatId() {

@@ -25,14 +25,14 @@ Page({
 
   onShow() {
     if (this.hasShownOnce) {
-      // 第二次进入：优先返回缓存，后台刷�?
+      // 第二次进入：优先返回缓存，后台刷新
       this.fetchAvailableBooks();
       this.fetchRecommendations();
     } else {
       this.hasShownOnce = true;
-      // 首次进入：正常加�?
+      // 首次进入：正常加载
       this.fetchAvailableBooks();
-      this.fetchAvailableBooks();
+      this.fetchRecommendations();
     }
   },
 

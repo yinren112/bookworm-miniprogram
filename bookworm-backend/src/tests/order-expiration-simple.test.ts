@@ -17,6 +17,21 @@ vi.mock("../db", () => ({
   },
 }));
 
+vi.mock("../config", () => ({
+  default: {
+    JWT_SECRET: "test-jwt-secret",
+    ORDER_PAYMENT_TTL_MINUTES: 15,
+    ORDER_PICKUP_CODE_LENGTH: 10,
+    ORDER_PICKUP_CODE_BYTES: 5,
+    MAX_ITEMS_PER_ORDER: 10,
+    MAX_RESERVED_ITEMS_PER_USER: 20,
+    DB_TRANSACTION_RETRY_COUNT: 3,
+    DB_TRANSACTION_RETRY_BASE_DELAY_MS: 20,
+    DB_TRANSACTION_RETRY_JITTER_MS: 40,
+    PICKUP_CODE_RETRY_COUNT: 5,
+  },
+}));
+
 import { cancelExpiredOrders } from "../services/orderService";
 import prisma from "../db";
 

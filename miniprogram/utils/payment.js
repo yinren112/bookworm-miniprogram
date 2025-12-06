@@ -13,22 +13,28 @@ function requestPayment(params) {
 }
 
 async function createOrderAndPay(inventoryItemIds) {
-  wx.showLoading({ title: '正在创建订单...' });
-  const order = await request({
-    url: '/orders/create',
-    method: 'POST',
-    data: { inventoryItemIds },
-  });
+  let order = null;
+  try {
+    wx.showLoading({ title: '正在创建订单...' });
+    order = await request({
+      url: '/orders/create',
+      method: 'POST',
+      data: { inventoryItemIds },
+    });
 
-  wx.showLoading({ title: '获取支付参数...' });
-  const payParams = await request({
-    url: '/orders/' + order.id + '/pay',
-    method: 'POST',
-  });
+    wx.showLoading({ title: '获取支付参数...' });
+    const payParams = await request({
+      url: '/orders/' + order.id + '/pay',
+      method: 'POST',
+    });
 
-  wx.hideLoading();
-  await requestPayment(payParams);
-  return order;
+    wx.hideLoading();
+    await requestPayment(payParams);
+    return order;
+  } catch (error) {
+    wx.hideLoading();
+    throw error;
+  }
 }
 
 async function safeCreateOrderAndPay(inventoryItemIds) {

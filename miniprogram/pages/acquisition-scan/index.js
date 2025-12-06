@@ -31,16 +31,33 @@ Page({
     batchPrice: ''         // 批量价格暂存
   },
 
+  // 定时器ID，用于清理
+  _scanTimerId: null,
+  // 页面是否活跃
+  _isPageActive: true,
+
   /**
    * 页面加载：初始化年份范围
    */
   onLoad() {
+    this._isPageActive = true;
     const currentYear = new Date().getFullYear();
     const yearRange = [];
     for (let i = 0; i < 10; i++) {
       yearRange.push((currentYear - i).toString());
     }
     this.setData({ yearRange });
+  },
+
+  /**
+   * 页面卸载：清理定时器
+   */
+  onUnload() {
+    this._isPageActive = false;
+    if (this._scanTimerId) {
+      clearTimeout(this._scanTimerId);
+      this._scanTimerId = null;
+    }
   },
 
   /**
@@ -120,9 +137,11 @@ Page({
         }
 
         // 如果是连续扫码模式，短暂延迟后继续扫码
-        if (this.data.continuousMode) {
-          setTimeout(() => {
-            this.performScan();
+        if (this.data.continuousMode && this._isPageActive) {
+          this._scanTimerId = setTimeout(() => {
+            if (this._isPageActive && this.data.continuousMode) {
+              this.performScan();
+            }
           }, 1200); // 等待 Toast 显示一会儿
         }
 
@@ -338,14 +357,16 @@ Page({
 
     const priceCents = Math.round(priceYuan * 100);
     const items = this.data.scannedItems.map(item => {
-      if (item.status === 'acquirable' && !item.individualPrice) {
+      // 只应用到可收购且未设置价格的项目（使用 undefined 检查而非 falsy）
+      if (item.status === 'acquirable' && item.individualPrice === undefined || item.individualPrice === '') {
         return {
           ...item,
           individualPrice: this.data.batchPrice,
           individualPriceCents: priceCents
         };
       }
-      return item;
+      // 始终返回新对象，避免引用问题
+      return { ...item };
     });
 
     // 重新计算总金额
@@ -479,7 +500,7 @@ Page({
 
       // 清空页面状态 (但保留部分偏好设置)
       const { unitPriceYuan, pricingMode, enrollmentYear, enrollmentYearIndex, major, className, continuousMode } = this.data;
-      
+
       setTimeout(() => {
         this.setData({
           scannedItems: [],
@@ -494,7 +515,9 @@ Page({
           enrollmentYearIndex,  // 保留
           major,                // 保留
           className,            // 保留
-          continuousMode        // 保留
+          continuousMode,       // 保留
+          batchPrice: '',       // 清空批量价格
+          hasRejectedItems: false // 清空拒绝项标志
         });
       }, 2000);
 

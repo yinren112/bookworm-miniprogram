@@ -1,6 +1,0 @@
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <path d="M16 8 C16 5.79 17.79 4 20 4 L44 4 C46.21 4 48 5.79 48 8 L48 56 C48 58.21 46.21 60 44 60 L20 60 C17.79 60 16 58.21 16 56 Z" fill="none" stroke="#A0AEC0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="24" y1="16" x2="40" y2="16" stroke="#A0AEC0" stroke-width="4" stroke-linecap="round"/>
-  <line x1="24" y1="28" x2="40" y2="28" stroke="#A0AEC0" stroke-width="4" stroke-linecap="round"/>
-  <line x1="24" y1="40" x2="40" y2="40" stroke="#A0AEC0" stroke-width="4" stroke-linecap="round"/>
-</svg>
