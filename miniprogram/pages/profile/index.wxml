@@ -1,8 +1,11 @@
 <!-- pages/profile/index.wxml -->
 <view class="container profile-container">
+  <!-- Header Section (User Card) -->
   <view class="header">
     <view class="avatar-wrapper">
-      <open-data type="userAvatarUrl"></open-data>
+      <image class="user-avatar" src="/images/default-avatar.png" mode="aspectFill"></image>
+      <!-- 微信头像组件 (OpenData) 已废弃，建议使用 button open-type="chooseAvatar" 或者直接显示默认头像引导用户完善 -->
+      <!-- 这里我们先用精致的默认头像 -->
     </view>
     <text class="username">用户名</text>
     <text class="nickname">{{userInfo.nickName}}</text>

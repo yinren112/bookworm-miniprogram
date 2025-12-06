@@ -1,41 +1,70 @@
 <!--pages/order-confirm/index.wxml-->
 <wxs module="filters" src="../../utils/filters.wxs"></wxs>
-<view class="container" wx:if="{{book}}">
-  <view class="card">
-    <view class="card-title">商品信息</view>
-    <view class="book-item">
-      <view class="book-info">
-        <text class="book-title">{{book.bookSku.bookMaster.title}}</text>
-        <text class="book-author">作者: {{book.bookSku.bookMaster.author || '未知'}}</text>
-        <text class="book-condition">品相: {{book.condition}}</text>
+
+<view class="container page-container">
+  <!-- Decorative Blobs -->
+  <view class="bg-blob bg-blob-1"></view>
+  <view class="bg-blob bg-blob-2"></view>
+
+  <view wx:if="{{book}}" class="anim-fade-in-up">
+    
+    <!-- Product Card (Ticket Style) -->
+    <view class="ticket-card">
+      <view class="ticket-main">
+        <image class="book-cover" src="{{book.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFill" />
+        <view class="book-info">
+          <text class="book-title">{{book.bookSku.bookMaster.title}}</text>
+          <text class="book-author">{{book.bookSku.bookMaster.author || '作者未知'}}</text>
+          <view class="condition-tag">{{book.condition}}</view>
+        </view>
       </view>
-      <text class="book-price">{{filters.formatCurrency(book.selling_price)}}</text>
+      
+      <!-- Dotted Line -->
+      <view class="ticket-divider">
+        <view class="half-circle left"></view>
+        <view class="line"></view>
+        <view class="half-circle right"></view>
+      </view>
+      
+      <view class="ticket-stub">
+        <view class="price-row">
+          <text class="label">商品金额</text>
+          <text class="value clay-num">{{filters.formatCurrency(book.selling_price)}}</text>
+        </view>
+        <view class="price-row">
+          <text class="label">运费</text>
+          <text class="value clay-num">¥0.00</text>
+        </view>
+      </view>
     </view>
+
+    <!-- Tips Card -->
+    <view class="tips-card">
+      <view class="tips-title">💡 温馨提示</view>
+      <view class="tips-content">
+        请在下单后 <text class="highlight">48小时内</text> 前往指定地点取货，超时订单将自动取消。
+      </view>
+    </view>
+
   </view>
   
-  <view class="card">
-    <view class="card-title">订单详情</view>
-    <view class="summary-item">
-      <text>商品总额</text>
-      <text>{{filters.formatCurrency(book.selling_price)}}</text>
-    </view>
-    <view class="summary-item">
-      <text>运费</text>
-      <text>¥0.00</text>
-    </view>
+  <!-- Error State -->
+  <view wx:else class="error-message anim-fade-in-up">
+    商品信息加载失败
   </view>
 
-  <view class="footer-bar">
+  <!-- Glass Footer -->
+  <view class="glass-footer anim-fade-in-up" wx:if="{{book}}">
     <view class="total-section">
-      <text>合计: </text>
-      <text class="total-price">{{filters.formatCurrency(book.selling_price)}}</text>
+      <text class="total-label">实付款</text>
+      <view class="total-price-box">
+        <text class="currency">¥</text>
+        <text class="amount clay-num">{{filters.formatCurrencyFromCents(book.selling_price).substring(1)}}</text>
+      </view>
     </view>
-    <button class="btn btn-primary" bindtap="handlePayment" disabled="{{isSubmitting}}">
-      {{isSubmitting ? '处理中...' : '去支付'}}
+    <button class="pay-btn" bindtap="handlePayment" disabled="{{isSubmitting}}">
+      {{isSubmitting ? '支付中...' : '立即支付'}}
     </button>
   </view>
-</view>
 
-<view class="container" wx:else>
-  <view class="error-message">商品信息加载失败</view>
 </view>

@@ -1,41 +1,51 @@
-<view class="page">
-  <!-- 联系方式区域 -->
-  <view class="contact-section">
-    <view class="section-title">联系客服</view>
-    
-    <view class="contact-item">
-      <view class="contact-label">客服微信号</view>
-      <view class="contact-value">
-        <text class="wechat-id">{{customerServiceWechat}}</text>
-        <button class="copy-btn" bindtap="copyWechatId">复制</button>
+<view class="container page-container">
+  <!-- 客服名片 (Business Card) -->
+  <view class="contact-card">
+    <view class="card-header">
+      <image class="avatar" src="/images/icons/customer-service.svg" />
+      <view class="card-info">
+        <text class="role-title">专属客服</text>
+        <text class="service-time">工作日 10:00 - 18:00</text>
       </view>
     </view>
     
-    <view class="contact-item">
-      <view class="contact-label">工作时间</view>
-      <view class="contact-value">
-        <text class="work-time">工作日 10:00 - 18:00</text>
+    <view class="wechat-row">
+      <view class="wechat-box">
+        <text class="label">微信号</text>
+        <text class="value">{{customerServiceWechat}}</text>
       </view>
+      <button class="copy-btn" bindtap="copyWechatId">复制</button>
     </view>
   </view>
 
-  <!-- 常见问题区域 -->
+  <!-- 常见问题 (Chat Bubbles) -->
   <view class="faq-section">
-    <view class="section-title">常见问题解答</view>
+    <view class="section-header">常见问题</view>
     
-    <view class="faq-item">
-      <view class="question">问：我不小心买错书了怎么办？</view>
-      <view class="answer">答：请在取货后24小时内，携带书籍到取货点联系工作人员处理。超过24小时将无法退货。</view>
-    </view>
-    
-    <view class="faq-item">
-      <view class="question">问：超过48小时忘记取货了怎么办？</view>
-      <view class="answer">答：订单将会被系统自动取消并退款。款项将原路退回您的微信支付账户，请注意查收。</view>
-    </view>
-    
-    <view class="faq-item">
-      <view class="question">问：取货时发现书的品相不满意怎么办？</view>
-      <view class="answer">答：您可以当场向工作人员提出拒收，订单会立即取消并全额退款。</view>
+    <view class="faq-group">
+      <!-- Q1 -->
+      <view class="chat-bubble question">
+        <text>我不小心买错书了怎么办？</text>
+      </view>
+      <view class="chat-bubble answer">
+        <text>请在取货后24小时内，携带书籍到取货点联系工作人员处理。超过24小时将无法退货。</text>
+      </view>
+
+      <!-- Q2 -->
+      <view class="chat-bubble question">
+        <text>超过48小时忘记取货了怎么办？</text>
+      </view>
+      <view class="chat-bubble answer">
+        <text>订单将会被系统自动取消并退款。款项将原路退回您的微信支付账户，请注意查收。</text>
+      </view>
+
+      <!-- Q3 -->
+      <view class="chat-bubble question">
+        <text>取货时发现书的品相不满意怎么办？</text>
+      </view>
+      <view class="chat-bubble answer">
+        <text>您可以当场向工作人员提出拒收，订单会立即取消并全额退款。</text>
+      </view>
     </view>
   </view>
 </view>

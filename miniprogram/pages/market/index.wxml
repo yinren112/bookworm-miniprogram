@@ -2,59 +2,76 @@
 <wxs module="filters" src="../../utils/filters.wxs"></wxs>
 <import src="../../templates/search-bar.wxml" />
 
-<view class="container">
-  <view class="header-title">二手书市场</view>
-
-  <template is="searchBar" data="{{placeholder: '搜索书名、作者或ISBN', searchTerm: searchTerm}}" />
+<view class="container market-container">
+  
+  <!-- Search Bar (Sticky or just top) -->
+  <view class="search-section">
+    <template is="searchBar" data="{{placeholder: 'Find books, authors...', searchTerm: searchTerm}}" />
+  </view>
 
   <!-- Personalized Recommendations Section -->
   <view wx:if="{{recommendations.length > 0}}" class="recommendations-section">
-    <view class="section-header">
-      <text class="section-title">为你推荐</text>
-      <text class="section-subtitle">根据你的专业和年级精选</text>
-    </view>
+    <view class="section-title">为你推荐</view>
     <scroll-view class="recommendations-scroll" scroll-x="true" enable-flex="true">
-      <view class="recommendation-card card"
+      <!-- Hero Card Style for Recommendations -->
+      <view class="hero-card"
             wx:for="{{recommendations}}"
             wx:key="skuId"
             data-isbn="{{item.isbn}}"
             bindtap="handleRecommendationTap">
-        <image class="recommendation-cover"
-               src="{{item.coverImageUrl || '/images/placeholder-cover.svg'}}"
-               mode="aspectFill" />
-        <view class="recommendation-info">
-          <text class="recommendation-title">{{item.title}}</text>
-          <text class="recommendation-author">{{item.author || '作者未知'}}</text>
-          <view class="recommendation-meta">
-            <text class="recommendation-price">{{filters.formatCurrencyFromCents(item.minPrice)}}</text>
-            <text class="recommendation-stock">库存{{item.availableCount}}本</text>
-          </view>
+        <view class="hero-bg-circle"></view>
+        <view class="hero-text">
+          <view class="hero-badge">推荐</view>
+          <view class="hero-h1">{{item.title}}</view>
+          <view class="hero-sub">{{item.author || '作者未知'}}</view>
+          <view class="hero-price">{{filters.formatCurrencyFromCents(item.minPrice)}}</view>
+        </view>
+        <view class="hero-img-box">
+           <image class="hero-img" 
+                  src="{{item.coverImageUrl || '/images/placeholder-cover.svg'}}" 
+                  mode="aspectFill" 
+                  binderror="onImageError"
+                  data-type="recommendation"
+                  data-index="{{index}}" />
         </view>
       </view>
     </scroll-view>
   </view>
+
+  <!-- New Arrivals / Main Grid -->
+  <view class="section-title">新书上架</view>
 
   <!-- Skeleton Loading State -->
   <skeleton wx:if="{{state.status === 'loading'}}" type="grid" count="4" />
 
   <view wx:if="{{state.status === 'error'}}" class="error-message">{{state.error}}</view>
   <view wx:if="{{state.status === 'success' && state.data.length === 0}}" class="empty-state">
-    <text>{{searchPerformed ? '没有找到匹配的图书' : '暂时没有可售图书'}}</text>
+    <image class="empty-img" src="/images/{{searchPerformed ? 'empty-search.png' : 'empty-shelf.png'}}" mode="widthFix" />
+    <text class="empty-text">{{searchPerformed ? '没有找到匹配的图书' : '暂时没有可售图书'}}</text>
   </view>
 
-  <!-- Real Content -->
+  <!-- Real Content Grid -->
   <view wx:if="{{state.status === 'success' && state.data.length > 0}}" class="book-grid">
     <navigator wx:for="{{state.data}}" wx:key="id" class="book-card-navigator" url="/pages/book-detail/index?id={{item.id}}" hover-class="none">
-      <view class="book-card card" hover-class="item-hover">
-        <image class="book-cover" src="{{item.booksku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFill" />
-        <view class="book-info">
+      <view class="book-card" hover-class="card-hover">
+        <!-- 图片凹陷容器 -->
+        <view class="card-img-container">
+          <image class="book-cover" 
+                 src="{{item.booksku.cover_image_url || '/images/placeholder-cover.svg'}}" 
+                 mode="aspectFill" 
+                 binderror="onImageError"
+                 data-type="grid"
+                 data-index="{{index}}" />
+        </view>
+        
+        <view class="card-content">
           <text class="book-title">{{item.booksku.bookmaster.title}}</text>
           <text class="book-author">{{item.booksku.bookmaster.author}}</text>
-          <view class="book-meta">
-            <text>版本: {{item.booksku.edition}}</text>
-            <text>品相: {{item.condition}}</text>
+          
+          <view class="card-footer">
+            <text class="book-price">{{filters.formatCurrency(item.selling_price)}}</text>
+            <view class="add-btn">+</view>
           </view>
-          <text class="book-price">{{filters.formatCurrency(item.selling_price)}}</text>
         </view>
       </view>
     </navigator>

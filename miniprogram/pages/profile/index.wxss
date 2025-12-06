@@ -3,274 +3,225 @@
 /* Profile Container */
 .profile-container {
   min-height: 100vh;
+  background-color: var(--clay-bg);
+  padding: var(--space-l);
 }
 
-/* Header Section */
+/* Header Section (User Card) */
 .header {
-  padding: var(--space-xl) var(--space-l) var(--space-xl) var(--space-l);
+  padding: var(--space-xl) var(--space-l);
   text-align: center;
-  background: var(--card-background);
-  margin: 0 var(--space-l) var(--space-l) var(--space-l);
-  border-radius: 24rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+  background: var(--clay-card-bg);
+  margin-bottom: var(--space-l);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-clay-out);
+  /* 加上一点微弱的渐变增强质感 */
+  background: linear-gradient(145deg, #ffffff, #f0f0f0);
 }
 
-/* Simple Avatar */
+/* Avatar - 悬浮球体感 */
 .avatar-wrapper {
   width: 200rpx;
   height: 200rpx;
   border-radius: 50%;
   margin: 0 auto var(--space-m) auto;
   overflow: hidden;
-  background: var(--border-color);
+  background: #fff;
+  border: 8rpx solid #fff;
+  box-shadow: var(--shadow-clay-out);
 }
 
-.avatar-wrapper open-data {
-  border-radius: 50%;
-  overflow: hidden;
+.user-avatar {
   width: 100%;
   height: 100%;
-  display: block;
+  border-radius: 50%;
 }
 
 /* Typography */
 .username {
   display: block;
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
+  font-size: 40rpx;
+  font-weight: 800;
+  color: var(--clay-text-main);
   margin-bottom: var(--space-xs);
+  letter-spacing: -1rpx;
 }
 
 .nickname {
   display: block;
   font-size: var(--font-size-body);
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-normal);
+  color: var(--clay-text-light);
+  font-weight: 600;
 }
 
-/* Menu Card */
+/* Auth Button - Clay Style */
+.auth-phone-button {
+  margin-top: var(--space-l);
+  background: var(--clay-text-main);
+  color: #fff;
+  border-radius: var(--radius-m);
+  font-weight: bold;
+  box-shadow: 8rpx 8rpx 16rpx rgba(74, 85, 104, 0.3);
+  border: none;
+  transition: transform 0.1s;
+}
+
+.auth-phone-button:active {
+  transform: scale(0.98);
+  box-shadow: inset 4rpx 4rpx 8rpx rgba(0,0,0,0.2);
+}
+
+/* Menu Card - The Clay Surface */
 .menu-card {
-  background: var(--card-background);
-  border-radius: 24rpx;
-  margin: 0 var(--space-l) var(--space-l) var(--space-l);
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+  background: var(--clay-card-bg);
+  border-radius: var(--radius-l);
+  margin-bottom: var(--space-l);
+  box-shadow: var(--shadow-clay-out);
   overflow: hidden;
+  padding: var(--space-s) 0;
 }
 
-/* Simple Menu Items */
+/* Menu Items */
 .menu-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-l);
-  border-bottom: 1rpx solid var(--border-color);
+  padding: var(--space-m) var(--space-l);
   background: transparent;
   border: none;
   transition: background-color 0.2s;
+  position: relative;
 }
 
-.menu-item:last-child {
-  border-bottom: none;
+/* 移除原来的线条，用空间区分，或者用更柔和的线条 */
+.menu-item::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: var(--space-l);
+  right: var(--space-l);
+  height: 2rpx;
+  background: #f0f0f0;
+}
+
+.menu-item:last-child::after {
+  display: none;
 }
 
 .menu-item:active {
-  background-color: var(--background-color);
+  background-color: #f7fafc;
 }
 
 /* Menu Text */
 .menu-text {
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--clay-text-main);
 }
 
 /* Arrow Icon */
 .menu-arrow {
-  width: 28rpx;
-  height: 28rpx;
-  opacity: 0.5;
+  width: 32rpx;
+  height: 32rpx;
+  opacity: 0.4;
 }
 
-/* Share Button - Simple Override */
+/* Share Button Reset */
 .share-button {
   background: transparent !important;
   border: none !important;
   text-align: left !important;
-  padding: var(--space-l) !important;
+  padding: var(--space-m) var(--space-l) !important;
   margin: 0 !important;
-  font-size: var(--font-size-body) !important;
+  font-size: 30rpx !important;
   width: 100% !important;
-  color: var(--text-primary) !important;
-  font-weight: var(--font-weight-bold) !important;
+  color: var(--clay-text-main) !important;
+  font-weight: 700 !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
-  border-bottom: 1rpx solid var(--border-color) !important;
   border-radius: 0 !important;
+  line-height: normal !important;
 }
 
 .share-button::after {
   border: none !important;
   background: none !important;
+  /* Re-add the separator line for the button */
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: var(--space-l);
+  right: var(--space-l);
+  height: 2rpx;
+  background: #f0f0f0;
+  width: auto !important;
+  transform: none !important;
+  border-radius: 0 !important;
 }
 
-.share-button:active {
-  background-color: var(--background-color) !important;
-}
-
-/* Support Info */
-.support-info {
-  margin: 0 var(--space-l) var(--space-xl) var(--space-l);
-  padding: var(--space-l);
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-  line-height: 1.6;
-  background: var(--card-background);
-  border-radius: 24rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
-  text-align: center;
-}
-
-.support-info text {
-  display: block;
-  margin-bottom: var(--space-xs);
-}
-
-.support-info text:last-child {
-  margin-bottom: 0;
-}
-
-/* Staff Operations Section */
+/* Staff Section - Special Clay Card */
 .staff-section {
-  background: linear-gradient(135deg, #2c5f2d 0%, #558056 100%);
-  color: white;
+  background: #E2F0CB; /* Pastel Green/Purple from reference */
+  color: var(--clay-text-main);
   position: relative;
   overflow: hidden;
 }
 
-.staff-section::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-  animation: pulse 3s ease-in-out infinite;
+.staff-section .menu-text {
+  color: #2c5f2d;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-.section-title {
+.staff-section .section-title {
+  padding: var(--space-m) var(--space-l);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-l);
-  border-bottom: 1rpx solid rgba(255, 255, 255, 0.2);
-  position: relative;
-  z-index: 1;
+  border-bottom: 2rpx solid rgba(0,0,0,0.05);
 }
 
-.title-text {
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-  color: white;
+.staff-section .title-text {
+  font-weight: 800;
+  font-size: 32rpx;
+  color: #2c5f2d;
 }
 
 .staff-badge {
-  padding: var(--space-xs) var(--space-m);
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 8rpx;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  color: white;
-  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  background: rgba(255,255,255,0.6);
+  padding: 4rpx 12rpx;
+  border-radius: 12rpx;
+  font-size: 22rpx;
+  color: #2c5f2d;
+  font-weight: 800;
+  box-shadow: 2rpx 2rpx 4rpx rgba(0,0,0,0.1);
 }
 
-.staff-section .menu-item {
-  border-bottom: 1rpx solid rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 1;
+/* Support Info - Inset Effect */
+.support-info {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-l);
+  font-size: 24rpx;
+  color: var(--clay-text-light);
+  line-height: 1.8;
+  background: var(--clay-bg); /* Match bg */
+  border-radius: var(--radius-m);
+  /* Inset shadow for "sunk" effect */
+  box-shadow: var(--shadow-clay-in);
+  text-align: center;
+  font-weight: 600;
 }
 
-.staff-section .menu-item:last-child {
-  border-bottom: none;
+.support-info text {
+  display: block;
 }
 
-.staff-section .menu-item:active {
-  background-color: rgba(255, 255, 255, 0.1);
+/* Icon Text for Staff Menu */
+.icon-text {
+  margin-right: 16rpx;
+  font-size: 36rpx;
 }
 
 .menu-content {
   display: flex;
   align-items: center;
-  gap: var(--space-m);
-}
-
-.icon-text {
-  font-size: 40rpx;
-}
-
-.staff-section .menu-text {
-  color: white;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
-}
-
-.staff-section .menu-arrow {
-  filter: brightness(0) invert(1);
-  opacity: 0.8;
-}
-
-/* Phone Number Authorization Button */
-.auth-phone-button {
-  margin-top: var(--space-l);
-  padding: var(--space-m) var(--space-xl);
-  background: linear-gradient(135deg, #2c5f2d 0%, #558056 100%);
-  color: white;
-  border-radius: 40rpx;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
-  border: none;
-  box-shadow: 0 4rpx 16rpx rgba(44, 95, 45, 0.3);
-  transition: all 0.3s ease;
-}
-
-.auth-phone-button::after {
-  border: none;
-}
-
-.auth-phone-button:active {
-  opacity: 0.8;
-  transform: scale(0.98);
-}
-
-/* Responsive Design */
-@media screen and (min-width: 768px) {
-  .profile-container {
-    max-width: 600rpx;
-    margin: 0 auto;
-  }
-
-  .header {
-    padding: var(--space-xl);
-  }
-
-  .avatar-wrapper {
-    width: 240rpx;
-    height: 240rpx;
-  }
-
-  .auth-phone-button {
-    font-size: var(--font-size-title);
-    padding: var(--space-l) var(--space-xxl);
-  }
 }

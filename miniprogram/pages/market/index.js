@@ -25,14 +25,32 @@ Page({
 
   onShow() {
     if (this.hasShownOnce) {
-      // 第二次进入：优先返回缓存，后台刷�?
+      // 第二次进入：优先返回缓存，后台刷�?
       this.fetchAvailableBooks();
       this.fetchRecommendations();
     } else {
       this.hasShownOnce = true;
-      // 首次进入：正常加�?
+      // 首次进入：正常加�?
       this.fetchAvailableBooks();
-      this.fetchRecommendations();
+      this.fetchAvailableBooks();
+    }
+  },
+
+  // 处理图片加载失败，降级为占位图
+  onImageError(e) {
+    const { index, type } = e.currentTarget.dataset;
+    if (type === 'recommendation') {
+      // 处理推荐列表图片错误
+      const list = this.data.recommendations;
+      if (!list[index] || list[index].coverImageUrl === '/images/placeholder-cover.svg') return;
+      const key = `recommendations[${index}].coverImageUrl`;
+      this.setData({ [key]: '/images/placeholder-cover.svg' });
+    } else {
+      // 处理主列表图片错误
+      const list = this.data.state.data;
+      if (!list[index] || list[index].booksku.cover_image_url === '/images/placeholder-cover.svg') return;
+      const key = `state.data[${index}].booksku.cover_image_url`;
+      this.setData({ [key]: '/images/placeholder-cover.svg' });
     }
   },
 
@@ -41,7 +59,7 @@ Page({
     const searchTerm = this.data.searchTerm || '';
     const cacheKey = `market:list:${searchTerm}`;
 
-    // 显示加载状态（首次加载或强制刷新时�?
+    // 显示加载状态（首次加载或强制刷新时�?
     if (forceRefresh || this.data.state.data.length === 0) {
       this.setData({ 'state.status': 'loading', 'state.error': null });
     }
@@ -55,7 +73,7 @@ Page({
 
     try {
       const data = await swrFetch(cacheKey, fetcher, {
-        ttlMs: 30000, // 30 �?TTL
+        ttlMs: 30000, // 30 �?TTL
         forceRefresh,
         onBackgroundUpdate: (freshData) => {
           if (!freshData) {
@@ -113,7 +131,7 @@ Page({
 
   // Pull down refresh
   async onPullDownRefresh() {
-    // 下拉刷新强制拉取新数�?
+    // 下拉刷新强制拉取新数�?
     await Promise.all([
       this.fetchAvailableBooks({ forceRefresh: true }),
       this.fetchRecommendations({ forceRefresh: true })
@@ -128,10 +146,10 @@ Page({
 
     try {
       const data = await swrFetch(cacheKey, fetcher, {
-        ttlMs: 60000, // 60 �?TTL（推荐更新频率较低）
+        ttlMs: 60000, // 60 �?TTL（推荐更新频率较低）
         forceRefresh,
         onBackgroundUpdate: (freshData) => {
-          // 后台刷新成功，静默更�?UI
+          // 后台刷新成功，静默更�?UI
           if (freshData && Array.isArray(freshData.recommendations)) {
             this.setData({
               recommendations: freshData.recommendations

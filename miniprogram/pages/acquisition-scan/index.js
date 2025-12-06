@@ -25,7 +25,10 @@ Page({
     enrollmentYearIndex: 0,
     yearRange: [],        // 年份选项数组
     major: '',
-    className: ''
+    className: '',
+    continuousMode: false, // 连续扫码模式
+    isScanning: false,     // 扫码锁
+    batchPrice: ''         // 批量价格暂存
   },
 
   /**
@@ -41,9 +44,26 @@ Page({
   },
 
   /**
+   * 连续扫码开关切换
+   */
+  onContinuousModeChange(e) {
+    this.setData({ continuousMode: e.detail.value });
+  },
+
+  /**
    * 扫码处理
    */
   async onScanCode() {
+    if (this.data.isScanning) return;
+    this.setData({ isScanning: true });
+    await this.performScan();
+    this.setData({ isScanning: false });
+  },
+
+  /**
+   * 执行单次扫码
+   */
+  async performScan() {
     try {
       const res = await new Promise((resolve, reject) => {
         wx.scanCode({
@@ -65,7 +85,7 @@ Page({
         wx.hideLoading();
 
         if (data.acquirableSkus && data.acquirableSkus.length > 0) {
-          // 可收购 - 使用第一个SKU
+          // 可收购
           const sku = data.acquirableSkus[0];
           this.addScannedItem({
             isbn,
@@ -73,10 +93,13 @@ Page({
             skuInfo: sku
           });
 
+          // 震动反馈
+          wx.vibrateShort({ type: 'heavy' });
+          
           wx.showToast({
             title: '已添加到白名单',
             icon: 'success',
-            duration: 1500
+            duration: 1000
           });
         } else {
           // 不可收购
@@ -86,12 +109,23 @@ Page({
             skuInfo: null
           });
 
+          // 震动反馈
+          wx.vibrateLong();
+
           wx.showToast({
             title: '不在白名单',
             icon: 'none',
-            duration: 2000
+            duration: 1500
           });
         }
+
+        // 如果是连续扫码模式，短暂延迟后继续扫码
+        if (this.data.continuousMode) {
+          setTimeout(() => {
+            this.performScan();
+          }, 1200); // 等待 Toast 显示一会儿
+        }
+
       } catch (error) {
         wx.hideLoading();
         logger.error('Check acquisition failed:', error);
@@ -99,7 +133,8 @@ Page({
         ui.showError(errorMsg);
       }
     } catch (scanError) {
-      // 用户取消扫码，不显示错误
+      // 用户取消扫码，自然退出连续模式
+      // 不做任何操作
     }
   },
 
@@ -177,9 +212,11 @@ Page({
     );
 
     const count = acquirableItems.length;
+    const hasRejectedItems = this.data.scannedItems.some(item => item.status === 'rejected');
 
     this.setData({
-      summary: { count }
+      summary: { count },
+      hasRejectedItems
     });
   },
 
@@ -260,10 +297,72 @@ Page({
     const totalCents = acquirableItems.reduce((sum, item) => sum + (item.individualPriceCents || 0), 0);
     const finalAmount = (totalCents / 100).toFixed(2);
 
+    // 检查是否有拒绝项
+    const hasRejectedItems = items.some(item => item.status === 'rejected');
+
     this.setData({
       scannedItems: items,
+      hasRejectedItems,
       finalAmount: finalAmount
     });
+  },
+
+  /**
+   * 清理所有无效书籍
+   */
+  onClearRejected() {
+    const validItems = this.data.scannedItems.filter(item => item.status === 'acquirable');
+    this.setData({
+      scannedItems: validItems,
+      hasRejectedItems: false
+    });
+    wx.showToast({ title: '已清理', icon: 'success' });
+  },
+
+  /**
+   * 批量价格输入
+   */
+  onBatchPriceInput(e) {
+    this.setData({ batchPrice: e.detail.value });
+  },
+
+  /**
+   * 批量应用价格
+   */
+  onBatchApply() {
+    const priceYuan = parseFloat(this.data.batchPrice);
+    if (isNaN(priceYuan) || priceYuan <= 0) {
+      wx.showToast({ title: '请输入有效价格', icon: 'none' });
+      return;
+    }
+
+    const priceCents = Math.round(priceYuan * 100);
+    const items = this.data.scannedItems.map(item => {
+      if (item.status === 'acquirable' && !item.individualPrice) {
+        return {
+          ...item,
+          individualPrice: this.data.batchPrice,
+          individualPriceCents: priceCents
+        };
+      }
+      return item;
+    });
+
+    // 重新计算总金额
+    const acquirableItems = items.filter(item => item.status === 'acquirable');
+    const totalCents = acquirableItems.reduce((sum, item) => sum + (item.individualPriceCents || 0), 0);
+    const finalAmount = (totalCents / 100).toFixed(2);
+
+    // 检查是否有拒绝项
+    const hasRejectedItems = items.some(item => item.status === 'rejected');
+
+    this.setData({
+      scannedItems: items,
+      hasRejectedItems,
+      finalAmount: finalAmount
+    });
+
+    wx.showToast({ title: '已应用', icon: 'success' });
   },
 
   /**
@@ -378,21 +477,24 @@ Page({
         duration: 2000
       });
 
-      // 清空页面状态
+      // 清空页面状态 (但保留部分偏好设置)
+      const { unitPriceYuan, pricingMode, enrollmentYear, enrollmentYearIndex, major, className, continuousMode } = this.data;
+      
       setTimeout(() => {
         this.setData({
           scannedItems: [],
           summary: { count: 0 },
           customerPhone: '',
           totalWeight: '',
-          unitPriceYuan: '',
+          unitPriceYuan,        // 保留
           finalAmount: '0.00',
           submitting: false,
-          pricingMode: 'bulk',
-          enrollmentYear: null,
-          enrollmentYearIndex: 0,
-          major: '',
-          className: ''
+          pricingMode,          // 保留
+          enrollmentYear,       // 保留
+          enrollmentYearIndex,  // 保留
+          major,                // 保留
+          className,            // 保留
+          continuousMode        // 保留
         });
       }, 2000);
 

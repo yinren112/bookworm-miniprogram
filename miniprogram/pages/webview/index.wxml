@@ -1,13 +1,30 @@
 <!--pages/webview/index.wxml-->
-<view class="container">
-  <skeleton wx:if="{{isLoading}}" type="list" count="3" />
+<view class="container page-container">
+  
+  <!-- Loading -->
+  <skeleton wx:if="{{isLoading}}" type="article" />
 
+  <!-- Error -->
   <view wx:elif="{{errorMsg}}" class="error-container">
     <view class="error-icon">⚠️</view>
     <text class="error-text">{{errorMsg}}</text>
+    <button class="retry-btn" bindtap="onLoad" data-slug="{{currentSlug}}">重试</button>
   </view>
 
-  <view wx:else class="content-container">
-    <rich-text nodes="{{content.body}}" class="rich-content"></rich-text>
+  <!-- Content (Paper Style) -->
+  <view wx:else class="paper-card">
+    <!-- Decorative Holes -->
+    <view class="holes-row">
+      <view class="hole"></view>
+      <view class="hole"></view>
+      <view class="hole"></view>
+    </view>
+    
+    <view class="content-body">
+      <view class="doc-title">{{content.title}}</view>
+      <view class="doc-divider"></view>
+      <rich-text nodes="{{content.body}}" class="rich-content"></rich-text>
+    </view>
   </view>
+
 </view>

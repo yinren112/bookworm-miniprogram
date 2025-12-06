@@ -1,113 +1,127 @@
 <!-- pages/order-detail/index.wxml -->
 <wxs module="filters" src="../../utils/filters.wxs"></wxs>
-<view class="container">
+
+<view class="container page-container">
+  <!-- Decorative Blobs -->
+  <view class="bg-blob bg-blob-1"></view>
+  <view class="bg-blob bg-blob-2"></view>
+
   <!-- Loading State -->
-  <view wx:if="{{isLoading}}" class="loading-container">
-    <view class="loading-text">加载中...</view>
-  </view>
+  <skeleton wx:if="{{isLoading}}" type="list" count="3" />
 
   <!-- Error State -->
-  <view wx:elif="{{error}}" class="error-container">
+  <view wx:elif="{{error}}" class="error-container anim-fade-in-up">
+    <view class="error-icon">⚠️</view>
     <view class="error-text">{{error}}</view>
-    <button class="retry-btn" bind:tap="onRefresh">重试</button>
+    <button class="retry-btn" bind:tap="onRefresh">刷新重试</button>
   </view>
 
   <!-- Order Detail Content -->
-  <view wx:else class="order-detail">
-    <!-- 履约信息区 -->
-    <view class="fulfillment-section">
-      <view class="status-header">
-        <view class="status-text">{{filters.getStatusText(order.status)}}</view>
+  <view wx:else class="order-detail anim-fade-in-up">
+    
+    <!-- 1. Header Status (Hero Card) -->
+    <view class="status-card">
+      <view class="status-icon-box">
+        <!-- Simple status icon logic based on status -->
+        <text wx:if="{{order.status === 'PENDING_PICKUP'}}" class="status-icon">🎫</text>
+        <text wx:elif="{{order.status === 'PENDING_PAYMENT'}}" class="status-icon">💳</text>
+        <text wx:elif="{{order.status === 'COMPLETED'}}" class="status-icon">✅</text>
+        <text wx:elif="{{order.status === 'CANCELLED'}}" class="status-icon">🚫</text>
+        <text wx:else class="status-icon">📄</text>
+      </view>
+      <view class="status-main">
+        <text class="status-title">{{filters.getStatusText(order.status)}}</text>
+        <text class="status-desc" wx:if="{{order.status === 'PENDING_PICKUP'}}">请凭下方取货码取货</text>
+        <text class="status-desc" wx:elif="{{order.status === 'PENDING_PAYMENT'}}">请尽快完成支付</text>
+        <text class="status-desc" wx:else>订单已结束</text>
+      </view>
+    </view>
+
+    <!-- 2. Pickup Info (Ticket Style) - Only for PENDING_PICKUP -->
+    <view wx:if="{{order.status === 'PENDING_PICKUP'}}" class="pickup-ticket">
+      <view class="ticket-header">
+        <text class="ticket-label">取货凭证</text>
+        <text class="ticket-time">{{formatDate(order.createdAt)}}</text>
       </view>
       
-      <view wx:if="{{order.status === 'PENDING_PICKUP'}}" class="pickup-info">
-        <view class="pickup-code-container">
-          <view class="pickup-code-label">取货码</view>
-          <view class="pickup-code">{{order.pickup_code}}</view>
-          <button class="btn btn-sm copy-btn" bind:tap="copyPickupCode" data-code="{{order.pickup_code}}">复制</button>
+      <view class="code-section">
+        <text class="code-label">取货码</text>
+        <text class="pickup-code clay-num">{{order.pickup_code}}</text>
+        <button class="copy-btn" bind:tap="copyPickupCode" data-code="{{order.pickup_code}}">复制</button>
+      </view>
+
+      <view class="ticket-divider">
+        <view class="half-circle left"></view>
+        <view class="line"></view>
+        <view class="half-circle right"></view>
+      </view>
+
+      <view class="ticket-info">
+        <view class="info-row">
+          <text class="label">取货地点</text>
+          <text class="value">理科楼一楼活动室</text>
         </view>
-        
-        <view class="pickup-details">
-          <view class="pickup-item">
-            <view class="pickup-label">取货地点</view>
-            <view class="pickup-value">理科楼一楼活动室</view>
-          </view>
-          <view class="pickup-item">
-            <view class="pickup-label">营业时间</view>
-            <view class="pickup-value">周一至周五 10:00 - 18:00</view>
-          </view>
-          <view wx:if="{{order.pickupExpiresAt}}" class="pickup-item">
-            <view class="pickup-label">取货截止</view>
-            <view class="pickup-value">{{formatDate(order.pickupExpiresAt)}}</view>
-          </view>
+        <view class="info-row">
+          <text class="label">营业时间</text>
+          <text class="value">周一至周五 10:00 - 18:00</text>
+        </view>
+        <view class="info-row" wx:if="{{order.pickupExpiresAt}}">
+          <text class="label">截止时间</text>
+          <text class="value highlight">{{formatDate(order.pickupExpiresAt)}}</text>
         </view>
       </view>
     </view>
 
-    <!-- 书籍列表区 -->
-    <view class="books-section">
-      <view class="section-title">购买书籍</view>
+    <!-- 3. Book List (Clay List) -->
+    <view class="books-card">
+      <view class="card-title">购买书籍</view>
       <view class="book-list">
         <view wx:for="{{order.orderItem}}" wx:key="id" class="book-item">
-          <view class="book-cover">
-            <image 
-              wx:if="{{item.inventoryItem.bookSku.cover_image_url}}"
-              src="{{item.inventoryItem.bookSku.cover_image_url}}" 
-              class="cover-image"
-              mode="aspectFit"
-            />
-            <view wx:else class="cover-placeholder">
-              <text class="cover-placeholder-text">暂无封面</text>
-            </view>
-          </view>
-          
+          <image 
+            class="book-cover"
+            src="{{item.inventoryItem.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" 
+            mode="aspectFill"
+          />
           <view class="book-info">
-            <view class="book-title">{{item.inventoryItem.bookSku.bookMaster.title}}</view>
-            <view wx:if="{{item.inventoryItem.bookSku.bookMaster.author}}" class="book-author">
-              作者：{{item.inventoryItem.bookSku.bookMaster.author}}
+            <text class="book-title">{{item.inventoryItem.bookSku.bookMaster.title}}</text>
+            <text class="book-author">{{item.inventoryItem.bookSku.bookMaster.author || '作者未知'}}</text>
+            <view class="tags-row">
+              <view class="clay-tag">{{filters.getConditionText(item.inventoryItem.condition)}}</view>
+              <view class="clay-tag version" wx:if="{{item.inventoryItem.bookSku.edition}}">{{item.inventoryItem.bookSku.edition}}</view>
             </view>
-            <view wx:if="{{item.inventoryItem.bookSku.edition}}" class="book-edition">
-              版本：{{item.inventoryItem.bookSku.edition}}
-            </view>
-            <view class="book-condition">品相：{{filters.getConditionText(item.inventoryItem.condition)}}</view>
           </view>
-          
-          <view class="book-price">
-            {{filters.formatCurrency(item.price)}}
-          </view>
+          <text class="book-price clay-num">{{filters.formatCurrency(item.price)}}</text>
         </view>
       </view>
     </view>
 
-    <!-- 订单详情区 -->
-    <view class="order-info-section">
-      <view class="section-title">订单详情</view>
-      <view class="order-info-list">
-        <view class="info-item">
-          <view class="info-label">订单号</view>
-          <view class="info-value">{{order.id}}</view>
-        </view>
-        <view class="info-item">
-          <view class="info-label">下单时间</view>
-          <view class="info-value">{{formatDate(order.createdAt)}}</view>
-        </view>
-        <view wx:if="{{order.paid_at}}" class="info-item">
-          <view class="info-label">支付时间</view>
-          <view class="info-value">{{formatDate(order.paid_at)}}</view>
-        </view>
-        <view wx:if="{{order.completed_at}}" class="info-item">
-          <view class="info-label">完成时间</view>
-          <view class="info-value">{{formatDate(order.completed_at)}}</view>
-        </view>
-        <view wx:if="{{order.cancelled_at}}" class="info-item">
-          <view class="info-label">取消时间</view>
-          <view class="info-value">{{formatDate(order.cancelled_at)}}</view>
-        </view>
-        <view class="info-item total-amount">
-          <view class="info-label">订单总额</view>
-          <view class="info-value price">{{filters.formatCurrency(order.total_amount)}}</view>
-        </view>
+    <!-- 4. Order Meta Info (Inset Card) -->
+    <view class="meta-card">
+      <view class="meta-row">
+        <text class="label">订单编号</text>
+        <text class="value copyable clay-num" bindtap="copyOrderId" data-id="{{order.id}}">{{order.id}}</text>
+      </view>
+      <view class="meta-row">
+        <text class="label">下单时间</text>
+        <text class="value clay-num">{{formatDate(order.createdAt)}}</text>
+      </view>
+      <view wx:if="{{order.paid_at}}" class="meta-row">
+        <text class="label">支付时间</text>
+        <text class="value clay-num">{{formatDate(order.paid_at)}}</text>
+      </view>
+      
+      <view class="meta-divider"></view>
+      
+      <view class="meta-row total">
+        <text class="label">实付金额</text>
+        <text class="value total-price clay-num">{{filters.formatCurrency(order.total_amount)}}</text>
       </view>
     </view>
+
+    <!-- Action Bar (if needed) -->
+    <view class="action-bar" wx:if="{{order.status === 'PENDING_PAYMENT'}}">
+       <button class="pay-btn" bindtap="handlePay">立即支付</button>
+    </view>
+
   </view>
 </view>

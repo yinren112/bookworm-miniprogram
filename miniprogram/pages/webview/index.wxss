@@ -1,11 +1,12 @@
 /* pages/webview/index.wxss */
 
-.container {
+.page-container {
   min-height: 100vh;
-  background-color: #f5f7fa;
-  padding-bottom: var(--space-xl);
+  background-color: var(--clay-bg);
+  padding: var(--space-l);
 }
 
+/* Error State */
 .error-container {
   display: flex;
   flex-direction: column;
@@ -18,192 +19,84 @@
 .error-icon {
   font-size: 80rpx;
   margin-bottom: 30rpx;
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 .error-text {
   font-size: var(--font-size-body);
-  color: var(--text-secondary);
+  color: var(--clay-text-light);
+  margin-bottom: var(--space-l);
 }
 
-.content-container {
-  background-color: var(--card-background);
-  margin: var(--space-m);
-  border-radius: 24rpx;
-  padding: 0;
-  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.08);
+.retry-btn {
+  background: #fff;
+  color: var(--clay-text-main);
+  font-size: 28rpx;
+  padding: 16rpx 48rpx;
+  border-radius: 40rpx;
+  box-shadow: var(--shadow-clay-out);
+  border: none;
+}
+
+/* Paper Card (The Document) */
+.paper-card {
+  background-color: #fff;
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-clay-out);
+  position: relative;
+  margin-bottom: var(--space-xl);
   overflow: hidden;
-  position: relative;
 }
 
-.content-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6rpx;
-  background: linear-gradient(90deg,
-    var(--primary-color) 0%,
-    var(--secondary-color) 50%,
-    var(--primary-color) 100%
-  );
+/* Decorative Holes (Binding look) */
+.holes-row {
+  height: 80rpx;
+  background: #f7fafc;
+  display: flex;
+  align-items: center;
+  gap: 40rpx;
+  padding-left: 40rpx;
+  border-bottom: 2rpx dashed #e2e8f0;
+}
+
+.hole {
+  width: 24rpx;
+  height: 24rpx;
+  background: var(--clay-bg);
+  border-radius: 50%;
+  box-shadow: inset 2rpx 2rpx 4rpx rgba(0,0,0,0.1);
+}
+
+/* Content Body */
+.content-body {
+  padding: var(--space-xl);
+}
+
+.doc-title {
+  font-size: 40rpx;
+  font-weight: 900;
+  color: var(--clay-text-main);
+  text-align: center;
+  margin-bottom: var(--space-l);
+}
+
+.doc-divider {
+  height: 4rpx;
+  background: #f0f0f0;
+  width: 100rpx;
+  margin: 0 auto var(--space-xl) auto;
+  border-radius: 4rpx;
 }
 
 .rich-content {
-  padding: var(--space-xl) var(--space-xl) calc(var(--space-xl) + 40rpx);
+  font-size: 30rpx;
   line-height: 1.8;
-  font-size: var(--font-size-body);
-  color: #2d3436;
-  white-space: pre-line;
-  word-wrap: break-word;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-  letter-spacing: 0.3rpx;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+  color: var(--clay-text-main);
+  text-align: justify;
 }
 
-/* Create visual hierarchy for plain text */
-.rich-content {
-  background-image:
-    /* Title area highlight */
-    linear-gradient(
-      to bottom,
-      rgba(44, 95, 45, 0.03) 0rpx,
-      rgba(44, 95, 45, 0.02) 100rpx,
-      transparent 100rpx
-    ),
-    /* Subtle section separators */
-    repeating-linear-gradient(
-      transparent,
-      transparent 300rpx,
-      rgba(44, 95, 45, 0.03) 300rpx,
-      rgba(44, 95, 45, 0.03) 302rpx,
-      transparent 302rpx,
-      transparent 600rpx
-    );
-}
-
-/* Enhanced text styling for different content types */
-.rich-content {
-  text-align: left;
-  text-justify: inter-ideograph;
-  position: relative;
-}
-
-/* Add reading guides */
-.rich-content::after {
-  content: '';
-  position: absolute;
-  top: var(--space-xl);
-  bottom: var(--space-xl);
-  left: var(--space-s);
-  width: 4rpx;
-  background: linear-gradient(
-    to bottom,
-    var(--primary-color) 0%,
-    transparent 20%,
-    transparent 80%,
-    var(--secondary-color) 100%
-  );
-  border-radius: 2rpx;
-  opacity: 0.15;
-}
-
-/* Typography improvements */
-.rich-content {
-  font-feature-settings: "kern" 1, "liga" 1;
-  -webkit-text-size-adjust: 100%;
-  text-shadow: 0 0 1rpx rgba(0, 0, 0, 0.02);
-}
-
-/* Enhanced readability with subtle paragraph spacing */
-.rich-content {
-  background-attachment: local;
-  background-repeat: no-repeat;
-}
-
-/* Mobile responsiveness */
-@media screen and (max-width: 750rpx) {
-  .rich-content {
-    padding: var(--space-l);
-    font-size: 28rpx;
-    line-height: 1.7;
-    letter-spacing: 0.2rpx;
-  }
-
-  .content-container {
-    margin: var(--space-s);
-  }
-}
-
-/* Loading skeleton improvements */
-.skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-  border-radius: 16rpx;
-  margin: var(--space-s) 0;
-  height: 40rpx;
-}
-
-@keyframes loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-/* Scrollbar styling for content */
-::-webkit-scrollbar {
-  width: 8rpx;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 10rpx;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--secondary-color);
-  border-radius: 10rpx;
-  transition: background 0.3s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-color);
-}
-
-/* Add subtle focus indicators for accessibility */
-.rich-content:focus {
-  outline: none;
-  box-shadow: inset 0 0 0 3rpx rgba(44, 95, 45, 0.1);
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .rich-content {
-    color: #000;
-    background: #fff;
-  }
-
-  .content-container::before {
-    background: #000;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .container {
-    background-color: #1a1a1a;
-  }
-
-  .content-container {
-    background-color: #2d2d2d;
-  }
-
-  .rich-content {
-    color: #e0e0e0;
-  }
-}
+/* Rich Text Styling (matches typical HTML tags) */
+/* Note: rich-text class selection is limited in小程序, 
+   but global tags or inline styles work. 
+   We rely on inherited styles mostly. */

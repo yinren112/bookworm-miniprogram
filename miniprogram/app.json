@@ -12,17 +12,17 @@
     "pages/acquisition-scan/index"
   ],
   "window": {
-    "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#2c5f2d",
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#F0F9F4",
     "navigationBarTitleText": "\u6821\u56ed\u4e66\u5e02",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#f8f9fa",
-    "backgroundColorTop": "#2c5f2d",
-    "backgroundColorBottom": "#f8f9fa"
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F0F9F4",
+    "backgroundColorTop": "#F0F9F4",
+    "backgroundColorBottom": "#E1EFE6"
   },
   "tabBar": {
-    "color": "#6b6b6b",
-    "selectedColor": "#2c5f2d",
+    "color": "#8FA396",
+    "selectedColor": "#2C3E35",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "list": [

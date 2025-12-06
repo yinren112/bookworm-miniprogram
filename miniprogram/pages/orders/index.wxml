@@ -2,29 +2,103 @@
 <wxs src="../../utils/formatter.wxs" module="tools" />
 <wxs module="filters" src="../../utils/filters.wxs"></wxs>
 
-<view class="container">
-  <view class="header-title">我的订单</view>
-
+<view class="container order-page">
+  
+  <!-- Loading State -->
   <skeleton wx:if="{{state.status === 'loading'}}" type="list" count="3" />
+  
+  <!-- Error State -->
   <view wx:if="{{state.status === 'error'}}" class="error-message">{{state.error}}</view>
+  
+  <!-- Empty State -->
   <view wx:if="{{state.status === 'success' && state.data.length === 0}}" class="empty-state">
-    <text>你还没有任何订单</text>
+    <image class="empty-img" src="/images/empty-orders.png" mode="widthFix" />
+    <text class="empty-text">你还没有任何订单</text>
+    <navigator url="/pages/market/index" open-type="switchTab" class="go-market-btn">去逛逛</navigator>
   </view>
 
+  <!-- Order List -->
   <view class="order-list" wx:if="{{state.status === 'success' && state.data.length > 0}}">
-    <view class="order-card" wx:for="{{state.data}}" wx:key="id" bind:tap="navigateToDetail" data-order-id="{{item.id}}" hover-class="item-hover">
-      <view class="order-header">
-        <view class="status-tag {{item.status === 'COMPLETED' ? 'success' : item.status === 'PENDING_PAYMENT' ? 'error' : 'warning'}}">{{statusMap[item.status] || '未知状态'}}</view>
-        <view class="order-date">{{tools.formatOrderTime(item.createdAt)}}</view>
-      </view>
+    
+    <!-- 遍历订单 -->
+    <block wx:for="{{state.data}}" wx:key="id">
       
-      <view class="order-content">
-        <view class="book-summary">
-          <text class="first-book">{{item.orderItem[0].inventoryItem.bookSku.bookMaster.title}}</text>
-          <text wx:if="{{item.orderItem.length > 1}}" class="more-books"> 等{{item.orderItem.length}}件商品</text>
+      <!-- 1. PENDING_PICKUP: 票据风格 (Hero Receipt) -->
+      <view wx:if="{{item.status === 'PENDING_PICKUP'}}" 
+            class="order-card receipt-card" 
+            bind:tap="navigateToDetail" 
+            data-order-id="{{item.id}}" 
+            hover-class="card-hover">
+        <!-- 锯齿边缘 (Top) -->
+        <view class="receipt-edge top"></view>
+        
+        <view class="receipt-content">
+          <view class="receipt-header">
+            <text class="receipt-label">待取货凭证</text>
+            <text class="receipt-time">{{tools.formatOrderTime(item.createdAt)}}</text>
+          </view>
+          
+          <view class="pickup-code-section">
+            <text class="code-label">取货码</text>
+            <text class="pickup-code">{{item.pickup_code}}</text>
+          </view>
+          
+          <view class="receipt-divider"></view>
+          
+          <view class="book-preview">
+             <text class="book-title">{{item.orderItem[0].inventoryItem.bookSku.bookMaster.title}}</text>
+             <text wx:if="{{item.orderItem.length > 1}}" class="more-count">+{{item.orderItem.length - 1}}</text>
+          </view>
         </view>
-        <view class="order-total">{{filters.formatCurrency(item.total_amount)}}</view>
+        
+        <!-- 锯齿边缘 (Bottom) -->
+        <view class="receipt-edge bottom"></view>
       </view>
-    </view>
+
+      <!-- 2. PENDING_PAYMENT: 倒计时紧迫风格 -->
+      <view wx:elif="{{item.status === 'PENDING_PAYMENT'}}" 
+            class="order-card urgency-card" 
+            bind:tap="navigateToDetail" 
+            data-order-id="{{item.id}}" 
+            hover-class="card-hover">
+        <view class="urgency-header">
+          <view class="status-badge error">待支付</view>
+          <text class="urgency-time">请尽快支付</text>
+        </view>
+        
+        <view class="card-body">
+          <view class="book-info-row">
+            <image class="mini-cover" src="{{item.orderItem[0].inventoryItem.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFill" />
+            <view class="info-col">
+              <text class="book-title">{{item.orderItem[0].inventoryItem.bookSku.bookMaster.title}}</text>
+              <text class="order-total">{{filters.formatCurrency(item.total_amount)}}</text>
+            </view>
+          </view>
+          <button class="pay-btn-small">去支付</button>
+        </view>
+      </view>
+
+      <!-- 3. 其他状态 (COMPLETED, CANCELLED): 普通轻粘土卡片 -->
+      <view wx:else 
+            class="order-card history-card" 
+            bind:tap="navigateToDetail" 
+            data-order-id="{{item.id}}" 
+            hover-class="card-hover">
+        <view class="history-header">
+           <text class="order-date">{{tools.formatOrderTime(item.createdAt)}}</text>
+           <text class="status-text {{item.status === 'COMPLETED' ? 'success' : 'gray'}}">{{statusMap[item.status]}}</text>
+        </view>
+        
+        <view class="history-body">
+          <image class="mini-cover-sm" src="{{item.orderItem[0].inventoryItem.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFill" />
+          <view class="history-info">
+             <text class="book-title-sm">{{item.orderItem[0].inventoryItem.bookSku.bookMaster.title}}</text>
+             <text class="total-price-sm">{{filters.formatCurrency(item.total_amount)}}</text>
+          </view>
+        </view>
+      </view>
+
+    </block>
+
   </view>
 </view>

@@ -2,33 +2,44 @@
 .search-bar-wrapper {
   display: flex;
   align-items: center;
-  background: var(--card-background-color);
-  border-radius: 24rpx;
-  padding: 20rpx 30rpx;
-  margin-bottom: 30rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.05);
-  border: 2rpx solid transparent;
+  background: var(--clay-bg); /* 背景同色 */
+  border-radius: var(--radius-xl);
+  padding: 24rpx 40rpx;
+  margin: 0 var(--space-l) var(--space-l) var(--space-l);
+  /* 关键：使用内阴影制造凹槽感 */
+  box-shadow: var(--shadow-clay-in);
+  border: none;
   transition: all 0.3s ease;
 }
 
 .search-bar-wrapper:focus-within {
-  border-color: var(--primary-color);
-  box-shadow: 0 4rpx 20rpx rgba(44, 95, 45, 0.2);
+  /* 聚焦时稍微深一点 */
+  box-shadow: inset 8rpx 8rpx 16rpx rgba(166, 180, 200, 0.5), inset -8rpx -8rpx 16rpx rgba(255, 255, 255, 1);
 }
 
 .search-icon {
-  width: 32rpx;
-  height: 32rpx;
-  margin-right: 20rpx;
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 24rpx;
   opacity: 0.5;
   transition: opacity 0.3s ease;
 }
 
 .search-bar-wrapper:focus-within .search-icon {
-  opacity: 1;
+  opacity: 0.8;
+  color: var(--clay-text-main);
 }
 
 .search-input {
   flex-grow: 1;
-  font-size: 28rpx;
+  font-size: 30rpx;
+  color: var(--clay-text-main);
+  font-weight: 600;
+  height: 48rpx;
+  line-height: 48rpx;
+}
+
+.search-input-placeholder {
+  color: var(--clay-text-light);
+  font-weight: normal;
 }

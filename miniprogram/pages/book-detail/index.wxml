@@ -1,52 +1,76 @@
 <!-- pages/book-detail/index.wxml -->
 <wxs module="filters" src="../../utils/filters.wxs"></wxs>
-<view class="container">
+<view class="container detail-page">
   <!-- Skeleton -->
   <skeleton wx:if="{{isLoading}}" type="detail" />
 
   <!-- Real Content -->
-  <view wx:if="{{!isLoading && bookDetail}}" class="detail-container animated">
-    <image class="cover-image" src="{{bookDetail.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" mode="aspectFit" />
+  <view wx:if="{{!isLoading && bookDetail}}" class="content-wrapper">
+    
+    <!-- 1. Cover Section (Clay Display Stand) -->
+    <view class="cover-section">
+      <view class="cover-bg-circle"></view>
+      <view class="cover-container">
+        <image class="cover-image" 
+               src="{{bookDetail.bookSku.cover_image_url || '/images/placeholder-cover.svg'}}" 
+               mode="aspectFit" 
+               binderror="onImageError" />
+      </view>
+    </view>
 
-    <view class="info-section">
-      <text class="title">{{bookDetail.bookSku.bookMaster.title}}</text>
+    <!-- 2. Info Card (Clay Card) -->
+    <view class="info-card">
+      <view class="title-row">
+        <text class="title">{{bookDetail.bookSku.bookMaster.title}}</text>
+        <view class="condition-badge">{{bookDetail.condition}}</view>
+      </view>
+      
       <text class="author">{{bookDetail.bookSku.bookMaster.author}}</text>
       
-      <view class="price-section">
-        <text class="selling-price">{{filters.formatCurrency(bookDetail.selling_price)}}</text>
+      <view class="price-row">
+        <text class="currency">¥</text>
+        <text class="selling-price">{{filters.formatCurrencyFromCents(bookDetail.selling_price).substring(1)}}</text>
         <text class="original-price" wx:if="{{bookDetail.bookSku.bookMaster.original_price}}">{{filters.formatCurrency(bookDetail.bookSku.bookMaster.original_price)}}</text>
       </view>
 
-      <view class="specs-card card">
+      <!-- Specs Grid (Inset Style) -->
+      <view class="specs-grid">
         <view class="spec-item">
           <text class="spec-label">版本</text>
-          <text class="spec-value">{{bookDetail.bookSku.edition || '暂无'}}</text>
-        </view>
-        <view class="spec-item">
-          <text class="spec-label">品相</text>
-          <text class="spec-value">{{bookDetail.condition}}</text>
+          <text class="spec-value">{{bookDetail.bookSku.edition || '标准版'}}</text>
         </view>
         <view class="spec-item">
           <text class="spec-label">ISBN</text>
-          <text class="spec-value">{{bookDetail.bookSku.bookMaster.isbn13}}</text>
+          <text class="spec-value isbn">{{bookDetail.bookSku.bookMaster.isbn13}}</text>
         </view>
       </view>
+
     </view>
+
   </view>
 
   <!-- Empty State -->
   <view wx:if="{{!isLoading && !bookDetail && !error}}" class="error-container">
+    <image class="empty-img" src="/images/empty-shelf.png" mode="widthFix" />
     <text>书籍信息不存在</text>
   </view>
 
   <!-- Error State -->
   <view wx:if="{{!isLoading && error}}" class="error-container">
+    <image class="empty-img" src="/images/empty-search.png" mode="widthFix" />
     <text>{{error}}</text>
   </view>
 
+  <!-- Floating Action Bar (Clay Glass) -->
   <view class="footer-bar" wx:if="{{bookDetail}}">
-    <button class="btn btn-primary" bindtap="handleBuyNow" disabled="{{isSubmitting}}">
-      {{isSubmitting ? '处理中...' : '立即购买'}}
-    </button>
+    <view class="action-row">
+      <view class="price-info">
+        <text class="label">总计</text>
+        <text class="total-price">{{filters.formatCurrency(bookDetail.selling_price)}}</text>
+      </view>
+      <button class="buy-btn" bindtap="handleBuyNow" disabled="{{isSubmitting}}">
+        {{isSubmitting ? '处理中...' : '立即购买'}}
+      </button>
+    </view>
   </view>
 </view>

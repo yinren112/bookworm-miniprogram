@@ -12,10 +12,17 @@
     <text class="scan-text">扫描ISBN条码</text>
   </button>
 
+  <!-- 连续扫码开关 -->
+  <view class="scan-mode-switch">
+    <text class="switch-label">连续扫码模式</text>
+    <switch checked="{{continuousMode}}" bindchange="onContinuousModeChange" color="#48BB78" />
+  </view>
+
   <!-- 已扫描书籍列表 -->
-  <view wx:if="{{scannedItems.length > 0}}" class="scanned-list">
+  <view wx:if="{{scannedItems.length > 0}}" class="scanned-list {{scannedItems.length > 5 ? 'compact' : ''}}">
     <view class="list-header">
       <text class="list-title">已扫描书籍 ({{scannedItems.length}})</text>
+      <text class="clear-btn" bindtap="onClearRejected" wx:if="{{hasRejectedItems}}">清理无效</text>
     </view>
 
     <view class="book-item {{item.status === 'acquirable' ? 'acquirable' : 'rejected'}}"
@@ -44,7 +51,7 @@
 
   <!-- 空状态 -->
   <view wx:if="{{scannedItems.length === 0}}" class="empty-state">
-    <text class="empty-icon">📚</text>
+    <image class="empty-img" src="/images/empty-shelf.png" mode="widthFix" />
     <text class="empty-text">还没有扫描任何书籍</text>
     <text class="empty-hint">点击上方按钮开始扫码</text>
   </view>
@@ -82,7 +89,8 @@
         value="{{customerPhone}}"
         bindinput="onPhoneInput"
         placeholder="请输入手机号"
-        maxlength="11" />
+        maxlength="11"
+        confirm-type="next" />
     </view>
 
     <!-- 快速模式：按重量计价 -->
@@ -95,7 +103,8 @@
           type="digit"
           value="{{totalWeight}}"
           bindinput="onWeightInput"
-          placeholder="0.00" />
+          placeholder="0.00"
+          confirm-type="next" />
       </view>
 
       <!-- 单价 -->
@@ -106,7 +115,8 @@
           type="digit"
           value="{{unitPriceYuan}}"
           bindinput="onUnitPriceInput"
-          placeholder="0.00" />
+          placeholder="0.00"
+          confirm-type="next" />
       </view>
     </view>
 
@@ -114,6 +124,12 @@
     <view wx:if="{{pricingMode === 'individual'}}" class="individual-pricing">
       <view class="pricing-header">
         <text class="pricing-hint">为每本书设置品相和价格</text>
+      </view>
+
+      <!-- 批量设置工具栏 -->
+      <view class="batch-toolbar">
+        <input class="batch-input" placeholder="批量价格" type="digit" bindinput="onBatchPriceInput" />
+        <button class="batch-btn" bindtap="onBatchApply">应用</button>
       </view>
 
       <view
@@ -151,7 +167,8 @@
               value="{{book.individualPrice}}"
               data-index="{{index}}"
               bindinput="onIndividualPriceInput"
-              placeholder="0.00" />
+              placeholder="0.00"
+              confirm-type="next" />
           </view>
         </view>
       </view>
@@ -186,7 +203,8 @@
         value="{{major}}"
         bindinput="onMajorInput"
         placeholder="如：计算机科学与技术"
-        maxlength="100" />
+        maxlength="100"
+        confirm-type="next" />
     </view>
 
     <!-- 班级 -->
@@ -198,7 +216,8 @@
         value="{{className}}"
         bindinput="onClassNameInput"
         placeholder="如：1班"
-        maxlength="50" />
+        maxlength="50"
+        confirm-type="done" />
     </view>
 
     <!-- 最终总金额 -->

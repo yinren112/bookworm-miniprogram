@@ -1,4 +1,4 @@
-﻿// pages/book-detail/index.js
+// pages/book-detail/index.js
 const { request } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { safeCreateOrderAndPay } = require('../../utils/payment');
@@ -22,6 +22,12 @@ Page({
     } else {
       this.setData({ error: '无效的书籍ID', isLoading: false });
     }
+  },
+
+  // Handle image load errors
+  onImageError() {
+    const key = 'bookDetail.bookSku.cover_image_url';
+    this.setData({ [key]: '/images/placeholder-cover.svg' });
   },
 
   onShow() {

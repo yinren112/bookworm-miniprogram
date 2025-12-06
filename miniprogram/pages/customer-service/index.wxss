@@ -1,132 +1,159 @@
 /* pages/customer-service/index.wxss */
-.page {
-  padding: var(--space-m) var(--space-l);
-  background-color: var(--background-color);
+
+.page-container {
   min-height: 100vh;
-}
-
-/* Use Global Card Style */
-.contact-section, .faq-section {
-  background-color: var(--card-background);
-  border-radius: 24rpx;
+  background-color: var(--clay-bg);
   padding: var(--space-l);
-  margin-bottom: var(--space-m);
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
 }
 
-.section-title {
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-  color: var(--primary-color);
-  margin-bottom: var(--space-xl);
-  padding-bottom: var(--space-m);
-  border-bottom: 3rpx solid var(--primary-color);
+/* 1. Contact Card (Business Card Style) */
+.contact-card {
+  background: #fff;
+  border-radius: var(--radius-l);
+  padding: 40rpx;
+  margin-bottom: 60rpx;
+  box-shadow: var(--shadow-clay-out);
   position: relative;
+  overflow: hidden;
 }
 
-.section-title::after {
+/* Card decoration */
+.contact-card::before {
   content: '';
   position: absolute;
-  bottom: -3rpx;
-  left: 0;
-  width: 60rpx;
-  height: 3rpx;
-  background-color: var(--secondary-color);
+  top: -50rpx; right: -50rpx;
+  width: 200rpx; height: 200rpx;
+  background: #E2F0CB;
+  border-radius: 50%;
+  opacity: 0.5;
+  filter: blur(30rpx);
 }
 
-/* Contact Styles */
-.contact-item {
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-l) 0;
-  border-bottom: 1rpx solid var(--border-color);
-  gap: var(--space-m);
-}
-
-.contact-item:last-child {
-  border-bottom: none;
-}
-
-.contact-label {
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-bold);
-  margin-bottom: var(--space-xs);
-}
-
-.contact-value {
+.card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background-color: var(--background-color);
-  padding: var(--space-m);
-  border-radius: 16rpx;
-  border: 1rpx solid var(--border-color);
+  margin-bottom: 40rpx;
+  position: relative;
+  z-index: 1;
 }
 
-.wechat-id {
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  font-family: monospace;
-  font-weight: var(--font-weight-bold);
+.avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: #fff;
+  border: 6rpx solid #fff;
+  box-shadow: var(--shadow-clay-out);
+  margin-right: 24rpx;
+}
+
+.card-info {
   flex: 1;
 }
 
-.work-time {
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-  font-weight: 500;
+.role-title {
+  font-size: 36rpx;
+  font-weight: 900;
+  color: var(--clay-text-main);
+  margin-bottom: 8rpx;
+  display: block;
 }
 
-/* Copy Button - Enhanced Style */
+.service-time {
+  font-size: 24rpx;
+  color: var(--clay-text-light);
+  font-weight: 600;
+}
+
+.wechat-row {
+  display: flex;
+  align-items: center;
+  background: var(--clay-bg);
+  border-radius: var(--radius-m);
+  padding: 16rpx 24rpx;
+  box-shadow: var(--shadow-clay-in); /* 凹陷效果 */
+}
+
+.wechat-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.wechat-box .label {
+  font-size: 20rpx;
+  color: var(--clay-text-light);
+  margin-bottom: 4rpx;
+}
+
+.wechat-box .value {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--clay-text-main);
+  font-family: monospace;
+}
+
 .copy-btn {
-  padding: var(--space-s) var(--space-m);
-  background-color: var(--primary-color);
-  color: white;
+  background: var(--clay-text-main);
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
+  padding: 12rpx 32rpx;
+  border-radius: 30rpx;
+  box-shadow: 4rpx 4rpx 10rpx rgba(74, 85, 104, 0.3);
   border: none;
-  border-radius: 20rpx;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  min-width: 120rpx;
-  transition: all 0.3s ease;
-  box-shadow: 0 2rpx 8rpx rgba(44, 95, 45, 0.2);
-}
-
-.copy-btn:hover {
-  background-color: var(--secondary-color);
-  transform: translateY(-2rpx);
-  box-shadow: 0 4rpx 12rpx rgba(44, 95, 45, 0.3);
-}
-
-.copy-btn:after {
-  display: none;
-}
-
-/* FAQ Styles */
-.faq-item {
-  margin-bottom: var(--space-l);
-}
-
-.faq-item:last-child {
-  margin-bottom: 0;
-}
-
-.question {
-  font-size: var(--font-size-body);
-  color: var(--primary-color);
-  font-weight: var(--font-weight-bold);
-  margin-bottom: var(--space-s);
   line-height: 1.5;
+  margin: 0;
 }
 
-.answer {
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-  line-height: 1.6;
-  padding-left: var(--space-m);
-  border-left: 3rpx solid var(--background-color);
-  background-color: var(--background-color);
-  padding: var(--space-m);
-  border-radius: 8rpx;
+.copy-btn:active {
+  transform: scale(0.95);
+}
+
+
+/* 2. FAQ Section (Chat Style) */
+.faq-section {
+  margin-top: var(--space-xl);
+}
+
+.section-header {
+  font-size: 32rpx;
+  font-weight: 900;
+  color: var(--clay-text-light);
+  margin-bottom: 32rpx;
+  text-align: center;
+  opacity: 0.5;
+  letter-spacing: 2rpx;
+}
+
+.faq-group {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 24rpx 32rpx;
+  border-radius: 32rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  position: relative;
+  box-shadow: 4rpx 4rpx 12rpx rgba(166, 180, 200, 0.15);
+}
+
+/* Question (Right aligned, darker) */
+.chat-bubble.question {
+  align-self: flex-end;
+  background: var(--clay-text-main);
+  color: #fff;
+  border-bottom-right-radius: 4rpx;
+}
+
+/* Answer (Left aligned, lighter) */
+.chat-bubble.answer {
+  align-self: flex-start;
+  background: #fff;
+  color: var(--clay-text-main);
+  border-bottom-left-radius: 4rpx;
 }
