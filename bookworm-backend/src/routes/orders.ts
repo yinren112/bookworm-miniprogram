@@ -12,13 +12,14 @@ import {
 } from "../services/orderService";
 import config from "../config";
 import prisma from "../db";
+import { PickupCodeSchema } from "./sharedSchemas";
 
 const CreateOrderBodySchema = Type.Object({
   inventoryItemIds: Type.Array(Type.Number(), { minItems: 1 }),
 });
 
 const FulfillOrderBodySchema = Type.Object({
-  pickupCode: Type.String({ minLength: 1 }),
+  pickupCode: PickupCodeSchema,
 });
 
 const UpdateOrderStatusBodySchema = Type.Object({

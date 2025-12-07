@@ -9,6 +9,7 @@ import {
 import { getBookMetadata } from "../services/bookMetadataService";
 import { ApiError } from "../errors";
 import prisma from "../db";
+import { ISBN13Schema } from "./sharedSchemas";
 
 const ListAvailableQuery = Type.Object({
   search: Type.Optional(Type.String({ minLength: 1, maxLength: 50 })),
@@ -22,12 +23,8 @@ const GetItemParamsSchema = Type.Object({
 
 // Linus式输入校验：在数据进入系统前就拒绝垃圾
 const AddBookBody = Type.Object({
-  // ISBN必须是10-13位数字（允许短横线分隔）
-  isbn13: Type.String({
-    minLength: 10,
-    maxLength: 17, // 13 digits + 4 hyphens max
-    pattern: '^[0-9\\-]+$', // Only digits and hyphens
-  }),
+  // ISBN使用统一Schema
+  isbn13: ISBN13Schema,
   // 书名不能超过500字符（数据库列通常有限制）
   title: Type.String({ minLength: 1, maxLength: 500 }),
   // 作者名不能超过200字符

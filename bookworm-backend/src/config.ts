@@ -65,6 +65,11 @@ const schema = Type.Object({
 
   // Logging Security
   LOG_EXPOSE_DEBUG: Type.Boolean({ default: false }), // DANGER: 仅在本地调试时设为 true，禁止在生产环境使用
+
+  // CORS Configuration
+  // 逗号分隔的允许来源列表，例如: "https://example.com,https://app.example.com"
+  // 留空表示禁用 CORS（仅限开发环境）
+  CORS_ORIGIN: Type.String({ default: "" }),
 });
 
 type Schema = Static<typeof schema>;

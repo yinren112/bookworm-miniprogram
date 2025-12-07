@@ -8,21 +8,53 @@ import { processRefundQueue } from "./jobs/refundProcessor";
 import config from "./config";
 import prisma from "./db";
 
+// 存储所有定时任务，用于优雅关闭
+const scheduledTasks: cron.ScheduledTask[] = [];
+// 追踪当前正在执行的任务（允许返回null，因为withAdvisoryLock可能返回null）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const runningJobs = new Set<Promise<any>>();
+// 是否正在关闭
+let isShuttingDown = false;
+
+/**
+ * 优雅关闭所有定时任务
+ * 停止调度新任务，等待正在执行的任务完成
+ */
+export async function stopCronJobs(): Promise<void> {
+  isShuttingDown = true;
+
+  // 停止所有定时任务调度
+  for (const task of scheduledTasks) {
+    task.stop();
+  }
+
+  // 等待所有正在执行的任务完成
+  if (runningJobs.size > 0) {
+    console.warn(`Waiting for ${runningJobs.size} running job(s) to complete...`);
+    await Promise.all(runningJobs);
+  }
+
+  scheduledTasks.length = 0;
+  console.warn("All cron jobs stopped gracefully");
+}
+
 export function startCronJobs(fastify: FastifyInstance): void {
-  // --- START OF FIX: 添加订单清理定时任务 ---
+  // 测试环境不启动定时任务，避免污染测试结果
+  if (config.NODE_ENV === "test") {
+    fastify.log.info("Skipping cron jobs in test environment");
+    return;
+  }
 
   // 注意：'*/1 * * * *' (每分钟执行) 适用于开发和测试。
   // 在生产环境中，应通过 config.ts 配置为更合理的频率，例如 '*/5 * * * *' (每5分钟)。
-  cron.schedule(config.CRON_ORDER_CLEANUP, async () => {
-    await withAdvisoryLock(prisma, "job:cancel_expired_orders", async () => {
+  const orderCleanupTask = cron.schedule(config.CRON_ORDER_CLEANUP, async () => {
+    if (isShuttingDown) return;
+    const jobPromise = withAdvisoryLock(prisma, "job:cancel_expired_orders", async () => {
       fastify.log.info("Running scheduled job: CancelExpiredOrders");
       try {
-        // 在一个 try...catch 块中安全地调用它
         const result = await prisma.$transaction(async (tx) => {
           return cancelExpiredOrders(tx);
         });
-
-        // 记录有意义的日志
         if (result.cancelledCount > 0) {
           fastify.log.info(
             `CancelExpiredOrders job finished: ${result.cancelledCount} order(s) cancelled`,
@@ -33,20 +65,18 @@ export function startCronJobs(fastify: FastifyInstance): void {
           );
         }
       } catch (error) {
-        // 捕获并记录任何潜在的错误，防止搞垮主进程
-        console.error(
-          'CRITICAL: The "CancelExpiredOrders" job failed:',
-          error,
-        );
+        fastify.log.error(error, 'CRITICAL: The "CancelExpiredOrders" job failed');
       }
     });
+    runningJobs.add(jobPromise);
+    jobPromise.finally(() => runningJobs.delete(jobPromise));
   });
-
-  // --- END OF FIX ---
+  scheduledTasks.push(orderCleanupTask);
 
   // Schedule a job to update inventory gauge metrics every 5 minutes.
-  cron.schedule(config.CRON_INVENTORY_METRICS, async () => {
-    await withAdvisoryLock(
+  const metricsTask = cron.schedule(config.CRON_INVENTORY_METRICS, async () => {
+    if (isShuttingDown) return;
+    const jobPromise = withAdvisoryLock(
       prisma,
       "job:update_inventory_metrics",
       async () => {
@@ -62,18 +92,19 @@ export function startCronJobs(fastify: FastifyInstance): void {
             metrics.inventoryStatus.labels(item.status).set(item._count.id);
           });
         } catch (error) {
-          console.error(
-            'CRITICAL: The "updateInventoryMetrics" job failed:',
-            error,
-          );
+          fastify.log.error(error, 'CRITICAL: The "updateInventoryMetrics" job failed');
         }
       },
     );
+    runningJobs.add(jobPromise);
+    jobPromise.finally(() => runningJobs.delete(jobPromise));
   });
+  scheduledTasks.push(metricsTask);
 
   // Schedule refund processing job every 10 minutes
-  cron.schedule(config.CRON_REFUND_PROCESSOR, async () => {
-    await withAdvisoryLock(
+  const refundTask = cron.schedule(config.CRON_REFUND_PROCESSOR, async () => {
+    if (isShuttingDown) return;
+    const jobPromise = withAdvisoryLock(
       prisma,
       "job:process_refunds",
       async () => {
@@ -81,12 +112,14 @@ export function startCronJobs(fastify: FastifyInstance): void {
         try {
           await processRefundQueue();
         } catch (error) {
-          console.error(
-            'CRITICAL: The "processRefunds" job failed:',
-            error,
-          );
+          fastify.log.error(error, 'CRITICAL: The "processRefunds" job failed');
         }
       },
     );
+    runningJobs.add(jobPromise);
+    jobPromise.finally(() => runningJobs.delete(jobPromise));
   });
+  scheduledTasks.push(refundTask);
+
+  fastify.log.info(`Started ${scheduledTasks.length} cron jobs`);
 }

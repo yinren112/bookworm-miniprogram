@@ -1,5 +1,6 @@
 // src/index.ts
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
+import cors from "@fastify/cors";
 import { createWechatPayAdapter, WechatPayAdapter } from "./adapters/wechatPayAdapter";
 import { Prisma } from "@prisma/client";
 import { ApiError, ServiceError } from "./errors";
@@ -16,7 +17,7 @@ import {
 
 // Plugins and Routes
 import { registerPlugins } from "./plugins";
-import { startCronJobs } from "./jobs";
+import { startCronJobs, stopCronJobs } from "./jobs";
 import authRoutes from "./routes/auth";
 import healthRoutes from "./routes/health";
 import booksRoutes from "./routes/books";
@@ -274,6 +275,22 @@ const validateProductionConfig = () => {
 };
 
 const setupApplication = async () => {
+  // Register CORS plugin
+  // 微信小程序不受浏览器CORS限制，但Web管理后台需要
+  if (config.CORS_ORIGIN) {
+    await fastify.register(cors, {
+      origin: config.CORS_ORIGIN.split(",").map((o) => o.trim()),
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    });
+    fastify.log.info(`CORS enabled for origins: ${config.CORS_ORIGIN}`);
+  } else if (config.NODE_ENV === "development") {
+    // 开发环境：允许所有来源（仅用于本地调试）
+    await fastify.register(cors, { origin: true });
+    fastify.log.warn("CORS enabled for all origins (development mode)");
+  }
+
   // Register all plugins
   await registerPlugins(fastify);
 
@@ -307,6 +324,34 @@ const start = async () => {
 
     // Start cron jobs after server is running
     startCronJobs(fastify);
+
+    // 注册优雅关闭处理器
+    const gracefulShutdown = async (signal: string) => {
+      fastify.log.info(`Received ${signal}. Starting graceful shutdown...`);
+
+      try {
+        // 1. 停止接受新请求
+        await fastify.close();
+        fastify.log.info("HTTP server closed");
+
+        // 2. 停止定时任务并等待正在执行的任务完成
+        await stopCronJobs();
+
+        // 3. 关闭数据库连接
+        await prisma.$disconnect();
+        fastify.log.info("Database connection closed");
+
+        fastify.log.info("Graceful shutdown completed");
+        process.exit(0);
+      } catch (error) {
+        fastify.log.error(error, "Error during graceful shutdown");
+        process.exit(1);
+      }
+    };
+
+    // 监听终止信号
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

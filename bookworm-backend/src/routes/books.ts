@@ -5,18 +5,27 @@ import { getBookMetadata } from "../services/bookMetadataService";
 import { getRecommendedBooks } from "../services/bookService";
 import { ApiError } from "../errors";
 import prisma from "../db";
+import { ISBN13Schema } from "./sharedSchemas";
 
 const BookMetaQuerySchema = Type.Object({
-  isbn: Type.String({ minLength: 10, maxLength: 13 }),
+  isbn: ISBN13Schema,
 });
 
 const booksRoutes: FastifyPluginAsync = async function (fastify) {
-  // Books metadata
+  // PUBLIC ENDPOINT: Books metadata lookup
+  // Rate-limited to prevent ISBN enumeration attacks
   fastify.get<{ Querystring: Static<typeof BookMetaQuerySchema> }>(
     "/api/books/meta",
     {
       schema: {
         querystring: BookMetaQuerySchema,
+      },
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+          keyGenerator: (req) => req.ip,
+        },
       },
     },
     async (request, reply) => {

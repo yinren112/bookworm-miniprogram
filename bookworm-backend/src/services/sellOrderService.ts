@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, InventoryItem } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 import { ApiError } from "../errors";
 import {
@@ -38,7 +39,7 @@ async function createAndCompleteSellOrderImpl(
     where: { phone_number: input.customerPhoneNumber },
     create: {
       phone_number: input.customerPhoneNumber,
-      openid: `placeholder_${input.customerPhoneNumber}_${Date.now()}`,
+      openid: `pre_${randomUUID()}`, // 使用UUID确保完全唯一，避免任何碰撞风险
       role: "USER",
       status: "PRE_REGISTERED",
     },

@@ -3,11 +3,11 @@ import { FastifyPluginAsync } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
 import prisma from "../db";
 import { createAcquisition } from "../services/acquisitionService";
-import { PhoneNumberSchema } from "./sharedSchemas";
+import { PhoneNumberSchema, ISBN13Schema } from "./sharedSchemas";
 import { bookSkuWithMasterInclude } from "../db/views";
 
 const CheckQuerySchema = Type.Object({
-  isbn: Type.String({ minLength: 10, maxLength: 17 }),
+  isbn: ISBN13Schema,
 });
 
 const AcquisitionSkuSchema = Type.Object({
