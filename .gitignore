@@ -124,3 +124,4 @@ bookworm-backend/server-err.log
 bookworm-backend/embedded-postgres.log
 bookworm-backend/test-output.txt
 bookworm-backend/test_output.txt
+.trae/

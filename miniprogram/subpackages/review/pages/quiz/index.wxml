@@ -25,13 +25,13 @@
     </view>
     <!-- 选项区域 -->
     <view class="options-section" wx:if="{{currentQuestion.questionType !== 'FILL_BLANK'}}">
-      <view class="option-item {{selectedAnswers.indexOf(index) !== -1 ? 'selected' : ''}} {{showResult && correctIndices.indexOf(index) !== -1 ? 'correct' : ''}} {{showResult && selectedAnswers.indexOf(index) !== -1 && correctIndices.indexOf(index) === -1 ? 'wrong' : ''}}" wx:for="{{currentQuestion.options}}" wx:key="index" bindtap="selectOption" data-index="{{index}}">
+      <view class="option-item {{optionStates[index].isSelected ? 'selected' : ''}} {{showResult && optionStates[index].isCorrect ? 'correct' : ''}} {{showResult && optionStates[index].isWrong ? 'wrong' : ''}}" wx:for="{{currentQuestion.options}}" wx:key="index" bindtap="selectOption" data-index="{{index}}">
         <view class="option-marker">{{optionLabels[index]}}</view>
         <view class="option-content">
           <mp-html content="{{item}}" markdown="{{true}}" />
         </view>
-        <view class="option-icon" wx:if="{{showResult && correctIndices.indexOf(index) !== -1}}">✓</view>
-        <view class="option-icon wrong" wx:if="{{showResult && selectedAnswers.indexOf(index) !== -1 && correctIndices.indexOf(index) === -1}}">
+        <view class="option-icon" wx:if="{{showResult && optionStates[index].isCorrect}}">✓</view>
+        <view class="option-icon wrong" wx:if="{{showResult && optionStates[index].isWrong}}">
           ✗
         </view>
       </view>

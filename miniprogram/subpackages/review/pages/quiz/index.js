@@ -1,25 +1,26 @@
 // subpackages/review/pages/quiz/index.js
 // 刷题闯关页
 
-const { startQuiz, submitQuizAnswer } = require('../../utils/study-api');
+const { startQuiz, submitQuizAnswer } = require("../../utils/study-api");
 
 Page({
   data: {
     loading: true,
     submitting: false, // 防重复提交
-    courseKey: '',
+    courseKey: "",
     unitId: null,
     wrongItemsOnly: false,
-    sessionId: '',
+    sessionId: "",
     questions: [],
     currentIndex: 0,
     currentQuestion: null,
     selectedAnswers: [],
-    fillAnswer: '',
+    fillAnswer: "",
     showResult: false,
     lastResult: null,
     correctIndices: [],
-    correctAnswerText: '',
+    correctAnswerText: "",
+    optionStates: [], // 每个选项的渲染状态 { isCorrect, isWrong, isSelected }
     answeredCount: 0,
     correctCount: 0,
     completed: false,
@@ -27,12 +28,12 @@ Page({
     startTime: 0,
     // 常量
     questionTypeLabels: {
-      SINGLE_CHOICE: '单选题',
-      MULTI_CHOICE: '多选题',
-      TRUE_FALSE: '判断题',
-      FILL_BLANK: '填空题',
+      SINGLE_CHOICE: "单选题",
+      MULTI_CHOICE: "多选题",
+      TRUE_FALSE: "判断题",
+      FILL_BLANK: "填空题",
     },
-    optionLabels: ['A', 'B', 'C', 'D', 'E', 'F'],
+    optionLabels: ["A", "B", "C", "D", "E", "F"],
     showReportModal: false,
   },
 
@@ -42,14 +43,14 @@ Page({
       this.setData({
         courseKey: decodeURIComponent(courseKey),
         unitId: unitId ? parseInt(unitId, 10) : null,
-        wrongItemsOnly: wrongItemsOnly === 'true',
+        wrongItemsOnly: wrongItemsOnly === "true",
       });
       this.loadQuiz();
     } else {
       this.setData({ loading: false });
       wx.showToast({
-        title: '缺少课程参数',
-        icon: 'none',
+        title: "缺少课程参数",
+        icon: "none",
       });
     }
   },
@@ -79,7 +80,7 @@ Page({
         currentIndex: 0,
         currentQuestion: questions[0],
         selectedAnswers: [],
-        fillAnswer: '',
+        fillAnswer: "",
         showResult: false,
         answeredCount: 0,
         correctCount: 0,
@@ -88,14 +89,15 @@ Page({
         progressPercent: 0,
         startTime: Date.now(),
         correctIndices: [],
-        correctAnswerText: '',
+        correctAnswerText: "",
+        optionStates: buildOptionStates(questions[0]?.options || [], [], []),
       });
     } catch (err) {
-      console.error('Failed to start quiz:', err);
+      console.error("Failed to start quiz:", err);
       this.setData({ loading: false });
       wx.showToast({
-        title: '加载失败',
-        icon: 'none',
+        title: "加载失败",
+        icon: "none",
       });
     }
   },
@@ -105,9 +107,9 @@ Page({
 
     const { index } = e.currentTarget.dataset;
     const { currentQuestion } = this.data;
-    wx.vibrateShort({ type: 'light' });
+    wx.vibrateShort({ type: "light" });
 
-    if (currentQuestion.questionType === 'MULTI_CHOICE') {
+    if (currentQuestion.questionType === "MULTI_CHOICE") {
       const selectedAnswers = this.data.selectedAnswers.slice();
       const existingIndex = selectedAnswers.indexOf(index);
       if (existingIndex >= 0) {
@@ -115,13 +117,18 @@ Page({
       } else {
         selectedAnswers.push(index);
       }
-      this.setData({ selectedAnswers });
+      this.setData({
+        selectedAnswers,
+        optionStates: buildOptionStates(currentQuestion.options || [], [], selectedAnswers),
+      });
       return;
     }
 
     this.setData({ selectedAnswers: [index] });
 
-    const optionText = currentQuestion.options ? currentQuestion.options[index] : '';
+    const optionText = currentQuestion.options
+      ? currentQuestion.options[index]
+      : "";
     this.submitAnswer(String(optionText).trim());
   },
 
@@ -131,7 +138,7 @@ Page({
 
   submitFillAnswer() {
     if (!this.data.fillAnswer) return;
-    wx.vibrateShort({ type: 'light' });
+    wx.vibrateShort({ type: "light" });
     this.submitAnswer(this.data.fillAnswer.trim());
   },
 
@@ -141,18 +148,20 @@ Page({
 
     if (selectedAnswers.length === 0) {
       wx.showToast({
-        title: '请选择答案',
-        icon: 'none',
+        title: "请选择答案",
+        icon: "none",
       });
       return;
     }
 
     const answerTexts = currentQuestion.options
-      .map((option, idx) => (selectedAnswers.indexOf(idx) !== -1 ? option : null))
+      .map((option, idx) =>
+        selectedAnswers.indexOf(idx) !== -1 ? option : null,
+      )
       .filter((option) => option !== null)
       .map((option) => String(option).trim());
 
-    this.submitAnswer(answerTexts.join('|'));
+    this.submitAnswer(answerTexts.join("|"));
   },
 
   async submitAnswer(answer) {
@@ -165,29 +174,69 @@ Page({
     this.setData({ submitting: true });
 
     try {
-      const result = await submitQuizAnswer(sessionId, currentQuestion.id, answer, durationMs);
+      const result = await submitQuizAnswer(
+        sessionId,
+        currentQuestion.id,
+        answer,
+        durationMs,
+      );
 
-      const correctIndices = getCorrectIndices(currentQuestion, result.correctAnswer);
-      const correctAnswerText = formatCorrectAnswer(currentQuestion, result.correctAnswer);
+      const optionsLength = Array.isArray(currentQuestion.options)
+        ? currentQuestion.options.length
+        : 0;
+      const serverIndices = normalizeIndices(
+        result.correctOptionIndices,
+        optionsLength,
+      );
+      const localIndices = normalizeIndices(
+        getCorrectIndices(currentQuestion, result.correctAnswer),
+        optionsLength,
+      );
+      const correctIndices = pickCorrectIndices(
+        currentQuestion.questionType,
+        localIndices,
+        serverIndices,
+      );
+      const correctAnswerText = formatCorrectAnswer(
+        currentQuestion,
+        result.correctAnswer,
+      );
+      logQuizDebug({
+        questionId: currentQuestion.id,
+        questionType: currentQuestion.questionType,
+        options: currentQuestion.options,
+        optionsLength,
+        result,
+        serverIndices,
+        localIndices,
+        correctIndices,
+      });
 
-      const newCorrectCount = this.data.correctCount + (result.isCorrect ? 1 : 0);
+      const newCorrectCount =
+        this.data.correctCount + (result.isCorrect ? 1 : 0);
+      const optionStates = buildOptionStates(
+        currentQuestion.options || [],
+        correctIndices,
+        this.data.selectedAnswers,
+      );
 
       this.setData({
         showResult: true,
         lastResult: result,
         correctIndices,
         correctAnswerText,
+        optionStates,
         answeredCount: this.data.answeredCount + 1,
         correctCount: newCorrectCount,
       });
 
       // 触觉反馈
-      wx.vibrateShort({ type: result.isCorrect ? 'light' : 'medium' });
+      wx.vibrateShort({ type: result.isCorrect ? "light" : "medium" });
     } catch (err) {
-      console.error('Failed to submit answer:', err);
+      console.error("Failed to submit answer:", err);
       wx.showToast({
-        title: '提交失败',
-        icon: 'none',
+        title: "提交失败",
+        icon: "none",
       });
     } finally {
       this.setData({ submitting: false });
@@ -211,11 +260,12 @@ Page({
       currentIndex: nextIndex,
       currentQuestion: questions[nextIndex],
       selectedAnswers: [],
-      fillAnswer: '',
+      fillAnswer: "",
       showResult: false,
       lastResult: null,
       correctIndices: [],
-      correctAnswerText: '',
+      correctAnswerText: "",
+      optionStates: buildOptionStates(questions[nextIndex]?.options || [], [], []),
       progressPercent: Math.round((nextIndex / questions.length) * 100),
       startTime: Date.now(),
     });
@@ -234,14 +284,14 @@ Page({
     if (pages.length > 1) {
       wx.navigateBack();
     } else {
-      wx.redirectTo({
-        url: `/subpackages/review/pages/home/index`,
+      wx.switchTab({
+        url: "/pages/review/index",
       });
     }
   },
 
   openReportModal() {
-    wx.vibrateShort({ type: 'light' });
+    wx.vibrateShort({ type: "light" });
     this.setData({ showReportModal: true });
   },
 
@@ -255,27 +305,32 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '一起来刷题吧',
-      path: `/subpackages/review/pages/home/index`,
+      title: "一起来刷题吧",
+      path: "/pages/review/index",
     };
   },
 });
 
 function getCorrectIndices(question, correctAnswer) {
-  if (!question || !question.options || question.questionType === 'FILL_BLANK') {
+  if (
+    !question ||
+    !question.options ||
+    question.questionType === "FILL_BLANK"
+  ) {
     return [];
   }
 
   const options = question.options;
-  const correctAnswers = question.questionType === 'MULTI_CHOICE'
-    ? parseAnswerList(correctAnswer)
-    : [correctAnswer];
+  const correctAnswers =
+    question.questionType === "MULTI_CHOICE"
+      ? parseAnswerList(correctAnswer)
+      : [correctAnswer];
 
   const indices = [];
   correctAnswers.forEach((answer) => {
     const normalizedAnswer = normalizeAnswerToken(answer);
     const idx = options.findIndex(
-      (option) => normalizeAnswerToken(String(option)) === normalizedAnswer
+      (option) => normalizeAnswerToken(String(option)) === normalizedAnswer,
     );
     if (idx >= 0) indices.push(idx);
   });
@@ -284,36 +339,126 @@ function getCorrectIndices(question, correctAnswer) {
 }
 
 function formatCorrectAnswer(question, correctAnswer) {
-  if (!question || question.questionType !== 'MULTI_CHOICE') {
+  if (!question || question.questionType !== "MULTI_CHOICE") {
     return correctAnswer;
   }
 
   const answers = parseAnswerList(correctAnswer);
-  return answers.join(', ');
+  return answers.join(", ");
 }
 
 function parseAnswerList(answer) {
-  const trimmed = String(answer || '').trim();
+  const trimmed = String(answer || "").trim();
   if (!trimmed) return [];
 
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).filter((item) => item.length > 0);
+        return parsed
+          .map((item) => String(item).trim())
+          .filter((item) => item.length > 0);
       }
     } catch {
       // Fall back to pipe parsing.
     }
   }
 
-  if (trimmed.includes('|')) {
-    return trimmed.split('|').map((item) => item.trim()).filter((item) => item.length > 0);
+  if (trimmed.includes("|")) {
+    return trimmed
+      .split("|")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
   }
 
   return [trimmed];
 }
 
 function normalizeAnswerToken(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeIndices(indices, maxLength) {
+  if (maxLength <= 0) return [];
+  let source = indices;
+  if (typeof source === "string") {
+    const trimmed = source.trim();
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          source = parsed;
+        }
+      } catch {
+        source = trimmed;
+      }
+    }
+    if (typeof source === "string") {
+      if (trimmed.includes(",")) {
+        source = trimmed.split(",");
+      } else if (trimmed.includes("|")) {
+        source = trimmed.split("|");
+      } else {
+        source = [trimmed];
+      }
+    }
+  }
+  if (!Array.isArray(source)) return [];
+  const normalized = source
+    .map((value) => Number(value))
+    .filter(
+      (value) => Number.isInteger(value) && value >= 0 && value < maxLength,
+    );
+  return Array.from(new Set(normalized));
+}
+
+function pickCorrectIndices(questionType, localIndices, serverIndices) {
+  if (questionType === "MULTI_CHOICE") {
+    return serverIndices.length > 0 ? serverIndices : localIndices;
+  }
+
+  if (serverIndices.length > 0) {
+    if (serverIndices.length > 1) {
+      return [Math.min(...serverIndices)];
+    }
+    return serverIndices;
+  }
+
+  if (localIndices.length > 1) {
+    return [Math.min(...localIndices)];
+  }
+
+  return localIndices;
+}
+
+/**
+ * 为 WXML 构建选项状态数组，避免在模板中使用 indexOf
+ * @param {Array} options - 选项列表
+ * @param {Array} correctIndices - 正确答案索引
+ * @param {Array} selectedAnswers - 用户选中的索引
+ * @returns {Array} 包含 isCorrect/isWrong/isSelected 的状态数组
+ */
+function buildOptionStates(options, correctIndices, selectedAnswers) {
+  const correctSet = new Set(correctIndices);
+  const selectedSet = new Set(selectedAnswers);
+
+  return options.map((_, idx) => {
+    const isCorrect = correctSet.has(idx);
+    const isSelected = selectedSet.has(idx);
+    const isWrong = isSelected && !isCorrect;
+    return { isCorrect, isWrong, isSelected };
+  });
+}
+
+function logQuizDebug(payload) {
+  try {
+    const env = wx.getAccountInfoSync().miniProgram.envVersion;
+    if (env !== "release") {
+      console.log("[QUIZ_UI_DEBUG]", payload);
+    }
+  } catch {
+    // Ignore logging errors in older environments.
+  }
 }
