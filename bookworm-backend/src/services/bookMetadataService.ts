@@ -5,6 +5,9 @@ import config from "../config";
 import { ServiceError } from "../errors";
 import { API_CONSTANTS, DEFAULT_VALUES } from "../constants";
 import { log } from "../lib/logger";
+import { retryAsync } from "../utils/retry";
+
+const METADATA_REQUEST_TIMEOUT_MS = 5000;
 
 interface TanshuBookData {
   title: string;
@@ -53,9 +56,17 @@ export async function getBookMetadata(
   const url = `${API_CONSTANTS.TANSHU_BASE_URL}?key=${config.TANSHU_API_KEY}&isbn=${isbn}`;
 
   try {
-    const response = await axios.get<TanshuApiResponse>(url, {
-      validateStatus: () => true, // 接受所有状态码，自己处理
-    });
+    const response = await retryAsync(() =>
+      axios.get<TanshuApiResponse>(url, {
+        timeout: METADATA_REQUEST_TIMEOUT_MS,
+        validateStatus: () => true, // 接受所有状态码，自己处理
+      }).then((res) => {
+        if (res.status >= 500 || res.status === 429) {
+          throw new Error(`Tanshu API retryable status: ${res.status}`);
+        }
+        return res;
+      })
+    );
 
     if (response.status !== 200 || response.data.code !== 1) {
       log.error(
