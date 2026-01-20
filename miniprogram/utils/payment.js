@@ -1,6 +1,7 @@
 const { request } = require('./api');
 const ui = require('./ui');
 const { extractErrorMessage } = require('./error');
+const { APP_CONFIG } = require('../config');
 
 function requestPayment(params) {
   return new Promise((resolve, reject) => {
@@ -13,6 +14,14 @@ function requestPayment(params) {
 }
 
 async function createOrderAndPay(inventoryItemIds) {
+  if (APP_CONFIG.REVIEW_ONLY_MODE) {
+    console.warn('[Payment] Blocked: Review-only mode is enabled');
+    return Promise.reject({
+      errMsg: 'requestPayment:fail review mode',
+      reviewModeBlocked: true
+    });
+  }
+
   let order = null;
   try {
     wx.showLoading({ title: '正在创建订单...' });

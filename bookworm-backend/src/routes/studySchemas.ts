@@ -212,6 +212,7 @@ export const SubmitAnswerResponseSchema = Type.Object({
   questionId: Type.Integer(),
   isCorrect: Type.Boolean(),
   correctAnswer: Type.String(),
+  correctOptionIndices: Type.Optional(Type.Array(Type.Integer())),
   explanation: Type.Union([Type.String(), Type.Null()]),
   wrongCount: Type.Integer(),
 });

@@ -9,6 +9,8 @@ import { verifyDatabaseConstraints } from "./utils/dbVerifier";
 import prisma from "./db";
 import { ERROR_CODES, ERROR_MESSAGES } from "./constants";
 import * as fs from "fs";
+import path from "path";
+import { sanitizeObject } from "./lib/logSanitizer";
 import {
   isFastifyHttpError,
   isFastifyValidationError,
@@ -101,6 +103,50 @@ const fastify = Fastify({
     },
   },
 });
+
+const errorLogPath = path.resolve(process.cwd(), "logs", "server-errors.log");
+
+const sanitizePayload = (value: unknown) => {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      return sanitizeObject(item as Record<string, unknown>);
+    });
+  }
+  return sanitizeObject(value as Record<string, unknown>);
+};
+
+const writeErrorLog = async (error: unknown, request: FastifyRequest) => {
+  try {
+    await fs.promises.mkdir(path.dirname(errorLogPath), { recursive: true });
+    const payload = {
+      timestamp: new Date().toISOString(),
+      method: request.method,
+      url: request.url,
+      requestId: request.id,
+      userId: request.user?.userId ?? null,
+      params: sanitizePayload(request.params),
+      query: sanitizePayload(request.query),
+      body: sanitizePayload(request.body),
+      statusCode: isFastifyHttpError(error) ? error.statusCode : undefined,
+      code:
+        error instanceof ApiError
+          ? error.code
+          : (error as { code?: string | undefined })?.code,
+      message: getErrorMessage(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    };
+    await fs.promises.appendFile(
+      errorLogPath,
+      `${JSON.stringify(payload)}\n`,
+      "utf8",
+    );
+  } catch (logError) {
+    request.log.warn({ err: logError }, "Failed to write error log file");
+  }
+};
 
 // --- WeChat Pay Setup ---
 let wechatPayAdapter: WechatPayAdapter | null = null;
@@ -218,6 +264,7 @@ fastify.setErrorHandler(
     }
 
     // Layer 7: Catch-all for unknown errors (500)
+    await writeErrorLog(error, request);
     request.log.fatal({ err: error }, "Unhandled error in application");
     reply.code(500).send({
       code: ERROR_CODES.INTERNAL_ERROR,

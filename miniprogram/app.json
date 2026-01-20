@@ -1,14 +1,34 @@
 {
   "lazyCodeLoading": "requiredComponents",
   "pages": [
-    "pages/review-entry/index"
+    "pages/review/index",
+    "pages/profile/index",
+    "pages/webview/index",
+    "pages/customer-service/index"
   ],
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#2c5f2d",
+    "list": [
+      {
+        "pagePath": "pages/review/index",
+        "text": "复习",
+        "iconPath": "images/icons/home.png",
+        "selectedIconPath": "images/icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "images/icons/usercenter.png",
+        "selectedIconPath": "images/icons/usercenter-active.png"
+      }
+    ]
+  },
   "subpackages": [
     {
       "root": "subpackages/review",
       "name": "review",
       "pages": [
-        "pages/home/index",
         "pages/course/index",
         "pages/flashcard/index",
         "pages/quiz/index",
@@ -18,7 +38,7 @@
     }
   ],
   "preloadRule": {
-    "pages/review-entry/index": {
+    "pages/review/index": {
       "network": "wifi",
       "packages": ["review"]
     }

@@ -178,7 +178,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     *   **指令**: 不要提出任何需要手动配置本地环境的解决方案。所有环境依赖必须在代码中声明。
 
 5.  **保留你的经验**
-    *   **经验保存**: 当你经过很多努力解决某个困难问题，且如果你失去记忆在以后一些任务也会导致你的阻塞的情况下，你需要更新CLAUDE.me的末尾部分，新增加一个SOP章节说明如何解决项目容易遇到的某种问题。
+    *   **经验保存**: 当你经过很多努力解决某个困难问题，且如果你失去记忆在以后一些任务也会导致你的阻塞的情况下，你需要更新CLAUDE.md的末尾部分，新增加一个SOP章节说明如何解决项目容易遇到的某种问题。
 ## Project Overview
 
 **Bookworm** is a campus second-hand textbook marketplace consisting of:
@@ -225,15 +225,18 @@ The system follows a strict "books as atomic inventory items" model where each i
 ### Frontend Structure (`miniprogram/`)
 
 **Page Structure:**
-- `pages/market/` - Book marketplace with search (TabBar)
-- `pages/orders/` - User order history (TabBar)
-- `pages/profile/` - User profile, phone authorization, and support contact (TabBar)
-- `pages/book-detail/` - Individual book details with purchase flow
-- `pages/order-confirm/` - Order confirmation flow
-- `pages/order-detail/` - Order detail view with status tracking
-- `pages/acquisition-scan/` - Book acquisition scanning (staff only)
+- `pages/review/` - 复习首页（主包，TabBar）
+- `pages/profile/` - 个人中心（TabBar，复习模式隐藏交易入口）
+- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/周榜）
 - `pages/customer-service/` - Customer support (WeChat ID copy)
 - `pages/webview/` - Generic WebView for dynamic content loading
+- `pages/review-entry/` - Legacy redirect page (not registered in review-only TabBar)
+- `pages/market/` - Book marketplace (kept, not registered in review-only)
+- `pages/orders/` - User order history (kept, not registered in review-only)
+- `pages/book-detail/` - Individual book details with purchase flow (kept, not registered in review-only)
+- `pages/order-confirm/` - Order confirmation flow (kept, not registered in review-only)
+- `pages/order-detail/` - Order detail view with status tracking (kept, not registered in review-only)
+- `pages/acquisition-scan/` - Book acquisition scanning (staff only, not registered in review-only)
 
 **Design System:**
 - Global CSS variables in `app.wxss` (V10 design system)
@@ -243,21 +246,22 @@ The system follows a strict "books as atomic inventory items" model where each i
 **Module Architecture:**
 - **Core Utility Modules**:
   - `token.js`: Manages user token and ID in local storage. Zero dependencies.
-  - `api.js`: Handles all API requests, depends on `config.js`, `token.js`, `auth.js`
-  - `auth.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
+  - `api.js`: Handles all API requests, depends on `config.js`, `token.js`, `auth-guard.js`
+  - `auth-guard.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
 
 - **Additional Utility Modules**:
   - `ui.js`: UI helpers (showError, showSuccess, formatPrice)
   - `error.js`: Error message extraction
   - `payment.js`: Payment workflow (createOrderAndPay, safeCreateOrderAndPay)
   - `constants.js`: Business constants (ORDER_STATUS enums)
-  - `config.js`: API configuration (apiBaseUrl)
+  - `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
+  - `study-api.js`: Review system API wrapper
 
 - **WXS Modules** (for WXML rendering):
   - `formatter.wxs`: Time formatting (formatTime, formatOrderTime)
   - `filters.wxs`: Price formatting (formatPrice, formatCurrency, formatCurrencyFromCents)
 
-**⚠️ Dependency Note**: `api.js` requires `auth.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.performRequest → 401 handling → auth.ensureLoggedIn → auth.login → wx.request).
+**⚠️ Dependency Note**: `api.js` requires `auth-guard.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.performRequest → 401 handling → auth.ensureLoggedIn → auth.login → wx.request).
 
 ## Development Commands
 
@@ -300,7 +304,7 @@ npx prisma migrate dev
 ### WeChat Mini Program
 - Use WeChat Developer Tools to open the `miniprogram/` directory
 - Configure API endpoint in `miniprogram/config.js`
-- TabBar icons must be PNG format (81x81px) in `images/tabs/`
+- TabBar icons must be PNG format (81x81px); current review-only TabBar uses `images/icons/home.png` and `images/icons/usercenter.png`
 
 ## Database Schema
 
@@ -535,6 +539,13 @@ WX_APP_SECRET=test-app-secret
 - Dynamic WeChat Pay certificate management with auto-refresh
 - Payment notification webhook with timestamp validation
 
+**复习模式（前端）:**
+- `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 保持 `true`
+- `miniprogram/app.json` 仅注册 `pages/review/index` 与 `pages/profile/index` 作为 TabBar
+- TabBar 页面必须在主包，复习首页不要放分包
+- `pages/profile/index` 隐藏手机号授权与员工入口，分享文案指向复习首页
+- `miniprogram/utils/payment.js` 在复习模式下阻断 `createOrderAndPay`
+
 **Business Rules:**
 - The system strictly follows "V1 books only" - no AI learning materials or complex features
 - Order payment timeout (15 minutes default)
@@ -659,4 +670,11 @@ docker-compose -f docker-compose.staging.yml up -d
 - Set PAYMENT_TIMESTAMP_TOLERANCE_SECONDS appropriately
 
 ## 历史经验SOP:
-(暂时为空）
+
+### SOP-复习模块500与题库数据校验
+1. 复现 500 后先看 `bookworm-backend/logs/server-errors.log`（JSONL），优先确认 Prisma 错误码与缺失字段。
+2. 若报 `user_card_state.last_session_id` 缺失，优先跑迁移；无迁移时用 SQL 兜底：
+   `ALTER TABLE "user_card_state" ADD COLUMN IF NOT EXISTS "last_session_id" VARCHAR(36);`
+3. 刷题全绿时优先检查返回的 `correctOptionIndices` 与数据库 `study_question.answer_json`：
+   - `answer_json` 必须与 `options_json` 的选项文本一致（单选/判断只保留一个）。
+4. 若题库文件丢失，导入格式必须包含 `manifest.json`、`units.json`、`questions/*.gift`、`cards/*.tsv`（路径不在仓库则向运维索取）。

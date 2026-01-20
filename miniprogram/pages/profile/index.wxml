@@ -12,7 +12,7 @@
 
     <!-- Phone Number Authorization Button -->
     <button
-      wx:if="{{!hasPhoneNumber}}"
+      wx:if="{{!isReviewMode && !hasPhoneNumber}}"
       class="auth-phone-button"
       open-type="getPhoneNumber"
       bindgetphonenumber="onGetPhoneNumber"
@@ -36,7 +36,7 @@
   </view>
 
   <!-- Staff Operations Section - Only visible for STAFF role -->
-  <view wx:if="{{userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
+  <view wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
     <view class="section-title">
       <text class="title-text">员工操作</text>
       <view class="staff-badge">STAFF</view>

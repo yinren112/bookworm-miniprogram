@@ -30,4 +30,11 @@ const config = {
   apiBaseUrl: getApiBaseUrl()
 };
 
-module.exports = config;
+const APP_CONFIG = {
+  REVIEW_ONLY_MODE: true
+};
+
+module.exports = {
+  ...config,
+  APP_CONFIG
+};

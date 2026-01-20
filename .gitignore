@@ -1,18 +1,13 @@
 # Node.js dependencies
-/bookworm-backend/node_modules
+node_modules/
 /bookworm-backend/dist
-/bookworm-backend/.env
-/bookworm-backend/prisma/dev.db
-/bookworm-backend/prisma/dev.db-journal
-
-# VSCode specific
-.vscode/
-
-# macOS specific
-.DS_Store
 
 # Logs
 *.log
+logs/
+bookworm-backend/logs/
+reports/
+bookworm-backend/reports/
 
 # Runtime data
 pids
@@ -20,108 +15,66 @@ pids
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage
 coverage/
-
-# nyc test coverage
 .nyc_output
 
-# Dependency directories
-node_modules/
-
-# Optional npm cache directory
+# npm/yarn
 .npm
-
-# Optional REPL history
 .node_repl_history
-
-# Output of 'npm pack'
 *.tgz
-
-# Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# Environment variables
 .env
-.env.test
-.env.production
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.load-test
+.env.*
+!.env.example
 
-# WeChat Developer Tools
+# WeChat Developer Tools (local config)
 project.config.json
 project.private.config.json
-
-# Local-only artifacts
 miniprogram/package-lock.json
-26-1-6/
-reports/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
 
 # Backup files
 *.backup
 
-# Audit reports and temporary scripts
-bookworm_code_review.txt
-BOOKWORM_AUDIT_REPORT.txt
-fix_transactions.py
-update_user_metrics.js
-test_metrics.sh
-审查.py
-审查 (v2 - 带脱敏功能).py
+# Excel files
+*.xls
+*.xlsx
 
-# Load testing and temporary files
+# Test output
+*.txt
+!README.txt
+bookworm-backend/test-output.txt
+bookworm-backend/test_output.txt
+bookworm-backend/test-results.txt
+bookworm-backend/eslint-full.txt
+
+# Temporary/one-time files
+审查*.py
+fixes/
+artifacts/
+26-1-6/
+nul
+bin/
 k6-v0.49.0-windows-amd64/
 k6-v0.49.0-windows-amd64.zip
-load-test*.js.backup
-nul
-"C:/"
-ISBN.csv
-bin/
+review-module-blockers.md
 
-# Scripts directory
-scripts/
-
-# Claude Code settings (local only)
+# Tool-specific directories
+.trae/
 .claude/settings.local.json
 .claude/commands/allowlist/
 
-# Test data and migrations (keep migrations tracked)
-# bookworm-backend/附件*.xls
-# bookworm-backend/附件*.xlsx
-*.xls
-*.xlsx
-# 大文件与临时文件(2025-10-22添加)
-bin/
-k6-v0.49.0-windows-amd64/
-k6-v0.49.0-windows-amd64.zip
-server-out.log
-server-err.log
-backend-dev.log
-k6-*.log
-nul
-C:/
-bookworm-backend/server-out.log
-bookworm-backend/server-err.log
-bookworm-backend/embedded-postgres.log
-bookworm-backend/test-output.txt
-bookworm-backend/test_output.txt
-
-# 大文件与临时文件(2025-10-22添加)
-bin/
-k6-v0.49.0-windows-amd64/
-k6-v0.49.0-windows-amd64.zip
-server-out.log
-server-err.log
-backend-dev.log
-k6-*.log
-nul
-C:/
-bookworm-backend/server-out.log
-bookworm-backend/server-err.log
-bookworm-backend/embedded-postgres.log
-bookworm-backend/test-output.txt
-bookworm-backend/test_output.txt
-.trae/
+# Prisma dev database
+/bookworm-backend/prisma/dev.db
+/bookworm-backend/prisma/dev.db-journal

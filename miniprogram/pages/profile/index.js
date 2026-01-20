@@ -4,6 +4,7 @@ const authGuard = require('../../utils/auth-guard');
 const ui = require('../../utils/ui');
 const logger = require('../../utils/logger');
 const privacy = require('../../utils/privacy');
+const { APP_CONFIG } = require('../../config');
 
 Page({
   data: {
@@ -16,7 +17,8 @@ Page({
       time: '工作日 9:00 - 18:00'
     },
     hasPhoneNumber: false, // 是否已授权手机号
-    isLinking: false       // 防止重复点击
+    isLinking: false,      // 防止重复点击
+    isReviewMode: APP_CONFIG.REVIEW_ONLY_MODE
   },
 
   onShow() {
@@ -93,8 +95,8 @@ Page({
     }
   },
   goToReview() {
-    wx.navigateTo({
-      url: '/subpackages/review/pages/home/index'
+    wx.switchTab({
+      url: '/pages/review/index'
     });
   },
 
@@ -125,8 +127,8 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '超值的二手教材，快来看看吧！',
-      path: '/pages/market/index',
+      title: '复习助手，随时开始学习',
+      path: '/pages/review/index',
     }
   }
 });

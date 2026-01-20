@@ -1,7 +1,7 @@
 ﻿# Repository Guidelines
 
 ## 项目结构与模块组织
-- `miniprogram/`：微信小程序前端；`pages/`承载市场、订单、个人中心等页面，`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
+- `miniprogram/`：微信小程序前端；`pages/`当前承载复习主页(`pages/review`)与个人中心(`pages/profile`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载刷题/背卡等复习子页面；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
 - `bookworm-backend/`：Fastify + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
 - 根目录脚本`test_metrics.sh`与`update_user_metrics.js`用于观测性验证，改动前须先与运维同步。
 
@@ -17,7 +17,7 @@
 - TypeScript 必须显式导出类型；配置常量统一放入`miniprogram/utils/constants.js`或`bookworm-backend/src/constants.ts`。
 
 ## 测试准则
-- 新增单元测试需在`src/tests`中镜像源码层级（如`services/orderService.test.ts`）；集成测试文件以`.integration.test.ts`结尾并复用`database-integration-setup.ts`。
+- 新增单元测试需在`src/tests`中镜像源码层级（如`services/orderService.test.ts`）；集成测试文件以`.integration.test.ts`结尾并复用`integrationSetup.ts`。
 - 服务层覆盖率目标不低于约定阈值，若暂无法覆盖需在 PR 中记录原因。
 - 小程序改动必须附带人工验证说明（设备、账号）及 UI 截图影响。
 
@@ -30,6 +30,14 @@
 - 通过复制`.env.example`生成`.env`；实际密钥不入库。Vitest 使用`.env.test`。
 - 小程序敏感凭据保存在`project.private.config.json`，输出日志与截图需脱敏。
 - `docker-compose.yml`与`docker-compose.monitoring.yml`默认使用 3000、5432、8080 端口，如需调整请使用 override 文件。
+
+## 当前复习模式（上线优先）
+- TabBar 仅包含“复习/我的”，对应 `pages/review/index` 与 `pages/profile/index`。
+- TabBar 页面必须在主包，复习首页不可放在分包。
+- 复习首页在主包，复习子页面仍在 `subpackages/review/`。
+- `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 需保持 `true`。
+- `miniprogram/utils/payment.js` 在复习模式下阻断 `createOrderAndPay`。
+- `pages/profile/index` 隐藏手机号授权与员工操作入口，分享指向复习首页。
 
 ## 沟通方式与角色定义
 - 所有协作者必须以中文思考、讨论与记录；命令及代码标识保持原文。
@@ -189,79 +197,440 @@
 
 ### 额外要求
 
-- 贡献与评审需以“Linus Torvalds”视角执行：优先梳理数据结构，消除特殊分支，避免多层缩进，任何改动不得破坏既有功能。
+- 贡献与评审需以"Linus Torvalds"视角执行：优先梳理数据结构，消除特殊分支，避免多层缩进，任何改动不得破坏既有功能。
 - 交付报告固定以`[X] passed, [Y] failed, [Z] total`开头，随后列出事实性变更，若遇阻塞需明确说明缺失信息。
+
+## 本项目核心法则 (Bookworm Core Principles)
+
+除了通用哲学之外，在这个项目中，我们已经用血泪建立了一些不可动摇的原则。你在提供任何代码或建议时，都必须严格遵守它们：
+
+1. **数据库即法律 (The Database is Law)**
+   - **事实**: 系统的核心业务规则通过多种数据库原生约束来强制执行，包括：
+     1. **部分唯一索引**: 保证一个用户只能有一个待支付订单 (`uniq_order_pending_per_user`)。
+     2. **CHECK 约束**: 保证库存状态 (`status`) 与其预留订单ID (`reserved_by_order_id`) 的逻辑一致性。
+     3. **咨询锁**: 在 `createOrder` 事务中通过 `pg_advisory_xact_lock` 串行化同一用户的下单操作，防止聚合计算的竞态条件。
+   - **指令**: 永远不要在应用层编写脆弱的"先检查后写入"的并发控制逻辑。信任数据库。你的代码应该优雅地处理数据库因违反约束而抛出的错误（如 Prisma 的 `P2002`），而不是试图阻止它们发生。
+
+2. **信任墙外的一切都是愚蠢的 (Zero Trust)**
+   - **事实**: 支付回调逻辑 (`processPaymentNotification`) 严格遵循"主动查单"模式。它会忽略通知内容，主动向微信的权威API查询真实支付状态，并内置了时间戳和签名验证以防止重放攻击。
+   - **指令**: 任何处理外部输入的代码，都必须遵循"验证，而不是信任"的原则。对于外部 API 的调用，必须包含带指数退避的重试逻辑。
+
+3. **测试是唯一的真相 (Tests as the Single Source of Truth)**
+   - **事实**: 项目拥有健壮的集成测试套件 (`npm run test:integration`)，该套件通过 `globalSetup.ts` 和 `vitest.integration.config.ts` 配置，以单进程串行方式运行真实 PostgreSQL 数据库测试，确保了测试的可靠性和无污染。
+   - **指令**: 任何代码变更都必须有对应的测试来验证。所有测试必须 100% 通过才能被认为是"完成"。
+
+4. **基础设施即代码 (Infrastructure as Code)**
+   - **事实**: 本地开发和测试环境由 `docker-compose.yml` 和 Testcontainers 严格定义，实现了开发环境的一致性和可重复性。数据库连接池通过 `globalThis` 单例和优雅关闭钩子进行管理，杜绝了资源泄漏。
+   - **指令**: 不要提出任何需要手动配置本地环境的解决方案。所有环境依赖必须在代码中声明。
+
+5. **保留你的经验**
+   - **经验保存**: 当你经过很多努力解决某个困难问题，且如果你失去记忆在以后一些任务也会导致你的阻塞的情况下，你需要更新CLAUDE.md的末尾部分，新增加一个SOP章节说明如何解决项目容易遇到的某种问题。
 
 ## 项目概览
 
-**Bookworm** 是一个校园二手教材平台，由微信小程序前端与 Fastify + Prisma 后端构成。系统以“书目 → SKU → 实体库存”三级模型管理每一本实体书，所有流程围绕库存状态流转设计。
+**Bookworm** 是一个校园二手教材平台，由微信小程序前端与 Fastify + Prisma 后端构成：
+- **Frontend**: WeChat Mini Program (`miniprogram/`)
+- **Backend**: Fastify + TypeScript API server (`bookworm-backend/`)
+- **Database**: PostgreSQL with Prisma ORM
+- **Repository**: https://github.com/yinren112/bookworm-miniprogram (Private)
 
-## Bookworm 核心原则
-
-1. **数据库即法律**：通过部分唯一索引、CHECK 约束与 `pg_advisory_xact_lock` 保证并发一致性。应用层必须优雅处理 Prisma 错误（如 `P2002`），禁止写“先查再写”的竞态代码。
-2. **零信任**：`processPaymentNotification` 主动查单并验证签名时间戳，所有外部输入均需验证与指数退避重试。
-3. **测试即真相**：`npm test` 覆盖单测，`npm run test:integration` 借助 Testcontainers 串行跑完真实数据库集成测试。任何改动都要让全部测试通过。
-4. **基础设施即代码**：开发环境由 `docker-compose` 与 Testcontainers 描述，数据库连接池通过 `globalThis` 单例与优雅关闭钩子管理，禁止依赖手工配置。
+系统以"书目 → SKU → 实体库存"三级模型管理每一本实体书，所有流程围绕库存状态流转设计。
 
 ## 架构速览
 
 ### 后端 (`bookworm-backend/`)
 
-- **核心服务**
-  - `src/services/purchaseOrderService.ts`：购书订单创建、付款意图、履约、状态流转等全部读取写入逻辑。
-  - `src/services/sellOrderService.ts`：按重量收购（SELL 单）的一步流转，创建 `PRE_REGISTERED` 用户、批量 SKU 与 `BULK_ACQUISITION` 库存。
-  - `src/services/orderService.ts`：仅作为聚合出口，重新导出购书与收购服务，保持既有引用路径兼容。
-  - 其余服务（`inventoryService.ts`、`authService.ts`、`acquisitionService.ts`、`refundService.ts` 等）保持 TypeScript 事务注入模式。
-- **外部适配器**
-  - `src/adapters/wechatPayAdapter.ts`：封装 wechatpay-node-v3，按“可重试/不可重试”分类错误。
-- **共享 Schema**
-  - `src/routes/sharedSchemas.ts` 定义 TypeBox 校验（如手机号、分页参数）。
-- **插件与作业**
-  - 认证、指标、限流均以 Fastify 插件注册；`src/jobs/cancelExpiredOrders.ts`、`src/jobs/refundProcessor.ts` 等以 CRON 驱动。
-- **测试配置**
-  - `vitest.config.ts`：单测。`vitest.integration.config.ts`：集成测试。`vitest.database-integration.config.ts` 已删除，禁止引用旧配置名称。
+**核心服务:**
+- `src/services/inventoryService.ts` - Book inventory management
+- `src/services/orderService.ts` - Order processing with inventory reservation (handles both PURCHASE and SELL orders)
+- `src/services/authService.ts` - WeChat OAuth integration and account merging
+- `src/services/bookMetadataService.ts` - Book metadata fetching from external APIs
+- `src/services/bookService.ts` - Book search and management
+- `src/services/contentService.ts` - Static content management
+- `src/services/acquisitionService.ts` - Book acquisition (buying from customers)
+- `src/services/refundService.ts` - Processes payments marked for refund
+
+**外部适配器:**
+- `src/adapters/wechatPayAdapter.ts` - Type-safe wrapper for wechatpay-node-v3 SDK
+  - Isolates all SDK 'any' casts to adapter layer
+  - Error classification: retryable vs non-retryable
+  - Core methods: createPaymentOrder, queryPaymentStatus, verifySignature, createRefund
+
+**共享 Schema:**
+- `src/routes/sharedSchemas.ts` - TypeBox schemas shared across routes (e.g., PhoneNumberSchema)
+
+**关键架构决策:**
+- **Monolithic Design**: Single Fastify server handling all APIs
+- **Inventory-First**: Every book is an `InventoryItem` with atomic state (`in_stock` → `reserved` → `sold`)
+- **Transaction Safety**: All multi-step database writes are wrapped in transactions at the route level, with services accepting the transaction context via dependency injection
+- **Static File Separation**: Admin UI served at `/admin/` to avoid conflicts with WeChat Mini Program
+- **Plugin Architecture**: Auth, Metrics, and Rate Limiting as Fastify plugins
+- **Background Jobs**: Cron-based scheduled tasks for order cleanup and metrics
+- **Monitoring**: Prometheus metrics exposed at `/metrics` endpoint
+- **Robust Connection Pooling**: Database client is a true singleton using `globalThis` and handles graceful shutdown to prevent connection leaks
+
+**插件与作业:**
+- 认证、指标、限流均以 Fastify 插件注册
+- `src/jobs/cancelExpiredOrders.ts` - Order expiration cleanup
+- `src/jobs/refundProcessor.ts` - Scans for and processes required refunds
+
+**测试配置:**
+- `vitest.config.ts` - Unit test configuration
+- `vitest.integration.config.ts` - Integration test configuration
+- `vitest.database-integration.config.ts` - Legacy config (not actively used)
 
 ### 前端 (`miniprogram/`)
 
-- **页面**
-  - `pages/market/`、`pages/orders/`、`pages/profile/` 为 TabBar 主入口。
-  - `pages/order-confirm/`、`pages/order-detail/`、`pages/acquisition-scan/` 等承载核心业务流。
-- **核心工具模块**
-  - `utils/token.js`：本地持久化 token 与 userId。
-  - `utils/api.js`：统一封装请求、重试与 401 处理，通过 `setLoginProvider` 注入登录 Promise，避免循环依赖。
-  - `utils/auth.js`：封装 `wx.login` / `/auth/login` 交换逻辑、手机号绑定与 UI 提示。
-  - 其余 `ui.js`、`payment.js`、`constants.js` 提供 UI 与支付辅助。
-- **WXS 模块**
-  - `formatter.wxs`、`filters.wxs` 等用于 WXML 渲染格式化，命名需和模板引用一致。
+**页面结构:**
+- `pages/review/` - 复习首页（主包，TabBar）
+- `pages/profile/` - 个人中心（TabBar，复习模式隐藏交易入口）
+- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/周榜）
+- `pages/customer-service/` - Customer support (WeChat ID copy)
+- `pages/webview/` - Generic WebView for dynamic content loading
+- `pages/review-entry/` - Legacy redirect page (not registered in review-only TabBar)
+- `pages/market/` - Book marketplace (kept, not registered in review-only)
+- `pages/orders/` - User order history (kept, not registered in review-only)
+- `pages/book-detail/` - Individual book details with purchase flow (kept, not registered in review-only)
+- `pages/order-confirm/` - Order confirmation flow (kept, not registered in review-only)
+- `pages/order-detail/` - Order detail view with status tracking (kept, not registered in review-only)
+- `pages/acquisition-scan/` - Book acquisition scanning (staff only, not registered in review-only)
 
-### 关键业务规则
+**设计系统:**
+- Global CSS variables in `app.wxss` (V10 design system)
+- Shared search component in `templates/search-bar.*`
+- Brand colors: Primary green `#2c5f2d`, secondary `#558056`
 
-- 库存状态流转：`IN_STOCK → RESERVED → SOLD`，另含 `RETURNED`、`DAMAGED`、`BULK_ACQUISITION`。
-- 订单状态：`PENDING_PAYMENT → PENDING_PICKUP → COMPLETED`，取消/退货穿插于流程。
-- 单用户仅允许一个待支付订单，最大预留数量与单笔订单条目由配置约束。
-- 收购单使用保留 ISBN `0000000000000` 创建批量 SKU，并即时完结。
+**核心工具模块:**
+- `utils/token.js`: Manages user token and ID in local storage. Zero dependencies.
+- `utils/api.js`: Handles all API requests, depends on `config.js`, `token.js`, `auth-guard.js`
+- `utils/auth-guard.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
+- `utils/ui.js`: UI helpers (showError, showSuccess, formatPrice)
+- `utils/error.js`: Error message extraction
+- `utils/payment.js`: Payment workflow (createOrderAndPay, safeCreateOrderAndPay)
+- `utils/constants.js`: Business constants (ORDER_STATUS enums)
+- `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
+- `utils/study-api.js`: 复习系统 API 封装
+
+**WXS 模块** (for WXML rendering):
+- `formatter.wxs`: Time formatting (formatTime, formatOrderTime)
+- `filters.wxs`: Price formatting (formatPrice, formatCurrency, formatCurrencyFromCents)
+
+**⚠️ 依赖注意**: `api.js` requires `auth-guard.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.performRequest → 401 handling → auth.ensureLoggedIn → auth.login → wx.request).
+
+## 数据库 Schema
+
+The system uses PostgreSQL with these core entities:
+
+**Book Hierarchy:**
+- `BookMaster` - Book metadata (ISBN, title, author)
+- `BookSKU` - Book editions/variants (with is_acquirable flag)
+- `InventoryItem` - Individual physical books for sale
+
+**Transaction Flow:**
+- `User` - WeChat users via OpenID, with optional phone_number and status (REGISTERED | PRE_REGISTERED)
+- `Order` - Purchase and sell orders with pickup codes (type: PURCHASE | SELL)
+- `OrderItem` - Links orders to specific inventory items
+- `PendingPaymentOrder` - Enforces one pending payment order per user (unique constraint)
+
+**Payment & Acquisition:**
+- `PaymentRecord` - Complete payment flow tracking with refund support (status: PENDING → SUCCESS → REFUNDED)
+- `Acquisition` - Book acquisition records (staff purchases from customers)
+
+**Recommendation System:**
+- `UserProfile` - Student identity (enrollment_year, major, class_name)
+- `RecommendedBookList` - Per-major book recommendations
+- `RecommendedBookItem` - Links BookSKU to recommendation lists
+
+**Static Content:**
+- `Content` - CMS-style static content (slug-based routing)
+
+**关键状态:**
+- `inventory_status`: `in_stock` → `reserved` → `sold` (also: `returned`, `damaged`, `BULK_ACQUISITION`)
+- `order_status`: `pending_payment` → `pending_pickup` → `completed` (also: `cancelled`, `returned`)
+- `order_type`: `PURCHASE` (user buys books) | `SELL` (staff acquires from customers)
+- `payment_status`: `PENDING` → `SUCCESS` → `REFUND_REQUIRED` → `REFUND_PROCESSING` → `REFUNDED` (also: `FAILED`)
+- `user_status`: `REGISTERED` (WeChat login) | `PRE_REGISTERED` (placeholder for phone-based merge)
+
+## 业务规则
+
+1. **Atomic Inventory**: Each `InventoryItem` represents one physical book
+2. **Reservation Model**: Books are `reserved` before payment, preventing overselling
+3. **No Partial Orders**: All items in an order must be available or the entire order fails
+4. **Pickup Flow**: Orders use unique pickup codes for fulfillment
+5. **Account Merging**: System supports two user types:
+   - **REGISTERED**: Normal WeChat users with openid
+   - **PRE_REGISTERED**: Placeholder accounts created during sell-book transactions (no WeChat login yet)
+   - When a PRE_REGISTERED user logs in via WeChat and authorizes phone number, accounts automatically merge
+   - Phone number serves as the bridge between the two identity systems
+   - Merge preserves all historical sell order records and acquisitions
+6. **Sell Order Workflow** (Book Acquisition from Customers):
+   - Staff acquires books from customers via single-step flow (no payment step required)
+   - Creates PRE_REGISTERED user if phone number doesn't exist in system
+   - Generates Order(type='SELL') with: totalWeightKg, unitPrice, settlementType, voucherFaceValue
+   - Creates InventoryItem(status='BULK_ACQUISITION', sourceOrderId=order.id)
+   - Settlement types: CASH (direct payment) or VOUCHER (store credit = baseAmount × 2)
+   - Special ISBN "0000000000000" used for bulk acquisitions without specific ISBN tracking
+   - Order is immediately marked as COMPLETED (no pickup flow for sell orders)
 
 ## 开发与测试命令
 
 ```bash
 cd bookworm-backend
-npm run dev                      # 热重载开发
-npm run build && npm run start   # 生产流程
-npm test                         # Vitest 单测 + 覆盖率
-npm run test:integration         # Testcontainers 集成测试
-npm run lint                     # ESLint 检查
-npm run migrate:dev              # 开发迁移
-dotenv -e .env.test -- npx prisma migrate reset --force  # 重置测试库
+
+# Development with auto-reload
+npm run dev
+
+# Build TypeScript
+npm run build
+
+# Production start
+npm run start
+
+# Testing
+npm test                    # Unit tests with coverage
+npm run test:integration    # Integration tests
+
+# Code Quality
+npm run lint                # Run ESLint checks
+npm run lint:fix            # Auto-fix ESLint issues
+
+# Database operations
+npm run migrate:dev         # Run development migrations
+npm run db:migrate:test     # Setup test database
+npm run db:migrate:test:reset # Reset test database
+npm run seed               # Seed database with test data
+
+# Jobs
+npm run job:cancel-orders  # Manually run order cleanup job
+
+# Database setup (requires Prisma CLI)
+npx prisma generate
+npx prisma db push
+npx prisma migrate dev
+
+# Reset test database
+dotenv -e .env.test -- npx prisma migrate reset --force
 ```
 
 小程序需在微信开发者工具导入 `miniprogram/`，并在 `miniprogram/config.js` 设置后端 `apiBaseUrl`。
 
-## 环境配置要点
+## 环境配置
 
-- 复制 `.env.example` 为 `.env`，按需覆盖数据库、JWT、微信参数。
-- 数据库连接串需附带 `connection_limit` 与 `pool_timeout`，测试环境独立使用 `.env.test`。
-- 微信手机号授权需企业资质并消耗配额；处理失败时要给出明确 UI 反馈。
-- 监控入口：`/metrics`（Prometheus），`/api/health`（健康检查）。
+Backend requires `.env` file in `bookworm-backend/`:
+```bash
+# Server Configuration
+PORT=8080
+HOST=0.0.0.0
+NODE_ENV=development
+LOG_LEVEL=info
+
+# Database
+DATABASE_URL=postgresql://postgres:password@localhost:65432/bookworm?connection_limit=50&pool_timeout=10
+
+# JWT Configuration
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRES_IN=7d
+
+# WeChat Mini Program
+WX_APP_ID=wx...
+WX_APP_SECRET=...
+
+# WeChat Pay (optional for development)
+WXPAY_MCHID=
+WXPAY_PRIVATE_KEY_PATH=
+WXPAY_CERT_SERIAL_NO=
+WXPAY_API_V3_KEY=
+WXPAY_NOTIFY_URL=
+
+# External APIs
+TANSHU_API_KEY=
+
+# Business Logic Configuration (optional, has defaults)
+ORDER_PAYMENT_TTL_MINUTES=15
+ORDER_PICKUP_CODE_LENGTH=10
+ORDER_PICKUP_CODE_BYTES=5
+MAX_ITEMS_PER_ORDER=10
+MAX_RESERVED_ITEMS_PER_USER=20
+
+# Database Transaction Retry Configuration
+DB_TRANSACTION_RETRY_COUNT=3
+DB_TRANSACTION_RETRY_BASE_DELAY_MS=20
+DB_TRANSACTION_RETRY_JITTER_MS=40
+PICKUP_CODE_RETRY_COUNT=5
+
+# Payment Security Configuration
+PAYMENT_TIMESTAMP_TOLERANCE_SECONDS=300
+
+# API Rate Limiting Configuration
+API_RATE_LIMIT_MAX=5
+API_RATE_LIMIT_WINDOW_MINUTES=1
+API_LOGIN_RATE_LIMIT_MAX=10
+API_FULFILL_RATE_LIMIT_MAX=30
+
+# Scheduled Jobs (cron expressions)
+CRON_ORDER_CLEANUP=*/1 * * * *
+CRON_INVENTORY_METRICS=*/5 * * * *
+CRON_WECHAT_CERT_REFRESH=0 */10 * * *
+CRON_REFUND_PROCESSOR=*/10 * * * *
+```
+
+**Database Connection Pooling:**
+- `connection_limit`: Sets the maximum number of database connections in the pool (Default: 50 for dev, 5 for test)
+- `pool_timeout`: Sets the time in seconds that a request will wait for a connection (Default: 10s for dev, 15s for test)
+
+**Test Environment:**
+Create `.env.test` for testing:
+```bash
+TEST_DATABASE_URL=postgresql://postgres:password@localhost:5433/bookworm_test?connection_limit=5&pool_timeout=15
+NODE_ENV=test
+JWT_SECRET=test-secret
+WX_APP_ID=test-app-id
+WX_APP_SECRET=test-app-secret
+```
+
+## API Endpoints
+
+**Core APIs** (all prefixed with `/api`):
+- `GET /health` - Health check endpoint
+- `POST /auth/login` - WeChat Mini Program authentication (accepts optional `phoneCode` for account merging)
+- `GET /users/me` - Get current user info (returns id, role, phone_number, createdAt)
+- `GET /books/meta?isbn=` - Book metadata lookup
+- `GET /books/recommendations` - Get personalized book recommendations (requires authentication)
+- `GET /inventory/available` - List available books with search & pagination
+- `GET /inventory/item/:id` - Book details
+- `POST /inventory/add` - Add book to inventory (staff only)
+- `GET /content/:slug` - Static content retrieval
+- `POST /orders/create` - Create new order (reserves inventory)
+- `GET /orders/:id` - Get specific order details
+- `GET /orders/my` - User order history with cursor-based pagination (secure: uses JWT userId)
+- `POST /orders/fulfill` - Fulfill order with pickup code (staff only)
+- `GET /orders/pending-pickup` - List pending pickup orders (staff only)
+- `PATCH /orders/:id/status` - Update order status to COMPLETED or CANCELLED (staff only)
+- `POST /orders/:orderId/pay` - Generate WeChat payment parameters
+- `POST /payment/notify` - WeChat Pay callback webhook (signature-verified, no JWT required)
+- `GET /acquisitions/check?isbn=` - Check if ISBN is eligible for acquisition
+- `POST /acquisitions` - Create acquisition record (staff only)
+- `POST /sell-orders` - Create sell order (staff only, for acquiring books from customers)
+
+**System APIs:**
+- `GET /metrics` - Prometheus metrics for monitoring
+
+## 测试策略
+
+**Unit Tests:** Use Vitest with mocks for service layer testing
+```bash
+npm test                    # Run all unit tests with coverage
+```
+- Uses Vitest's `vi.mock()` to mock Prisma client (no real database)
+- Fast execution, focused on business logic
+- Coverage reporting enabled
+
+**Integration Tests:** Test API endpoints with real PostgreSQL
+```bash
+npm run test:integration    # Run integration tests
+```
+- Configured via `globalSetup.ts` and `vitest.integration.config.ts`
+- Single-worker execution (threads: false, singleFork: true)
+- Database cleanup handled automatically via `integrationSetup.ts` hooks
+
+**Test Infrastructure:**
+- `globalSetup.ts`: Provides helper functions (createTestUser, createTestInventoryItems)
+- `integrationSetup.ts`: Provides beforeEach/afterEach hooks for automatic database cleanup
+- `setup.ts`: Provides Prisma mocks for unit tests
+- Test helpers in `test-helpers/testServices.ts`: Business logic test utilities
+
+**Important Notes:**
+- docker-compose.yml defines `postgres_test` service (port 54320) but is NOT used by integration tests
+- Integration tests create their own containers via Testcontainers, independent of docker-compose
+- vitest.database-integration.config.ts is legacy and not actively used (no corresponding npm script)
+
+## 监控与可观测性
+
+**Health Checks:**
+- `GET /api/health` - Database connectivity and system status
+
+**Metrics (Prometheus):**
+- `GET /metrics` - Business and system metrics
+- Order creation/completion/cancellation counters
+- Payment processing metrics
+- Inventory status gauges
+- Database retry counters
+
+**Logging:**
+- Structured JSON logging via Fastify
+- Request/response logging with redacted auth headers
+- Error tracking with stack traces
+
+## 后台任务与定时作业
+
+**Order Cleanup:** Automatically cancel expired orders
+- Runs every minute in development (configurable via CRON_ORDER_CLEANUP)
+- Releases reserved inventory back to available pool
+- Updates metrics counters
+- Uses atomic CTE queries for consistency
+
+**Inventory Metrics:** Update Prometheus gauges
+- Runs every 5 minutes (configurable via CRON_INVENTORY_METRICS)
+- Tracks inventory by status (in_stock, reserved, sold, BULK_ACQUISITION, etc.)
+
+**WeChat Pay Certificates:** Auto-refresh platform certificates
+- Runs every 10 hours (configurable via CRON_WECHAT_CERT_REFRESH)
+- Critical for payment verification
+- Graceful fallback and error handling
+
+**Refund Processor:** Process pending refunds
+- Runs every 10 minutes (configurable via CRON_REFUND_PROCESSOR)
+- Scans for PaymentRecord with status=REFUND_REQUIRED
+- Initiates refund via WeChat Pay API
+- Updates status to REFUND_PROCESSING → REFUNDED
+- Includes retry logic with exponential backoff
+
+## 部署
+
+**Docker Support:**
+```bash
+# Build production image (uses Dockerfile.prod in staging/production)
+docker build -f Dockerfile.prod -t bookworm-backend .
+
+# Run container (default port: 8080)
+docker run -p 8080:8080 --env-file .env bookworm-backend
+```
+
+**Multi-stage Build (Dockerfile.prod):**
+- Stage 1 (base): Node.js 20 alpine with npm mirror configuration
+- Stage 2 (dependencies): Install production dependencies
+- Stage 3 (builder): Build TypeScript and generate Prisma client
+- Stage 4 (production): Lightweight runtime with only production dependencies
+- Includes `entrypoint.sh` for database migration on startup
+
+**Staging Environment:**
+```bash
+# Deploy staging environment with load balancer
+docker-compose -f docker-compose.staging.yml up -d
+
+# Components:
+# - Backend (3 replicas via Dockerfile.prod)
+# - PostgreSQL (persistent volume)
+# - Nginx (load balancer, nginx.staging.conf)
+# - Monitoring stack (Grafana + Prometheus via docker-compose.monitoring.yml)
+```
+
+**⚠️ Port Configuration Note:**
+- Default application port: **8080** (configurable via PORT env var)
+- `Dockerfile` exposes port 3000 (legacy/dev config, ignore this)
+- `Dockerfile.prod` correctly exposes port 8080 (production config)
+- Local development (`npm run dev`) uses PORT from config.ts (default: 8080)
+
+**Production Checklist:**
+- Set strong `JWT_SECRET`
+- Configure proper `DATABASE_URL` with connection pooling
+- Set up WeChat app credentials (WX_APP_ID, WX_APP_SECRET)
+- Configure WeChat Pay credentials (WXPAY_*)
+- Configure monitoring endpoints (/metrics, /health)
+- Set appropriate cron schedules for background jobs
+- Review and adjust rate limiting configuration
+- Configure database transaction retry parameters
+- Set PAYMENT_TIMESTAMP_TOLERANCE_SECONDS appropriately
 
 ## 常见注意事项
 
@@ -269,3 +638,13 @@ dotenv -e .env.test -- npx prisma migrate reset --force  # 重置测试库
 - 401 自动重登仅通过 `api.setLoginProvider(auth.ensureLoggedIn)` 注入，禁止在模块顶层互相 `require`。
 - 提交前需确保 `npm test` 与（涉及数据库改动时）`npm run test:integration` 均通过。
 - 修改监控或计量逻辑时提供 `test_metrics.sh` 输出。
+
+## 历史经验SOP
+
+### SOP-复习模块500与题库数据校验
+1. 复现 500 后先看 `bookworm-backend/logs/server-errors.log`（JSONL），优先确认 Prisma 错误码与缺失字段。
+2. 若报 `user_card_state.last_session_id` 缺失，优先跑迁移；无迁移时用 SQL 兜底：
+   `ALTER TABLE "user_card_state" ADD COLUMN IF NOT EXISTS "last_session_id" VARCHAR(36);`
+3. 刷题全绿时优先检查返回的 `correctOptionIndices` 与数据库 `study_question.answer_json`：
+   - `answer_json` 必须与 `options_json` 的选项文本一致（单选/判断只保留一个）。
+4. 若题库文件丢失，导入格式必须包含 `manifest.json`、`units.json`、`questions/*.gift`、`cards/*.tsv`（路径不在仓库则向运维索取）。

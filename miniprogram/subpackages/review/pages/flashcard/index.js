@@ -137,8 +137,8 @@ Page({
     if (pages.length > 1) {
       wx.navigateBack();
     } else {
-      wx.redirectTo({
-        url: `/subpackages/review/pages/home/index`,
+      wx.switchTab({
+        url: '/pages/review/index',
       });
     }
   },
@@ -159,7 +159,7 @@ Page({
   onShareAppMessage() {
     return {
       title: '一起来复习吧',
-      path: `/subpackages/review/pages/home/index`,
+      path: '/pages/review/index',
     };
   },
 });

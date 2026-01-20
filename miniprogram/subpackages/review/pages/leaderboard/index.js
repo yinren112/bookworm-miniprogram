@@ -56,8 +56,8 @@ Page({
     if (pages.length > 1) {
       wx.navigateBack();
     } else {
-      wx.redirectTo({
-        url: '/subpackages/review/pages/home/index',
+      wx.switchTab({
+        url: '/pages/review/index',
       });
     }
   },
@@ -73,7 +73,7 @@ Page({
 
     return {
       title,
-      path: '/subpackages/review/pages/home/index',
+      path: '/pages/review/index',
     };
   },
 });

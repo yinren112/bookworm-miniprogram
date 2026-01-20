@@ -13,6 +13,8 @@ import { recordActivity } from "./streakService";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
+const QUIZ_DEBUG = process.env.QUIZ_DEBUG === "true";
+
 // 错题清除需要连续正确的次数
 const WRONG_ITEM_CLEAR_THRESHOLD = 3;
 
@@ -42,6 +44,7 @@ export interface SubmitAnswerResult {
   questionId: number;
   isCorrect: boolean;
   correctAnswer: string;
+  correctOptionIndices?: number[];
   explanation: string | null;
   wrongCount: number; // 累计错误次数
 }
@@ -184,11 +187,17 @@ export async function submitQuizAnswer(
     const wrongItem = await db.userWrongItem.findUnique({
       where: { userId_questionId: { userId, questionId } },
     });
+    const correctOptionIndices = extractCorrectOptionIndices(
+      question.questionType,
+      question.optionsJson,
+      question.answerJson,
+    );
 
     return {
       questionId,
       isCorrect: existingAttempt.isCorrect,
       correctAnswer: question.answerJson,
+      correctOptionIndices,
       explanation: question.explanationShort,
       wrongCount: wrongItem?.wrongCount ?? 0,
     };
@@ -196,6 +205,20 @@ export async function submitQuizAnswer(
 
   // 判断答案是否正确
   const isCorrect = checkAnswer(question.questionType, question.answerJson, chosenAnswer);
+  const correctOptionIndices = extractCorrectOptionIndices(
+    question.questionType,
+    question.optionsJson,
+    question.answerJson,
+  );
+
+  if (QUIZ_DEBUG) {
+    console.log("[QUIZ_DEBUG] Question ID:", questionId);
+    console.log("[QUIZ_DEBUG] question.questionType:", question.questionType);
+    console.log("[QUIZ_DEBUG] question.answerJson:", question.answerJson);
+    console.log("[QUIZ_DEBUG] question.optionsJson:", question.optionsJson);
+    console.log("[QUIZ_DEBUG] chosenAnswer:", chosenAnswer);
+    console.log("[QUIZ_DEBUG] isCorrect:", isCorrect);
+  }
 
   // 记录答题尝试（首次提交）
   try {
@@ -224,11 +247,17 @@ export async function submitQuizAnswer(
         const wrongItem = await db.userWrongItem.findUnique({
           where: { userId_questionId: { userId, questionId } },
         });
+        const correctOptionIndices = extractCorrectOptionIndices(
+          question.questionType,
+          question.optionsJson,
+          question.answerJson,
+        );
 
         return {
           questionId,
           isCorrect: attempt.isCorrect,
           correctAnswer: question.answerJson,
+          correctOptionIndices,
           explanation: question.explanationShort,
           wrongCount: wrongItem?.wrongCount ?? 0,
         };
@@ -301,6 +330,7 @@ export async function submitQuizAnswer(
     questionId,
     isCorrect,
     correctAnswer: question.answerJson,
+    correctOptionIndices,
     explanation: question.explanationShort,
     wrongCount,
   };
@@ -508,6 +538,92 @@ function parseAnswerList(answer: string): string[] {
 
 function normalizeAnswerToken(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function extractCorrectOptionIndices(
+  questionType: QuestionType,
+  optionsJson: unknown,
+  answerJson: string,
+): number[] {
+  if (!Array.isArray(optionsJson)) return [];
+
+  const options = optionsJson.map((option) => String(option));
+  if (options.length === 0) return [];
+
+  const normalizedOptions = options.map((option) => normalizeAnswerToken(option));
+  const answers = questionType === "MULTI_CHOICE"
+    ? parseAnswerTokens(answerJson)
+    : [String(answerJson ?? "")];
+
+  const indices = new Set<number>();
+
+  for (const answer of answers) {
+    const normalizedAnswer = normalizeAnswerToken(String(answer));
+    if (!normalizedAnswer) continue;
+
+    let idx = normalizedOptions.findIndex((option) => option === normalizedAnswer);
+    if (idx < 0) {
+      idx = resolveOptionIndexByLabel(normalizedAnswer, normalizedOptions);
+    }
+    if (idx >= 0) indices.add(idx);
+  }
+
+  const indexList = Array.from(indices);
+  if (questionType !== "MULTI_CHOICE" && indexList.length > 1) {
+    return [Math.min(...indexList)];
+  }
+
+  return indexList;
+}
+
+function parseAnswerTokens(answer: string): string[] {
+  const trimmed = String(answer || "").trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      // Fall back to pipe parsing.
+    }
+  }
+
+  if (trimmed.includes("|")) {
+    return trimmed
+      .split("|")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [trimmed];
+}
+
+function resolveOptionIndexByLabel(
+  normalizedAnswer: string,
+  normalizedOptions: string[],
+): number {
+  if (normalizedAnswer === "true" || normalizedAnswer === "正确" || normalizedAnswer === "对") {
+    return normalizedOptions.findIndex(
+      (option) => option === "正确" || option === "true",
+    );
+  }
+
+  if (normalizedAnswer === "false" || normalizedAnswer === "错误" || normalizedAnswer === "错") {
+    return normalizedOptions.findIndex(
+      (option) => option === "错误" || option === "false",
+    );
+  }
+
+  const letter = normalizedAnswer.charAt(0);
+  if (letter >= "a" && letter <= "f") {
+    const idx = letter.charCodeAt(0) - "a".charCodeAt(0);
+    if (idx < normalizedOptions.length) return idx;
+  }
+
+  return -1;
 }
 
 /**
