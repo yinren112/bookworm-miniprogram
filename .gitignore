@@ -55,6 +55,11 @@ node_modules/
 project.config.json
 project.private.config.json
 
+# Local-only artifacts
+miniprogram/package-lock.json
+26-1-6/
+reports/
+
 # Backup files
 *.backup
 
