@@ -358,7 +358,7 @@ Page({
     const priceCents = Math.round(priceYuan * 100);
     const items = this.data.scannedItems.map(item => {
       // 只应用到可收购且未设置价格的项目（使用 undefined 检查而非 falsy）
-      if (item.status === 'acquirable' && item.individualPrice === undefined || item.individualPrice === '') {
+      if (item.status === 'acquirable' && (item.individualPrice === undefined || item.individualPrice === '')) {
         return {
           ...item,
           individualPrice: this.data.batchPrice,
