@@ -1,0 +1,187 @@
+/* subpackages/review/components/report-issue/index.wxss */
+/* 纠错弹窗组件样式 */
+
+.report-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.report-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.report-modal {
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 32rpx;
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.report-overlay.visible .report-modal {
+  transform: translateY(0);
+}
+
+/* 标题栏 */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32rpx;
+}
+
+.modal-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text-primary, #2C3E35);
+}
+
+.close-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(44, 62, 53, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn text {
+  font-size: 28rpx;
+  color: var(--text-secondary, #8FA396);
+}
+
+/* 问题类型区域 */
+.reason-section {
+  margin-bottom: 32rpx;
+}
+
+.section-label {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary, #2C3E35);
+  margin-bottom: 16rpx;
+}
+
+.reason-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.reason-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx 24rpx;
+  background: #F8FCF9;
+  border: 2rpx solid transparent;
+  border-radius: 16rpx;
+  transition: all 0.2s ease;
+}
+
+.reason-item.selected {
+  background: rgba(44, 95, 45, 0.1);
+  border-color: var(--color-primary, #2c5f2d);
+}
+
+.reason-icon {
+  font-size: 28rpx;
+}
+
+.reason-label {
+  font-size: 26rpx;
+  color: var(--text-primary, #2C3E35);
+}
+
+.reason-item.selected .reason-label {
+  color: var(--color-primary, #2c5f2d);
+  font-weight: 500;
+}
+
+/* 补充说明区域 */
+.message-section {
+  margin-bottom: 32rpx;
+  position: relative;
+}
+
+.message-input {
+  width: 100%;
+  min-height: 160rpx;
+  max-height: 300rpx;
+  background: #F8FCF9;
+  border: 2rpx solid rgba(44, 95, 45, 0.15);
+  border-radius: 16rpx;
+  padding: 20rpx;
+  font-size: 28rpx;
+  color: var(--text-primary, #2C3E35);
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+.message-input::placeholder {
+  color: var(--text-tertiary, #B8C4BC);
+}
+
+.char-count {
+  position: absolute;
+  right: 16rpx;
+  bottom: 16rpx;
+  font-size: 22rpx;
+  color: var(--text-tertiary, #B8C4BC);
+}
+
+/* 提交按钮 */
+.submit-btn {
+  width: 100%;
+  height: 88rpx;
+  background: linear-gradient(135deg, #2c5f2d 0%, #558056 100%);
+  color: #FFFFFF;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 16rpx;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    4rpx 4rpx 12rpx rgba(44, 95, 45, 0.3),
+    inset 0 2rpx 4rpx rgba(255, 255, 255, 0.2);
+}
+
+.submit-btn::after {
+  border: none;
+}
+
+.submit-btn.disabled {
+  background: #CCCCCC;
+  box-shadow: none;
+}
+
+/* 提示文字 */
+.tip-text {
+  margin-top: 20rpx;
+  text-align: center;
+}
+
+.tip-text text {
+  font-size: 24rpx;
+  color: var(--text-tertiary, #B8C4BC);
+}

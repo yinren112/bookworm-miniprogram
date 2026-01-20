@@ -1,0 +1,8 @@
+{
+  "name": "miniprogram-client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "mp-html": "^2.4.2"
+  }
+}

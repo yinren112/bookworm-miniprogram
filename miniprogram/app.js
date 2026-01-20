@@ -1,4 +1,5 @@
 // miniprogram/app.js
+const privacy = require('./utils/privacy');
 App({
   TERMS_COPY: {
     title: '服务协议与隐私政策',
@@ -14,6 +15,7 @@ App({
       backgroundColorTop: '#2c5f2d',
       backgroundColorBottom: '#f8f9fa'
     });
+    privacy.setupPrivacyAuthorization();
     this.checkTermsAgreement();
   },
 

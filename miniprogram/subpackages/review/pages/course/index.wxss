@@ -1,0 +1,323 @@
+/* subpackages/review/pages/course/index.wxss */
+/* 课程详情页样式 */
+
+.container {
+  padding: 24rpx;
+  min-height: 100vh;
+  background: var(--bg-primary, #F3FBF6); /* Softer mint background */
+}
+
+/* 粘土风格卡片 - Light Clay Spec */
+.clay-card {
+  background: #FFFFFF;
+  border-radius: 32rpx; /* Larger border radius */
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  /* P1: Soft Drop Shadow + Inner Shine for pneumorphism/clay effect */
+  box-shadow:
+    16rpx 16rpx 32rpx rgba(44, 95, 45, 0.08),
+    -8rpx -8rpx 20rpx rgba(255, 255, 255, 1.0),
+    inset 2rpx 2rpx 4rpx rgba(255, 255, 255, 0.8),
+    inset -2rpx -2rpx 4rpx rgba(44, 95, 45, 0.02);
+  border: 1rpx solid rgba(255, 255, 255, 0.6);
+}
+
+.clay-card.clickable:active {
+  transform: scale(0.98);
+  box-shadow:
+    8rpx 8rpx 16rpx rgba(44, 95, 45, 0.06),
+    -4rpx -4rpx 10rpx rgba(255, 255, 255, 0.8),
+    inset 4rpx 4rpx 8rpx rgba(44, 95, 45, 0.03);
+  transition: all 0.1s ease;
+}
+
+/* 课程头部 */
+.course-header {
+  /* Subtle gradient */
+  background: linear-gradient(135deg, #FFFFFF 0%, #F5FBF7 100%);
+}
+
+.course-title {
+  font-size: 40rpx;
+  font-weight: 800; /* Bolder */
+  color: #1A2E22; /* Darker green-black */
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.course-desc {
+  font-size: 28rpx;
+  color: #6B7C72;
+  display: block;
+  margin-bottom: 32rpx;
+  line-height: 1.6; /* Increased line height */
+}
+
+.course-meta {
+  display: flex;
+  justify-content: space-around;
+  padding: 24rpx 0 0 0;
+  /* Remove top border for cleaner look */
+  border-top: none; 
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.meta-value {
+  font-size: 40rpx;
+  font-weight: 700;
+  /* P3: Unified numbers color or specific logic */
+  color: #2c5f2d; 
+}
+
+.meta-label {
+  font-size: 24rpx;
+  color: #8FA396;
+  margin-top: 8rpx;
+  font-weight: 500;
+}
+
+/* Removed meta-divider styles */
+
+/* 今日队列 */
+.queue-section {
+  background: #FFFFFF;
+}
+
+.queue-header {
+  margin-bottom: 24rpx;
+}
+
+.queue-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1A2E22;
+}
+
+.queue-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 32rpx;
+}
+
+.queue-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.queue-number {
+  font-size: 48rpx;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.queue-number.pending {
+  color: #FF9800; /* Keep orange for pending */
+}
+
+.queue-number.new {
+  color: #2c5f2d; /* Green for new */
+}
+
+.queue-number.done {
+  color: #8FA396; /* Muted for done */
+}
+
+.queue-label {
+  font-size: 26rpx;
+  color: #8FA396;
+  margin-top: 8rpx;
+}
+
+/* 按钮样式 */
+.start-btn,
+.enroll-btn {
+  width: 100%;
+  height: 96rpx; /* Taller button */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2c5f2d 0%, #447045 100%);
+  color: #FFFFFF;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 48rpx; /* Pill shape */
+  border: none;
+  box-shadow:
+    6rpx 6rpx 16rpx rgba(44, 95, 45, 0.25),
+    inset 0 4rpx 6rpx rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.start-btn:active,
+.enroll-btn:active {
+  transform: scale(0.98);
+  box-shadow: inset 0 4rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.start-btn::after,
+.enroll-btn::after {
+  border: none;
+}
+
+.enroll-section {
+  padding: 0 0 24rpx 0;
+}
+
+/* 区块 */
+.section {
+  margin-top: 16rpx;
+  padding: 0 8rpx;
+}
+
+.section-header {
+  margin-bottom: 24rpx;
+  padding: 0 8rpx;
+}
+
+.section-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1A2E22;
+}
+
+/* 学习工具栏 - Refined */
+.tool-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 40rpx 24rpx;
+}
+
+.tool-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  transition: transform 0.2s ease;
+}
+
+.tool-item:active {
+  transform: scale(0.92);
+  background: transparent;
+}
+
+.tool-icon {
+  font-size: 64rpx; /* Larger emoji fallback */
+  margin-bottom: 16rpx;
+}
+
+.tool-icon-img {
+  width: 96rpx;
+  height: 96rpx;
+  margin-bottom: 16rpx;
+}
+
+.tool-label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #4A5D50;
+}
+
+/* 章节目录 - Refined List */
+.unit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.unit-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 32rpx;
+  transition: all 0.2s;
+}
+
+.unit-main {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.unit-order {
+  width: 80rpx;
+  height: 80rpx;
+  /* P2: Circle background */
+  background: #E8F5E9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 32rpx;
+  box-shadow: inset 2rpx 2rpx 4rpx rgba(44, 95, 45, 0.05); /* Subtle depth in circle */
+}
+
+.order-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2c5f2d;
+  line-height: 1; /* Fix vertical alignment */
+}
+
+.unit-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.unit-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1A2E22;
+}
+
+.unit-stats {
+  display: flex;
+  gap: 16rpx;
+}
+
+.unit-cards {
+  font-size: 26rpx;
+  color: #8FA396;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #B8C4BC;
+}
+
+/* Loading & Error */
+.loading-state, .error-state {
+  padding: 120rpx 0;
+  display: flex;
+  justify-content: center;
+}
+
+.loading-text, .error-text {
+  color: #8FA396;
+  font-size: 28rpx;
+}
+
+.retry-btn {
+  margin-top: 24rpx;
+  background: #E8F5E9;
+  color: #2c5f2d;
+}

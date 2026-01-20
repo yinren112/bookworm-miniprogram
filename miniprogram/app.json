@@ -1,50 +1,36 @@
 {
   "lazyCodeLoading": "requiredComponents",
   "pages": [
-    "pages/market/index",
-    "pages/orders/index",
-    "pages/profile/index",
-    "pages/book-detail/index",
-    "pages/order-confirm/index",
-    "pages/order-detail/index",
-    "pages/webview/index",
-    "pages/customer-service/index",
-    "pages/acquisition-scan/index"
+    "pages/review-entry/index"
   ],
+  "subpackages": [
+    {
+      "root": "subpackages/review",
+      "name": "review",
+      "pages": [
+        "pages/home/index",
+        "pages/course/index",
+        "pages/flashcard/index",
+        "pages/quiz/index",
+        "pages/cheatsheet/index",
+        "pages/leaderboard/index"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/review-entry/index": {
+      "network": "wifi",
+      "packages": ["review"]
+    }
+  },
   "window": {
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#F0F9F4",
-    "navigationBarTitleText": "\u6821\u56ed\u4e66\u5e02",
+    "navigationBarTitleText": "\u590d\u4e60",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F0F9F4",
     "backgroundColorTop": "#F0F9F4",
     "backgroundColorBottom": "#E1EFE6"
-  },
-  "tabBar": {
-    "color": "#8FA396",
-    "selectedColor": "#2C3E35",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "white",
-    "list": [
-      {
-        "pagePath": "pages/market/index",
-        "text": "\u5e02\u573a",
-        "iconPath": "images/tabs/marketplace.png",
-        "selectedIconPath": "images/tabs/marketplace-active.png"
-      },
-      {
-        "pagePath": "pages/orders/index",
-        "text": "\u8ba2\u5355",
-        "iconPath": "images/tabs/orders.png",
-        "selectedIconPath": "images/tabs/orders-active.png"
-      },
-      {
-        "pagePath": "pages/profile/index",
-        "text": "\u6211\u7684",
-        "iconPath": "images/tabs/profile.png",
-        "selectedIconPath": "images/tabs/profile-active.png"
-      }
-    ]
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json"

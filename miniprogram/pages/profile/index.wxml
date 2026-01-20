@@ -21,6 +21,20 @@
     </button>
   </view>
 
+  <!-- Review System Entry -->
+  <view class="review-entry-card card" bindtap="goToReview">
+    <view class="review-entry-content">
+      <view class="review-icon-wrapper">
+        <text class="review-icon">📚</text>
+      </view>
+      <view class="review-text-wrapper">
+        <text class="review-title">复习助手</text>
+        <text class="review-desc">背单词、刷题、查资料</text>
+      </view>
+    </view>
+    <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+  </view>
+
   <!-- Staff Operations Section - Only visible for STAFF role -->
   <view wx:if="{{userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
     <view class="section-title">

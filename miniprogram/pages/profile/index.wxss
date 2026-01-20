@@ -225,3 +225,59 @@
   display: flex;
   align-items: center;
 }
+
+/* Review Entry Card - Feature Highlight */
+.review-entry-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-l);
+  margin-bottom: var(--space-l);
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-clay-out);
+}
+
+.review-entry-card:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-clay-in);
+}
+
+.review-entry-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+}
+
+.review-icon-wrapper {
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-m);
+  box-shadow: 4rpx 4rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.review-icon {
+  font-size: 44rpx;
+}
+
+.review-text-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.review-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #2c5f2d;
+}
+
+.review-desc {
+  font-size: 24rpx;
+  color: #558056;
+  font-weight: 600;
+}

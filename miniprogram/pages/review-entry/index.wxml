@@ -1,0 +1,4 @@
+<!-- pages/review-entry/index.wxml -->
+<view class="container">
+  <text class="loading-text">Loading...</text>
+</view>

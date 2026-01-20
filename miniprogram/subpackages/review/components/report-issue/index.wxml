@@ -1,0 +1,59 @@
+<!-- subpackages/review/components/report-issue/index.wxml -->
+<!-- 纠错弹窗组件 -->
+
+<view class="report-overlay {{visible ? 'visible' : ''}}" bindtap="handleClose">
+  <view class="report-modal" catchtap="preventBubble">
+    <!-- 标题 -->
+    <view class="modal-header">
+      <text class="modal-title">问题反馈</text>
+      <view class="close-btn" bindtap="handleClose">
+        <text>✕</text>
+      </view>
+    </view>
+
+    <!-- 问题类型选择 -->
+    <view class="reason-section">
+      <text class="section-label">问题类型</text>
+      <view class="reason-options">
+        <view
+          class="reason-item {{selectedReason === item.value ? 'selected' : ''}}"
+          wx:for="{{reasonOptions}}"
+          wx:key="value"
+          bindtap="selectReason"
+          data-value="{{item.value}}"
+        >
+          <text class="reason-icon">{{item.icon}}</text>
+          <text class="reason-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 补充说明 -->
+    <view class="message-section">
+      <text class="section-label">补充说明（可选）</text>
+      <textarea
+        class="message-input"
+        placeholder="请详细描述您发现的问题..."
+        value="{{message}}"
+        bindinput="onMessageInput"
+        maxlength="500"
+        auto-height
+      />
+      <text class="char-count">{{message.length}}/500</text>
+    </view>
+
+    <!-- 提交按钮 -->
+    <button
+      class="submit-btn {{!selectedReason || submitting ? 'disabled' : ''}}"
+      bindtap="handleSubmit"
+      disabled="{{!selectedReason || submitting}}"
+    >
+      <text>{{submitting ? '提交中...' : '提交反馈'}}</text>
+    </button>
+
+    <!-- 提示文字 -->
+    <view class="tip-text">
+      <text>感谢您帮助我们改进内容质量</text>
+    </view>
+  </view>
+</view>

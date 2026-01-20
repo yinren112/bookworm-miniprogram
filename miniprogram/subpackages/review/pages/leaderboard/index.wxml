@@ -1,0 +1,98 @@
+<!-- subpackages/review/pages/leaderboard/index.wxml -->
+<!-- 周榜页面 -->
+
+<view class="container">
+  <!-- 我的信息卡片 -->
+  <view class="my-card clay-card" wx:if="{{!loading && myStreak}}">
+    <view class="my-header">
+      <view class="my-rank" wx:if="{{myRank}}">
+        <text class="rank-number">{{myRank}}</text>
+        <text class="rank-label">我的排名</text>
+      </view>
+      <view class="my-rank no-rank" wx:else>
+        <text class="rank-number">-</text>
+        <text class="rank-label">暂无排名</text>
+      </view>
+      <view class="my-stats">
+        <view class="stat-item">
+          <text class="stat-value">{{myStreak.weeklyPoints}}</text>
+          <text class="stat-label">本周积分</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-value fire">{{myStreak.currentStreak}}</text>
+          <text class="stat-label">连续天数</text>
+        </view>
+      </view>
+    </view>
+    <view class="my-tip" wx:if="{{!myStreak.isStudiedToday}}">
+      <text>今天还没学习，快去打卡吧</text>
+    </view>
+    <view class="my-tip studied" wx:else>
+      <text>今日已学习，继续保持</text>
+    </view>
+  </view>
+
+  <!-- 榜单标题 -->
+  <view class="list-header" wx:if="{{!loading}}">
+    <text class="list-title">本周学习榜</text>
+    <text class="list-subtitle">每周一 00:00 重置</text>
+  </view>
+
+  <!-- 榜单列表 -->
+  <view class="leaderboard-list" wx:if="{{!loading && items.length > 0}}">
+    <view
+      class="rank-item {{index < 3 ? 'top-three' : ''}} {{item.userId === myStreak.userId ? 'is-me' : ''}}"
+      wx:for="{{items}}"
+      wx:key="userId"
+    >
+      <!-- 排名 -->
+      <view class="item-rank">
+        <view class="rank-badge rank-{{index + 1}}" wx:if="{{index < 3}}">
+          <text>{{index === 0 ? '🥇' : (index === 1 ? '🥈' : '🥉')}}</text>
+        </view>
+        <text class="rank-text" wx:else>{{item.rank}}</text>
+      </view>
+
+      <!-- 用户信息 -->
+      <view class="item-user">
+        <image
+          class="user-avatar"
+          src="{{item.avatarUrl || '/images/default-avatar.png'}}"
+          mode="aspectFill"
+        />
+        <text class="user-name">{{item.nickname}}</text>
+      </view>
+
+      <!-- 数据 -->
+      <view class="item-stats">
+        <view class="points">
+          <text class="points-value">{{item.weeklyPoints}}</text>
+          <text class="points-label">积分</text>
+        </view>
+        <view class="streak" wx:if="{{item.currentStreak > 0}}">
+          <text class="streak-icon">🔥</text>
+          <text class="streak-value">{{item.currentStreak}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && items.length === 0}}">
+    <view class="empty-icon">📊</view>
+    <text class="empty-text">本周暂无学习数据</text>
+    <text class="empty-hint">快去学习，成为第一名吧</text>
+    <button class="start-btn" bindtap="goBack">开始学习</button>
+  </view>
+
+  <!-- 底部提示 -->
+  <view class="footer-tip" wx:if="{{!loading && items.length > 0}}">
+    <text>每完成一道题目或卡片 +1 积分</text>
+  </view>
+</view>

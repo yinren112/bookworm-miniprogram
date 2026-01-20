@@ -1,0 +1,13 @@
+/* pages/review-entry/index.wxss */
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F0F9F4;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #8FA396;
+}

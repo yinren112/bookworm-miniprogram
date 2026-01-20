@@ -3,6 +3,7 @@ const { getCurrentUser } = require('../../utils/api');
 const authGuard = require('../../utils/auth-guard');
 const ui = require('../../utils/ui');
 const logger = require('../../utils/logger');
+const privacy = require('../../utils/privacy');
 
 Page({
   data: {
@@ -36,6 +37,11 @@ Page({
   },
 
   async onGetPhoneNumber(e) {
+    const { authorized } = await privacy.ensurePrivacyAuthorized({
+      content: '绑定手机号前，请先阅读并同意隐私保护指引。'
+    });
+    if (!authorized) return;
+
     // 防止重复点击
     if (this.data.isLinking) return;
 
@@ -86,6 +92,12 @@ Page({
       this.setData({ isLinking: false });
     }
   },
+  goToReview() {
+    wx.navigateTo({
+      url: '/subpackages/review/pages/home/index'
+    });
+  },
+
   copyWechatId() {
     wx.setClipboardData({
       data: this.data.serviceInfo.wechatId,

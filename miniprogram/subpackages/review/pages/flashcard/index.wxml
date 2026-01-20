@@ -1,0 +1,83 @@
+<!-- subpackages/review/pages/flashcard/index.wxml -->
+<!-- 卡片复习页 -->
+<view class="container">
+  <!-- 进度条 -->
+  <view class="progress-bar">
+    <view class="progress-fill" style="width: {{progressPercent}}%"></view>
+  </view>
+  <view class="progress-text">
+    <text>{{currentIndex + 1}} / {{cards.length}}</text>
+  </view>
+  <!-- 卡片区域 -->
+  <view class="card-wrapper" wx:if="{{!loading && currentCard}}">
+    <view class="card-container {{isFlipped ? 'flipped' : ''}}" bindtap="flipCard">
+      <!-- 正面 -->
+      <view class="card card-front clay-card">
+        <view class="card-label">问题</view>
+        <view class="card-content">
+          <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
+        </view>
+        <view class="card-hint">
+          <text>点击翻转查看答案</text>
+        </view>
+      </view>
+      <!-- 背面 -->
+      <view class="card card-back clay-card">
+        <view class="card-label">答案</view>
+        <view class="card-content">
+          <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
+        </view>
+      </view>
+    </view>
+  </view>
+  <!-- 反馈按钮 -->
+  <view class="feedback-buttons" wx:if="{{!loading && currentCard && isFlipped}}">
+    <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
+      <text class="btn-emoji">😓</text>
+      <text class="btn-label">忘了</text>
+    </button>
+    <button class="feedback-btn fuzzy" bindtap="submitFeedback" data-rating="FUZZY">
+      <text class="btn-emoji">🤔</text>
+      <text class="btn-label">模糊</text>
+    </button>
+    <button class="feedback-btn knew" bindtap="submitFeedback" data-rating="KNEW">
+      <text class="btn-emoji">😊</text>
+      <text class="btn-label">记得</text>
+    </button>
+    <button class="feedback-btn perfect" bindtap="submitFeedback" data-rating="PERFECT">
+      <text class="btn-emoji">🎉</text>
+      <text class="btn-label">完美</text>
+    </button>
+  </view>
+  <!-- 翻转提示 -->
+  <view class="flip-hint" wx:if="{{!loading && currentCard && !isFlipped}}">
+    <text>点击卡片查看答案</text>
+  </view>
+  <!-- 纠错按钮 -->
+  <view class="report-btn-wrapper" wx:if="{{!loading && currentCard}}">
+    <view class="report-btn" bindtap="openReportModal">
+      <text>🚨 内容有误？点击反馈</text>
+    </view>
+  </view>
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <text class="loading-text">加载卡片中...</text>
+  </view>
+  <!-- 完成状态 -->
+  <view class="complete-state" wx:if="{{!loading && completed}}">
+    <view class="complete-icon">🎊</view>
+    <text class="complete-title">太棒了!</text>
+    <text class="complete-desc">本次复习已完成</text>
+    <view class="complete-stats">
+      <text>复习了 {{cards.length}} 张卡片</text>
+    </view>
+    <button class="back-btn" bindtap="goBack">返回课程</button>
+  </view>
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && !completed && cards.length === 0}}">
+    <text class="empty-text">暂无待复习的卡片</text>
+    <button class="back-btn" bindtap="goBack">返回课程</button>
+  </view>
+  <!-- 纠错弹窗 -->
+  <report-issue visible="{{showReportModal}}" courseKey="{{courseKey}}" cardId="{{currentCard.id}}" bind:close="closeReportModal" bind:success="onReportSuccess" />
+</view>

@@ -1,0 +1,120 @@
+<!-- subpackages/review/pages/quiz/index.wxml -->
+<!-- 刷题闯关页 -->
+<view class="container">
+  <!-- 进度条 -->
+  <view class="progress-section" wx:if="{{!loading && !completed && questions.length > 0}}">
+    <view class="progress-bar">
+      <view class="progress-fill" style="width: {{progressPercent}}%"></view>
+    </view>
+    <view class="progress-info">
+      <text class="progress-text">{{currentIndex + 1}} / {{questions.length}}</text>
+      <text class="accuracy-text" wx:if="{{answeredCount > 0}}">
+        正确率 {{Math.round(correctCount / answeredCount * 100)}}%
+      </text>
+    </view>
+  </view>
+  <!-- 题目区域 -->
+  <view class="question-card clay-card" wx:if="{{!loading && !completed && currentQuestion}}">
+    <!-- 题目类型标签 -->
+    <view class="question-type-tag {{currentQuestion.questionType.toLowerCase()}}">
+      <text>{{questionTypeLabels[currentQuestion.questionType]}}</text>
+    </view>
+    <!-- 题干 -->
+    <view class="question-stem">
+      <mp-html content="{{currentQuestion.stem}}" markdown="{{true}}" />
+    </view>
+    <!-- 选项区域 -->
+    <view class="options-section" wx:if="{{currentQuestion.questionType !== 'FILL_BLANK'}}">
+      <view class="option-item {{selectedAnswers.indexOf(index) !== -1 ? 'selected' : ''}} {{showResult && correctIndices.indexOf(index) !== -1 ? 'correct' : ''}} {{showResult && selectedAnswers.indexOf(index) !== -1 && correctIndices.indexOf(index) === -1 ? 'wrong' : ''}}" wx:for="{{currentQuestion.options}}" wx:key="index" bindtap="selectOption" data-index="{{index}}">
+        <view class="option-marker">{{optionLabels[index]}}</view>
+        <view class="option-content">
+          <mp-html content="{{item}}" markdown="{{true}}" />
+        </view>
+        <view class="option-icon" wx:if="{{showResult && correctIndices.indexOf(index) !== -1}}">✓</view>
+        <view class="option-icon wrong" wx:if="{{showResult && selectedAnswers.indexOf(index) !== -1 && correctIndices.indexOf(index) === -1}}">
+          ✗
+        </view>
+      </view>
+      <button class="submit-multi-btn" bindtap="submitMultiChoice" wx:if="{{currentQuestion.questionType === 'MULTI_CHOICE' && !showResult && selectedAnswers.length > 0}}">
+        提交
+      </button>
+    </view>
+    <!-- 填空题输入 -->
+    <view class="fill-blank-section" wx:if="{{currentQuestion.questionType === 'FILL_BLANK'}}">
+      <input class="fill-input {{showResult ? (lastResult.isCorrect ? 'correct' : 'wrong') : ''}}" placeholder="请输入答案" value="{{fillAnswer}}" bindinput="onFillInput" disabled="{{showResult}}" />
+      <button class="submit-fill-btn" bindtap="submitFillAnswer" wx:if="{{!showResult && fillAnswer}}">
+        提交
+      </button>
+    </view>
+    <!-- 结果反馈 -->
+    <view class="result-section" wx:if="{{showResult}}">
+      <view class="result-badge {{lastResult.isCorrect ? 'correct' : 'wrong'}}">
+        <text>{{lastResult.isCorrect ? '回答正确' : '回答错误'}}</text>
+      </view>
+      <view class="explanation" wx:if="{{lastResult.explanation}}">
+        <text class="explanation-label">解析：</text>
+        <view class="explanation-text">
+          <mp-html content="{{lastResult.explanation}}" markdown="{{true}}" />
+        </view>
+      </view>
+      <view class="correct-answer" wx:if="{{!lastResult.isCorrect}}">
+        <text class="answer-label">正确答案：</text>
+        <view class="answer-text">
+          <mp-html content="{{correctAnswerText}}" markdown="{{true}}" />
+        </view>
+      </view>
+    </view>
+    <!-- 纠错按钮 -->
+    <view class="report-btn-wrapper">
+      <view class="report-btn" bindtap="openReportModal">
+        <text>🚨 内容有误？点击反馈</text>
+      </view>
+    </view>
+  </view>
+  <!-- 下一题按钮 -->
+  <view class="action-section" wx:if="{{showResult && !completed}}">
+    <button class="next-btn clay-btn-primary" bindtap="nextQuestion">
+      {{currentIndex < questions.length - 1 ? '下一题' : '查看结果'}}
+    </button>
+  </view>
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <text class="loading-text">加载题目中...</text>
+  </view>
+  <!-- 完成状态 -->
+  <view class="complete-state" wx:if="{{!loading && completed}}">
+    <view class="complete-icon">
+      {{correctCount === questions.length ? '🏆' : (correctCount >= questions.length * 0.6 ? '🎉' : '💪')}}
+    </view>
+    <text class="complete-title">
+      {{correctCount === questions.length ? '满分通关!' : (correctCount >= questions.length * 0.6 ? '答题完成!' : '继续加油!')}}
+    </text>
+    <view class="stats-card clay-card">
+      <view class="stat-row">
+        <text class="stat-label">答对</text>
+        <text class="stat-value correct">{{correctCount}}</text>
+      </view>
+      <view class="stat-row">
+        <text class="stat-label">答错</text>
+        <text class="stat-value wrong">{{questions.length - correctCount}}</text>
+      </view>
+      <view class="stat-row">
+        <text class="stat-label">正确率</text>
+        <text class="stat-value">{{Math.round(correctCount / questions.length * 100)}}%</text>
+      </view>
+    </view>
+    <view class="complete-actions">
+      <button class="retry-btn" bindtap="retryQuiz" wx:if="{{correctCount < questions.length}}">
+        重做错题
+      </button>
+      <button class="back-btn clay-btn-primary" bindtap="goBack">返回课程</button>
+    </view>
+  </view>
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && !completed && questions.length === 0}}">
+    <text class="empty-text">暂无题目</text>
+    <button class="back-btn" bindtap="goBack">返回课程</button>
+  </view>
+  <!-- 纠错弹窗 -->
+  <report-issue visible="{{showReportModal}}" courseKey="{{courseKey}}" questionId="{{currentQuestion.id}}" bind:close="closeReportModal" bind:success="onReportSuccess" />
+</view>
