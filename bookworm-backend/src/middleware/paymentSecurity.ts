@@ -115,14 +115,13 @@ export async function checkIdempotency(
     where: { id: payload.id },
   });
 
-  if (existingEvent) {
-    request.log.info({ eventId: payload.id }, 'Duplicate webhook event (idempotent response)');
+  if (existingEvent?.processed) {
+    request.log.info({ eventId: payload.id }, 'Duplicate webhook event (already processed)');
     reply.code(200).send({ code: WECHAT_CONSTANTS.SUCCESS_CODE });
     return;
   }
 
-  // Mark as new event
-  request.isNewEvent = true;
+  request.isNewEvent = !existingEvent;
 }
 
 /**

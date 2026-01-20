@@ -62,16 +62,20 @@ async function updateOrderStatusImpl(
     throw new ApiError(404, "订单不存在", "ORDER_NOT_FOUND");
   }
 
-  // Check if status transition is valid
-  const validTransitions: Record<string, string[]> = {
-    PENDING_PAYMENT: ["CANCELLED"],
-    PENDING_PICKUP: ["COMPLETED", "CANCELLED"],
-    COMPLETED: [],
-    CANCELLED: [],
+  const allowedFrom: Record<"COMPLETED" | "CANCELLED", string[]> = {
+    COMPLETED: ["PENDING_PICKUP"],
+    CANCELLED: ["PENDING_PAYMENT", "PENDING_PICKUP"],
   };
 
-  const allowedTransitions = validTransitions[currentOrder.status];
-  if (!allowedTransitions?.includes(newStatus)) {
+  if (!allowedFrom[newStatus].includes(currentOrder.status)) {
+    if (currentOrder.status === "COMPLETED" || currentOrder.status === "CANCELLED") {
+      throw new ApiError(
+        409,
+        `订单状态已变更为 ${currentOrder.status}，请刷新后重试`,
+        "ORDER_STATUS_CONFLICT",
+      );
+    }
+
     throw new ApiError(
       400,
       `无法将订单从 ${currentOrder.status} 更新为 ${newStatus}`,
@@ -79,9 +83,11 @@ async function updateOrderStatusImpl(
     );
   }
 
-  // Update order status
-  const updatedOrder = await tx.order.update({
-    where: { id: orderId },
+  const previousStatus = currentOrder.status;
+
+  // Atomic update: only proceed if status is still the same
+  const orderUpdate = await tx.order.updateMany({
+    where: { id: orderId, status: previousStatus },
     data: {
       status: newStatus,
       ...(newStatus === "COMPLETED" && { completed_at: new Date() }),
@@ -89,19 +95,53 @@ async function updateOrderStatusImpl(
     },
   });
 
+  if (orderUpdate.count !== 1) {
+    const latestOrder = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+
+    if (!latestOrder) {
+      throw new ApiError(404, "订单不存在", "ORDER_NOT_FOUND");
+    }
+
+    if (latestOrder.status === newStatus) {
+      return tx.order.findUnique({
+        where: { id: orderId },
+      });
+    }
+
+    throw new ApiError(
+      409,
+      `订单状态已变更为 ${latestOrder.status}，请刷新后重试`,
+      "ORDER_STATUS_CONFLICT",
+    );
+  }
+
   // Update inventory items based on new status
   if (newStatus === "COMPLETED") {
+    const inventoryItemIds = currentOrder.orderItem.map(
+      (item) => item.inventory_item_id,
+    );
+
     // Mark all items as sold and clear reservation pointer
-    await tx.inventoryItem.updateMany({
+    const inventoryUpdate = await tx.inventoryItem.updateMany({
       where: {
-        id: {
-          in: currentOrder.orderItem.map((item) => item.inventory_item_id),
-        },
+        id: { in: inventoryItemIds },
+        status: INVENTORY_STATUS.RESERVED,
       },
       data: {
         status: INVENTORY_STATUS.SOLD,
       },
     });
+
+    if (inventoryUpdate.count !== inventoryItemIds.length) {
+      throw new ApiError(
+        409,
+        "库存状态已变更，订单完成失败",
+        "INVENTORY_STATUS_CONFLICT",
+      );
+    }
     metrics.ordersCompleted.inc();
   } else if (newStatus === "CANCELLED") {
     const inventoryItemIds = currentOrder.orderItem.map(
@@ -109,16 +149,23 @@ async function updateOrderStatusImpl(
     );
 
     // Release inventory back to stock
-    await tx.inventoryItem.updateMany({
+    const inventoryUpdate = await tx.inventoryItem.updateMany({
       where: {
-        id: {
-          in: inventoryItemIds,
-        },
+        id: { in: inventoryItemIds },
+        status: INVENTORY_STATUS.RESERVED,
       },
       data: {
         status: INVENTORY_STATUS.IN_STOCK,
       },
     });
+
+    if (inventoryUpdate.count !== inventoryItemIds.length) {
+      throw new ApiError(
+        409,
+        "库存状态已变更，订单取消失败",
+        "INVENTORY_STATUS_CONFLICT",
+      );
+    }
 
     // Delete reservation records
     await tx.inventoryReservation.deleteMany({
@@ -130,7 +177,7 @@ async function updateOrderStatusImpl(
     });
 
     // If cancelling a paid order, mark payment for refund
-    if (currentOrder.status === "PENDING_PICKUP") {
+    if (previousStatus === "PENDING_PICKUP") {
       await tx.paymentRecord.updateMany({
         where: { order_id: orderId, status: "SUCCESS" },
         data: { status: "REFUND_REQUIRED" },
@@ -140,7 +187,9 @@ async function updateOrderStatusImpl(
     metrics.ordersCancelled.inc();
   }
 
-  return updatedOrder;
+  return tx.order.findUnique({
+    where: { id: orderId },
+  });
 }
 
 /**

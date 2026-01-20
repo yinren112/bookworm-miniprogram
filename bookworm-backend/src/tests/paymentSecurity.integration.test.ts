@@ -642,11 +642,14 @@ describe("Payment Security Integration Tests", () => {
       expect(response.body.message).toBe(WECHAT_CONSTANTS.RETRY_MESSAGE);
       expect(processSpy).toHaveBeenCalledTimes(1);
 
-      // Transaction should roll back, not persisting webhookEvent
+      // Retryable failure should keep webhookEvent for reprocessing
       const savedEvent = await prisma.webhookEvent.findUnique({
         where: { id: webhookId },
       });
-      expect(savedEvent).toBeNull();
+      expect(savedEvent).not.toBeNull();
+      expect(savedEvent?.processed).toBe(false);
+
+      await prisma.webhookEvent.deleteMany({ where: { id: webhookId } });
     });
   });
 

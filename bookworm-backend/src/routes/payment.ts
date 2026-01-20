@@ -2,6 +2,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { Type, Static } from "@sinclair/typebox";
 import { WechatPayAdapter } from "../adapters/wechatPayAdapter";
+import { Prisma } from "@prisma/client";
 import {
   buildClientPaymentSignature,
   buildWechatPaymentRequest,
@@ -77,26 +78,42 @@ const paymentRoutes: FastifyPluginAsync<PaymentRoutesOptions> = async function (
       const payload = request.validatedPayload!;
       const notificationData = request.decryptedNotification!;
 
+      let webhookEventCreated = false;
       try {
-        // Atomic transaction: record event + process payment
-        await prisma.$transaction(async (tx) => {
-          // Record webhook event for idempotency
-          await tx.webhookEvent.create({
-            data: {
-              id: payload.id,
-              event_type: payload.event_type,
-              processed: false,
-            },
-          });
-
-          // Hand off to service layer
-          await processPaymentNotification(tx, wechatPayAdapter, notificationData);
-
-          // Mark as processed
-          await tx.webhookEvent.update({
+        await prisma.webhookEvent.create({
+          data: {
+            id: payload.id,
+            event_type: payload.event_type,
+            processed: false,
+          },
+        });
+        webhookEventCreated = true;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const existingEvent = await prisma.webhookEvent.findUnique({
             where: { id: payload.id },
-            data: { processed: true },
           });
+
+          if (existingEvent?.processed) {
+            return reply.code(200).send({
+              code: WECHAT_CONSTANTS.SUCCESS_CODE,
+              message: WECHAT_CONSTANTS.SUCCESS_MESSAGE,
+            });
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      try {
+        await processPaymentNotification(prisma, wechatPayAdapter, notificationData);
+
+        await prisma.webhookEvent.updateMany({
+          where: { id: payload.id, processed: false },
+          data: { processed: true },
         });
 
         // Signal success to WeChat
@@ -113,6 +130,13 @@ const paymentRoutes: FastifyPluginAsync<PaymentRoutesOptions> = async function (
           { err: error, classification },
           "Payment notification processing failed"
         );
+
+        if (!classification.shouldRetry && (webhookEventCreated || request.isNewEvent === false)) {
+          await prisma.webhookEvent.updateMany({
+            where: { id: payload.id, processed: false },
+            data: { processed: true },
+          });
+        }
 
         // Respond based on classification
         reply.code(classification.httpStatus).send({

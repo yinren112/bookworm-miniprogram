@@ -36,10 +36,13 @@ const OrderListQuerySchema = Type.Object({
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const presentOrderAmount = (order: any) => ({
-  ...order,
-  total_amount: formatCentsToYuanString(order.total_amount),
-});
+const presentOrderAmount = (order: any) => {
+  const { web_staff_id: _webStaffId, ...rest } = order;
+  return {
+    ...rest,
+    total_amount: formatCentsToYuanString(order.total_amount),
+  };
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const presentOrderList = (orders: any[]) => orders.map(presentOrderAmount);

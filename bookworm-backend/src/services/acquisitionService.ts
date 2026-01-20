@@ -41,7 +41,8 @@ export interface CreateAcquisitionInput {
  */
 export interface CreateAcquisitionResult {
   id: number;
-  staff_user_id: number;
+  staff_user_id: number | null;
+  web_staff_id: number | null;
   customer_user_id: number | null;
   total_value: number;
   item_count: number;

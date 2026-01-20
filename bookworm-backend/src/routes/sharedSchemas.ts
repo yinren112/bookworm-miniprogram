@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import config from "../config";
 
 // 手机号：11位纯数字
 export const PhoneNumberSchema = Type.String({
@@ -16,10 +17,11 @@ export const ISBN13Schema = Type.String({
   description: "ISBN-10 或 ISBN-13，支持带短横线格式",
 });
 
-// 取货码：10位十六进制字符串（大小写不敏感，服务端统一转大写）
+// 取货码：固定长度十六进制字符串（大小写不敏感，服务端统一转大写）
+const PICKUP_CODE_LENGTH = config.ORDER_PICKUP_CODE_LENGTH;
 export const PickupCodeSchema = Type.String({
-  pattern: "^[a-fA-F0-9]{10}$",
-  minLength: 10,
-  maxLength: 10,
-  description: "取货码 (10位十六进制)",
+  pattern: `^[a-fA-F0-9]{${PICKUP_CODE_LENGTH}}$`,
+  minLength: PICKUP_CODE_LENGTH,
+  maxLength: PICKUP_CODE_LENGTH,
+  description: `取货码 (${PICKUP_CODE_LENGTH}位十六进制)`,
 });

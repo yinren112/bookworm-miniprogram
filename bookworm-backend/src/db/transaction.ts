@@ -73,7 +73,7 @@ export async function withTxRetry<T>(
   const merged = { ...DEFAULT_OPTIONS, ...options };
   const { maxRetries, baseDelayMs, jitter, jitterMs, isolationLevel, transactionOptions } = merged;
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await prisma.$transaction(
         (tx) => fn(tx),
@@ -84,7 +84,7 @@ export async function withTxRetry<T>(
       );
     } catch (error) {
       const shouldRetry = isRetryableTxError(error);
-      const lastAttempt = attempt === maxRetries - 1;
+      const lastAttempt = attempt === maxRetries;
 
       if (!shouldRetry || lastAttempt) {
         throw error;
@@ -92,7 +92,8 @@ export async function withTxRetry<T>(
 
       metrics.dbTransactionRetries.inc();
 
-      const backoff = baseDelayMs * Math.pow(2, attempt);
+      const retryIndex = attempt + 1;
+      const backoff = baseDelayMs * Math.pow(2, retryIndex);
       const jitterOffset = jitter ? Math.random() * jitterMs : 0;
       await new Promise((resolve) => setTimeout(resolve, backoff + jitterOffset));
     }

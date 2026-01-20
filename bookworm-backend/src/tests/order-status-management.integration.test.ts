@@ -53,6 +53,56 @@ describe("Order Status Management Integration Tests", () => {
   });
 
   describe("STAFF Order Status Updates", () => {
+    it("should keep order and inventory consistent under concurrent cancel vs fulfill", async () => {
+      const order = await prisma.order.findUnique({
+        where: { id: testOrderId },
+        select: { pickup_code: true },
+      });
+
+      const pickupCode = order?.pickup_code as string;
+
+      const [cancelResponse, fulfillResponse] = await Promise.all([
+        request(app.server)
+          .patch(`/api/orders/${testOrderId}/status`)
+          .set("Authorization", `Bearer ${staffToken}`)
+          .send({ status: "CANCELLED" }),
+        request(app.server)
+          .post("/api/orders/fulfill")
+          .set("Authorization", `Bearer ${staffToken}`)
+          .send({ pickupCode }),
+      ]);
+
+      const statusCodes = [cancelResponse.status, fulfillResponse.status];
+      expect(statusCodes).toContain(200);
+      expect(statusCodes).toContain(409);
+
+      const finalOrder = await prisma.order.findUnique({
+        where: { id: testOrderId },
+      });
+      expect(finalOrder).not.toBeNull();
+
+      const inventoryItems = await prisma.inventoryItem.findMany({
+        where: { id: { in: inventoryItemIds } },
+      });
+
+      if (finalOrder?.status === "COMPLETED") {
+        inventoryItems.forEach((item) => {
+          expect(item.status).toBe("sold");
+        });
+      } else if (finalOrder?.status === "CANCELLED") {
+        inventoryItems.forEach((item) => {
+          expect(item.status).toBe("in_stock");
+        });
+
+        const reservations = await prisma.inventoryReservation.findMany({
+          where: { inventory_item_id: { in: inventoryItemIds } },
+        });
+        expect(reservations).toHaveLength(0);
+      } else {
+        expect.fail(`Unexpected final order status: ${finalOrder?.status}`);
+      }
+    });
+
     it("should allow STAFF to complete a PENDING_PICKUP order", async () => {
       const response = await request(app.server)
         .patch(`/api/orders/${testOrderId}/status`)
@@ -141,8 +191,8 @@ describe("Order Status Management Integration Tests", () => {
         .set("Authorization", `Bearer ${staffToken}`)
         .send({ status: "CANCELLED" });
 
-      expect(response.status).toBe(400);
-      expect(response.body.code).toBe("INVALID_STATUS_TRANSITION");
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe("ORDER_STATUS_CONFLICT");
     });
 
     it("should reject attempts to change status of already CANCELLED orders", async () => {
@@ -157,8 +207,8 @@ describe("Order Status Management Integration Tests", () => {
         .set("Authorization", `Bearer ${staffToken}`)
         .send({ status: "COMPLETED" });
 
-      expect(response.status).toBe(400);
-      expect(response.body.code).toBe("INVALID_STATUS_TRANSITION");
+      expect(response.status).toBe(409);
+      expect(response.body.code).toBe("ORDER_STATUS_CONFLICT");
     });
   });
 
@@ -248,10 +298,10 @@ describe("Order Status Management Integration Tests", () => {
       const responses = await Promise.all(promises);
 
       // First request should succeed (or fail due to invalid transition after first success)
-      expect([200, 400, 500]).toContain(responses[0].status);
+      expect([200, 400, 409, 500]).toContain(responses[0].status);
 
       // In test environment, rate limiting is disabled, so all requests should succeed or fail with business logic errors
-      const successfulResponses = responses.filter((r) => [200, 400].includes(r.status));
+      const successfulResponses = responses.filter((r) => [200, 400, 409].includes(r.status));
       expect(successfulResponses.length).toBeGreaterThan(0);
     });
   });

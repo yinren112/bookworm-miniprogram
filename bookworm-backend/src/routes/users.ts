@@ -21,6 +21,10 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         response: {
           200: UserResponseSchema,
+          404: Type.Object({
+            code: Type.String(),
+            message: Type.String(),
+          }),
         },
       },
     },
