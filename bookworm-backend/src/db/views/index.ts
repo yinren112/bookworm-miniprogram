@@ -7,3 +7,4 @@ export * from './inventoryViews';
 export * from './bookViews';
 export * from './acquisitionViews';
 export * from './paymentViews';
+export * from './studyViews';

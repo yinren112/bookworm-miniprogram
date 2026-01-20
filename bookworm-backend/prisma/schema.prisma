@@ -10,6 +10,7 @@ datasource db {
 model Order {
   id               Int                    @id @default(autoincrement())
   user_id          Int
+  web_staff_id     Int?                   // Web员工 (Staff表，仅SELL订单使用)
   status           OrderStatus            @default(PENDING_PAYMENT)
   total_amount     Int                    @db.Integer
   pickup_code      String                 @unique @db.VarChar(16)
@@ -26,6 +27,7 @@ model Order {
   voucherFaceValue Int?                   @map("voucher_face_value")
   notes            String?
   User             User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user")
+  WebStaff         Staff?                 @relation("WebStaffSellOrders", fields: [web_staff_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
   orderItem        OrderItem[]
   PaymentRecord    PaymentRecord[]
   reservations     InventoryReservation[]
@@ -36,6 +38,7 @@ model Order {
   @@index([user_id, status], map: "idx_order_user_id_status")
   @@index([createdAt], map: "idx_order_created_at")
   @@index([user_id, createdAt, id], map: "idx_order_user_created_at_id")
+  @@index([web_staff_id], map: "idx_order_web_staff_id")
 }
 
 model PendingPaymentOrder {
@@ -79,6 +82,14 @@ model User {
   StaffAcquisitions    Acquisition[]         @relation("StaffAcquisitions")
   CustomerAcquisitions Acquisition[]         @relation("CustomerAcquisitions")
   profile              UserProfile?
+
+  // 复习系统关联
+  courseEnrollments UserCourseEnrollment[]
+  cardStates        UserCardState[]
+  questionAttempts  UserQuestionAttempt[]
+  wrongItems        UserWrongItem[]
+  studyStreak       UserStudyStreak?
+  studyFeedbacks    StudyFeedback[]
 
   @@index([phone_number])
 }
@@ -201,19 +212,22 @@ model PaymentRecord {
 
 model Acquisition {
   id               Int             @id @default(autoincrement())
-  staff_user_id    Int
+  staff_user_id    Int?            // 小程序员工 (User表)
   customer_user_id Int?
+  web_staff_id     Int?            // Web员工 (Staff表)
   total_value      Int
   item_count       Int
   settlement_type  SettlementType
   voucher_code     String?         @db.VarChar(255)
   notes            String?
   created_at       DateTime        @default(now()) @db.Timestamptz(6)
-  StaffUser        User            @relation("StaffAcquisitions", fields: [staff_user_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  StaffUser        User?           @relation("StaffAcquisitions", fields: [staff_user_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
   CustomerUser     User?           @relation("CustomerAcquisitions", fields: [customer_user_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  WebStaff         Staff?          @relation("WebStaffAcquisitions", fields: [web_staff_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
   items            InventoryItem[]
 
   @@index([staff_user_id], map: "Acquisition_staff_user_id_idx")
+  @@index([web_staff_id], map: "Acquisition_web_staff_id_idx")
   @@index([created_at], map: "Acquisition_created_at_idx")
 }
 
@@ -312,4 +326,317 @@ model WebhookEvent {
 
   @@index([received_at])
   @@map("webhook_events")
+}
+
+// ============================================
+// Web员工系统 (临时过渡方案，小程序上架后废弃)
+// ============================================
+
+enum StaffRole {
+  STAFF // 普通员工：只能收书
+  ADMIN // 管理员：收书 + 管理员工 + 查看所有人统计
+}
+
+enum StaffStatus {
+  ACTIVE
+  DISABLED
+}
+
+model Staff {
+  id            Int         @id @default(autoincrement())
+  username      String      @unique @db.VarChar(50)
+  password_hash String      @db.VarChar(255)
+  display_name  String      @db.VarChar(100)
+  role          StaffRole   @default(STAFF)
+  status        StaffStatus @default(ACTIVE)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime    @updatedAt @db.Timestamptz(6)
+  last_login_at DateTime?   @db.Timestamptz(6)
+
+  acquisitions Acquisition[] @relation("WebStaffAcquisitions")
+  sellOrders   Order[]       @relation("WebStaffSellOrders")
+
+  @@index([username])
+  @@index([status])
+  @@map("staff")
+}
+
+// ============================================
+// 复习系统 (Study Domain) - 与库存/订单域完全隔离
+// ============================================
+
+// 复习系统枚举
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTI_CHOICE
+  TRUE_FALSE
+  FILL_BLANK
+}
+
+enum FeedbackRating {
+  FORGOT  // 不会 -> boxLevel = 1
+  FUZZY   // 模糊 -> boxLevel = max(1, current - 1)
+  KNEW    // 会   -> boxLevel = min(5, current + 1)
+  PERFECT // 很熟 -> boxLevel = min(5, current + 2)
+}
+
+enum FeedbackReasonType {
+  ANSWER_ERROR
+  STEM_AMBIGUOUS
+  EXPLANATION_UNCLEAR
+  FORMAT_ERROR
+  OTHER
+}
+
+enum StudyFeedbackStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================
+// 复习系统 - 内容侧模型 (Content Models)
+// ============================================
+
+model StudyCourse {
+  id             Int          @id @default(autoincrement())
+  courseKey      String       @db.VarChar(100) // e.g., "MA101"
+  title          String       @db.VarChar(255)
+  description    String?
+  contentVersion Int          @default(1) @map("content_version")
+  locale         String       @default("zh-CN") @db.VarChar(10)
+  status         CourseStatus @default(DRAFT)
+  totalCards     Int          @default(0) @map("total_cards")
+  totalQuestions Int          @default(0) @map("total_questions")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  units       StudyUnit[]
+  cheatSheets StudyCheatSheet[]
+  enrollments UserCourseEnrollment[]
+  campaignMaps StudyCampaignMap[]
+  feedbacks   StudyFeedback[]
+
+  @@unique([courseKey, contentVersion])
+  @@index([status, courseKey])
+  @@map("study_course")
+}
+
+model StudyUnit {
+  id         Int      @id @default(autoincrement())
+  courseId   Int      @map("course_id")
+  unitKey    String   @db.VarChar(100) // e.g., "limit", "derivative"
+  title      String   @db.VarChar(255)
+  orderIndex Int      @default(0) @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  course      StudyCourse      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  cards       StudyCard[]
+  questions   StudyQuestion[]
+  cheatSheets StudyCheatSheet[]
+
+  @@unique([courseId, unitKey])
+  @@index([courseId, orderIndex])
+  @@map("study_unit")
+}
+
+model StudyCard {
+  id         Int      @id @default(autoincrement())
+  courseId   Int      @map("course_id")
+  unitId     Int      @map("unit_id")
+  contentId  String   @db.VarChar(100) // 课程包内唯一ID，用于进度继承
+  front      String   @db.Text // 正面（问题/提示）
+  back       String   @db.Text // 背面（答案/解释）
+  tags       String?  @db.VarChar(255) // 逗号分隔的标签
+  difficulty Int      @default(1) // 1-5 难度等级
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  unit       StudyUnit       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  userStates UserCardState[]
+  feedbacks  StudyFeedback[] @relation("CardFeedbacks")
+
+  @@unique([unitId, contentId])
+  @@index([unitId, sortOrder])
+  @@index([courseId])
+  @@map("study_card")
+}
+
+model StudyQuestion {
+  id               Int          @id @default(autoincrement())
+  courseId         Int          @map("course_id")
+  unitId           Int          @map("unit_id")
+  contentId        String       @db.VarChar(100)
+  questionType     QuestionType @map("question_type")
+  stem             String       @db.Text // 题干
+  optionsJson      Json?        @map("options_json") // 选项 JSON: ["A. xxx", "B. xxx", ...]
+  answerJson       String       @db.VarChar(500) @map("answer_json") // 正确答案
+  explanationShort String?      @map("explanation_short") @db.Text // 一句话解析
+  difficulty       Int          @default(1)
+  sortOrder        Int          @default(0) @map("sort_order")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  unit       StudyUnit             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  attempts   UserQuestionAttempt[]
+  wrongItems UserWrongItem[]
+  feedbacks  StudyFeedback[]       @relation("QuestionFeedbacks")
+
+  @@unique([unitId, contentId])
+  @@index([unitId, sortOrder])
+  @@index([courseId])
+  @@map("study_question")
+}
+
+model StudyCheatSheet {
+  id        Int      @id @default(autoincrement())
+  courseId  Int      @map("course_id")
+  unitId    Int?     @map("unit_id") // 可选：关联到特定章节
+  title     String   @db.VarChar(255)
+  assetType String   @db.VarChar(20) // "pdf" | "image"
+  url       String   @db.VarChar(500)
+  version   Int      @default(1)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  course StudyCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  unit   StudyUnit?  @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@index([courseId, sortOrder])
+  @@map("study_cheat_sheet")
+}
+
+model StudyCampaignMap {
+  id        Int      @id @default(autoincrement())
+  sceneCode String   @unique @db.VarChar(32) // 小程序码 scene 参数，e.g., "R9xK2pQ"
+  courseId  Int      @map("course_id")
+  unitKey   String?  @db.VarChar(100) // 可选：直接跳转到特定章节
+  note      String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  course StudyCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([sceneCode])
+  @@map("study_campaign_map")
+}
+
+// ============================================
+// 复习系统 - 进度侧模型 (Progress Models)
+// ============================================
+
+model UserCourseEnrollment {
+  id             Int       @id @default(autoincrement())
+  userId         Int       @map("user_id")
+  courseId       Int       @map("course_id")
+  enrolledAt     DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  sourceScene    String?   @map("source_scene") @db.VarChar(32) // 来源扫码场景
+  lastStudiedAt  DateTime? @map("last_studied_at") @db.Timestamptz(6)
+  completedCards Int       @default(0) @map("completed_cards")
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course StudyCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId, lastStudiedAt])
+  @@map("user_course_enrollment")
+}
+
+model UserCardState {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @map("user_id")
+  cardId          Int       @map("card_id")
+  boxLevel        Int       @default(1) @map("box_level") // Leitner 1-5
+  nextDueAt       DateTime  @map("next_due_at") @db.Timestamptz(6) // 下次复习时间
+  lastAnsweredAt  DateTime? @map("last_answered_at") @db.Timestamptz(6)
+  lastSessionId   String?   @map("last_session_id") @db.VarChar(36)
+  todayShownCount Int       @default(0) @map("today_shown_count") // 今日已显示次数
+  totalAttempts   Int       @default(0) @map("total_attempts")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card StudyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId, nextDueAt]) // 今日队列核心查询
+  @@map("user_card_state")
+}
+
+model UserQuestionAttempt {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  questionId       Int      @map("question_id")
+  sessionId        String   @db.VarChar(36) @map("session_id") // Quiz session UUID
+  chosenAnswerJson String   @map("chosen_answer_json") @db.VarChar(500)
+  isCorrect        Boolean  @map("is_correct")
+  durationMs       Int?     @map("duration_ms")
+  attemptedAt      DateTime @default(now()) @map("attempted_at") @db.Timestamptz(6)
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId, questionId], map: "uniq_attempt_session_user_question") // Idempotency: one attempt per session+user+question
+  @@index([userId, sessionId])
+  @@index([questionId, isCorrect])
+  @@map("user_question_attempt")
+}
+
+model UserWrongItem {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  questionId Int       @map("question_id")
+  wrongCount Int       @default(1) @map("wrong_count")
+  lastWrongAt DateTime @default(now()) @map("last_wrong_at") @db.Timestamptz(6)
+  clearedAt  DateTime? @map("cleared_at") @db.Timestamptz(6) // null = 仍在错题本
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question StudyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId, clearedAt]) // 查询未解决的错题
+  @@map("user_wrong_item")
+}
+
+model UserStudyStreak {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @unique @map("user_id")
+  currentStreak Int       @default(0) @map("current_streak") // 当前连续天数
+  bestStreak    Int       @default(0) @map("best_streak") // 历史最长
+  lastStudyDate DateTime? @map("last_study_date") @db.Date
+  weeklyPoints  Int       @default(0) @map("weekly_points") // 本周积分
+  weekStartDate DateTime? @map("week_start_date") @db.Date
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([weeklyPoints]) // 周榜排序
+  @@map("user_study_streak")
+}
+
+model StudyFeedback {
+  id         Int                 @id @default(autoincrement())
+  userId     Int                 @map("user_id")
+  courseId   Int                 @map("course_id")
+  cardId     Int?                @map("card_id")
+  questionId Int?                @map("question_id")
+  reason     FeedbackReasonType
+  message    String              @db.Text
+  status     StudyFeedbackStatus @default(PENDING)
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedAt DateTime?           @map("resolved_at") @db.Timestamptz(6)
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   StudyCourse    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  card     StudyCard?     @relation("CardFeedbacks", fields: [cardId], references: [id], onDelete: SetNull)
+  question StudyQuestion? @relation("QuestionFeedbacks", fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([courseId])
+  @@map("study_feedback")
 }

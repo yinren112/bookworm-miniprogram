@@ -28,6 +28,7 @@ import paymentRoutes from "./routes/payment";
 import sellOrdersRoutes from "./routes/sellOrders";
 import acquisitionsRoutes from "./routes/acquisitions";
 import usersRoutes from "./routes/users";
+import studyRoutes from "./routes/study";
 
 // --- Type Augmentation for Fastify ---
 declare module "fastify" {
@@ -305,6 +306,7 @@ const setupApplication = async () => {
   await fastify.register(sellOrdersRoutes);
   await fastify.register(ordersRoutes);
   await fastify.register(paymentRoutes, { wechatPayAdapter });
+  await fastify.register(studyRoutes);
 };
 
 // Export function to build app for testing

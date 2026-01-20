@@ -58,6 +58,8 @@ const schema = Type.Object({
   CRON_INVENTORY_METRICS: Type.String({ default: "*/5 * * * *" }),
   CRON_WECHAT_CERT_REFRESH: Type.String({ default: "0 */10 * * *" }),
   CRON_REFUND_PROCESSOR: Type.String({ default: "*/10 * * * *" }),
+  // Weekly reset: Monday 00:00 Beijing time (UTC+8) = Sunday 16:00 UTC
+  CRON_WEEKLY_POINTS_RESET: Type.String({ default: "0 16 * * 0" }),
 
   // API Rate Limiting
   API_LOGIN_RATE_LIMIT_MAX: Type.Number({ default: 10 }),
@@ -165,6 +167,16 @@ if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
     errors.push(
       "LOG_EXPOSE_DEBUG must be false in production. This setting exposes sensitive data in logs."
     );
+  }
+
+  // Network binding must be reachable in production/staging
+  if (!config.HOST || config.HOST === "127.0.0.1" || config.HOST === "localhost") {
+    errors.push("HOST must be set to 0.0.0.0 (or a routable address) in production.");
+  }
+
+  // CORS must be explicitly configured for web admin
+  if (!config.CORS_ORIGIN) {
+    errors.push("CORS_ORIGIN must be set in production.");
   }
 
   if (errors.length > 0) {

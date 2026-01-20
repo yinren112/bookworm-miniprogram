@@ -5,6 +5,7 @@ import { withAdvisoryLock } from "./utils/dbLock";
 import { cancelExpiredOrders } from "./services/orderService";
 import { metrics } from "./plugins/metrics";
 import { processRefundQueue } from "./jobs/refundProcessor";
+import { resetWeeklyPoints } from "./services/study/streakService";
 import config from "./config";
 import prisma from "./db";
 
@@ -120,6 +121,31 @@ export function startCronJobs(fastify: FastifyInstance): void {
     jobPromise.finally(() => runningJobs.delete(jobPromise));
   });
   scheduledTasks.push(refundTask);
+
+  // Schedule weekly points reset (Monday 00:00 Beijing time = Sunday 16:00 UTC)
+  const weeklyResetTask = cron.schedule(config.CRON_WEEKLY_POINTS_RESET, async () => {
+    if (isShuttingDown) return;
+    const jobPromise = withAdvisoryLock(
+      prisma,
+      "job:reset_weekly_points",
+      async () => {
+        fastify.log.info("Running scheduled job to reset weekly points");
+        try {
+          const resetCount = await prisma.$transaction(async (tx) => {
+            return resetWeeklyPoints(tx);
+          });
+          fastify.log.info(
+            `WeeklyPointsReset job finished: ${resetCount} user(s) reset`,
+          );
+        } catch (error) {
+          fastify.log.error(error, 'CRITICAL: The "WeeklyPointsReset" job failed');
+        }
+      },
+    );
+    runningJobs.add(jobPromise);
+    jobPromise.finally(() => runningJobs.delete(jobPromise));
+  });
+  scheduledTasks.push(weeklyResetTask);
 
   fastify.log.info(`Started ${scheduledTasks.length} cron jobs`);
 }
