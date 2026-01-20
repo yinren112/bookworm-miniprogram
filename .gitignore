@@ -6,7 +6,6 @@ node_modules/
 *.log
 logs/
 bookworm-backend/logs/
-reports/
 bookworm-backend/reports/
 
 # Runtime data
@@ -51,9 +50,7 @@ miniprogram/package-lock.json
 *.xls
 *.xlsx
 
-# Test output
-*.txt
-!README.txt
+# Test output (specific files only)
 bookworm-backend/test-output.txt
 bookworm-backend/test_output.txt
 bookworm-backend/test-results.txt
@@ -69,6 +66,13 @@ bin/
 k6-v0.49.0-windows-amd64/
 k6-v0.49.0-windows-amd64.zip
 review-module-blockers.md
+
+# Temporary docs (task-specific)
+docs/HANDOFF_REVIEW_BUGS.md
+docs/REVIEW_ONLY_MODE_PLAN.md
+
+# Seeds with sensitive data
+data/seeds/ISBN.csv
 
 # Tool-specific directories
 .trae/
