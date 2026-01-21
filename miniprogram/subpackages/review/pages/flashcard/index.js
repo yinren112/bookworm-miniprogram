@@ -249,13 +249,14 @@ Page({
 
         if (isLastCard) {
             this.triggerHaptic('celebration');
-            this.setData({
-                completed: true,
-                progressPercent: 100,
-                // cleanup
-                cardStyle: '',
-                swipeOpacityForgot: 0,
-                swipeOpacityKnew: 0
+            
+            // 计算统计数据
+            const durationSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+            const starredCount = Object.keys(this.data.starredItems).length;
+            
+            // 跳转到结算页面
+            wx.redirectTo({
+                url: `/subpackages/review/pages/session-complete/index?count=${cards.length}&duration=${durationSeconds}&starred=${starredCount}&courseKey=${encodeURIComponent(this.data.courseKey)}`
             });
         } else {
             const nextCard = cards[nextIndex];

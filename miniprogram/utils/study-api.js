@@ -352,6 +352,22 @@ const getStarredItems = (options = {}) => {
   });
 };
 
+/**
+ * 获取学习活动历史（热力图数据）
+ * @param {Object} options - 查询选项
+ * @param {number} [options.days] - 天数，默认35天
+ */
+const getActivityHistory = (options = {}) => {
+  const queryString = buildQueryString({
+    days: options.days,
+  });
+  return request({
+    url: `/study/activity-history${queryString}`,
+    method: 'GET',
+    requireAuth: true,
+  });
+};
+
 module.exports = {
   // Phase 2: 课程和卡片
   getCourses,
@@ -377,4 +393,6 @@ module.exports = {
   starItem,
   unstarItem,
   getStarredItems,
+  // Phase 5.5: 热力图
+  getActivityHistory,
 };

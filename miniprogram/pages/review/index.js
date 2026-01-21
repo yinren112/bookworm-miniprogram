@@ -1,7 +1,7 @@
 // pages/review/index.js
 // 复习首页
 
-const { getCourses, getTodayQueue, getStreakInfo } = require('../../utils/study-api');
+const { getCourses, getTodayQueue, getStreakInfo, getActivityHistory } = require('../../utils/study-api');
 const logger = require('../../utils/logger');
 
 Page({
@@ -13,6 +13,7 @@ Page({
     todayDate: '',
     streakInfo: null,
     recommendedCourses: [],
+    heatmapData: [],
   },
 
   onLoad() {
@@ -75,12 +76,22 @@ Page({
         logger.error('Failed to get streak info:', err);
       }
 
+      // 获取热力图数据
+      let heatmapData = [];
+      try {
+        const activityRes = await getActivityHistory({ days: 35 });
+        heatmapData = (activityRes.days || []).map(d => ({ level: d.level }));
+      } catch (err) {
+        logger.error('Failed to get activity history:', err);
+      }
+
       this.setData({
         courses: enrolledCourses,
         currentCourse,
         todaySummary,
         streakInfo,
-        recommendedCourses, 
+        recommendedCourses,
+        heatmapData,
         loading: false,
       });
     } catch (err) {

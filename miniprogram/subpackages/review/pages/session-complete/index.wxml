@@ -1,0 +1,50 @@
+<!-- pages/session-complete/index.wxml -->
+<view class="page">
+    <!-- 庆祝动画区域 -->
+    <view class="celebration-area">
+        <view class="celebration-icon">🎉</view>
+        <view class="celebration-title">太棒了！</view>
+        <view class="celebration-subtitle">今日复习完成</view>
+    </view>
+    <!-- 统计卡片 -->
+    <view class="stats-card clay-card">
+        <view class="stats-title">本次复习</view>
+        <view class="stat-row">
+            <view class="stat-icon">📚</view>
+            <view class="stat-label">复习卡片</view>
+            <view class="stat-value">{{cardCount}} 张</view>
+        </view>
+        <view class="stat-row">
+            <view class="stat-icon">⏱️</view>
+            <view class="stat-label">用时</view>
+            <view class="stat-value">
+                {{durationSeconds < 60 ? durationSeconds + '秒' : (durationSeconds / 60 | 0) + '分钟'}}
+            </view>
+        </view>
+        <view class="stat-row" wx:if="{{starredCount > 0}}">
+            <view class="stat-icon">⭐</view>
+            <view class="stat-label">星标收藏</view>
+            <view class="stat-value">{{starredCount}} 张</view>
+        </view>
+    </view>
+    <!-- 连续学习 -->
+    <view class="streak-card clay-card" wx:if="{{!loading}}">
+        <view class="streak-flame">🔥</view>
+        <view class="streak-info">
+            <view class="streak-current">
+                <text class="streak-number">{{currentStreak}}</text>
+                <text class="streak-unit">天</text>
+            </view>
+            <view class="streak-label">连续学习</view>
+        </view>
+        <view class="streak-best" wx:if="{{bestStreak > 0}}">最佳: {{bestStreak}}天</view>
+    </view>
+    <!-- 操作按钮 -->
+    <view class="action-area">
+        <button class="action-btn primary" bindtap="continueReview" wx:if="{{remainingCards > 0}}">
+            继续复习
+            <text class="btn-hint">(还有 {{remainingCards}} 张待复习)</text>
+        </button>
+        <button class="action-btn secondary" bindtap="goHome">返回首页</button>
+    </view>
+</view>

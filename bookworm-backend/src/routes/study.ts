@@ -32,6 +32,8 @@ import {
   getStreakInfo,
   getWeeklyLeaderboard,
   getUserRank,
+  // Phase 5.5: Activity History (Heatmap)
+  getActivityHistory,
   // Phase 6: Course Import
   importCoursePackage,
   listCourseVersions,
@@ -83,6 +85,9 @@ import {
   // Phase 5 schemas
   LeaderboardQuerySchema,
   LeaderboardQuery,
+  ActivityHistoryQuerySchema,
+  ActivityHistoryQuery,
+  ActivityHistoryResponseSchema,
   // Phase 6 schemas
   ImportCourseBodySchema,
   ImportCourseBody,
@@ -778,6 +783,36 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
             : null,
           isStudiedToday: myStreak.isStudiedToday,
         },
+      });
+    },
+  );
+
+  // ============================================
+  // Phase 5.5: 学习活动历史端点（热力图）
+  // ============================================
+
+  // GET /api/study/activity-history - 获取学习活动历史（热力图数据）
+  fastify.get<{ Querystring: ActivityHistoryQuery }>(
+    "/api/study/activity-history",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        querystring: ActivityHistoryQuerySchema,
+        response: {
+          200: ActivityHistoryResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const days = request.query.days || 35; // 默认35天（5周）
+
+      const history = await getActivityHistory(prisma, userId, days);
+
+      reply.send({
+        days: history.days,
+        totalDays: history.totalDays,
+        totalCount: history.totalCount,
       });
     },
   );

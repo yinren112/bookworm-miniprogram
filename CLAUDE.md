@@ -242,6 +242,7 @@ The system follows a strict "books as atomic inventory items" model where each i
 - Global CSS variables in `app.wxss` (V10 design system)
 - Shared search component in `templates/search-bar.*`
 - Brand colors: Primary green `#2c5f2d`, secondary `#558056`
+- `components/mp-html/`: Third-party rich-text component (do not lint/format or modify unless upgrading)
 
 **Module Architecture:**
 - **Core Utility Modules**:
@@ -251,6 +252,7 @@ The system follows a strict "books as atomic inventory items" model where each i
 
 - **Additional Utility Modules**:
   - `ui.js`: UI helpers (showError, showSuccess, formatPrice)
+  - `logger.js`: Unified logging helper (avoid direct `console.*` in miniprogram code)
   - `error.js`: Error message extraction
   - `payment.js`: Payment workflow (createOrderAndPay, safeCreateOrderAndPay)
   - `constants.js`: Business constants (ORDER_STATUS enums)
@@ -329,6 +331,9 @@ The system uses PostgreSQL with these core entities:
 - `UserProfile` - Student identity (enrollment_year, major, class_name)
 - `RecommendedBookList` - Per-major book recommendations
 - `RecommendedBookItem` - Links BookSKU to recommendation lists
+
+**Study System:**
+- `UserStarredItem` - User starred cards/questions (`type`: card | question, `contentId` or `questionId`)
 
 **Static Content:**
 - `Content` - CMS-style static content (slug-based routing)
@@ -489,6 +494,11 @@ WX_APP_SECRET=test-app-secret
 - `POST /acquisitions` - Create acquisition record (staff only)
 - `POST /sell-orders` - Create sell order (staff only, for acquiring books from customers)
 
+**Study APIs** (all prefixed with `/api`):
+- `POST /study/star` - Add starred item (type: card | question)
+- `DELETE /study/star` - Remove starred item (type: card | question)
+- `GET /study/starred-items` - Get starred items (filter by type/courseKey)
+
 **System APIs:**
 - `GET /metrics` - Prometheus metrics for monitoring
 
@@ -538,6 +548,7 @@ WX_APP_SECRET=test-app-secret
 - WeChat Mini Program TabBar only supports PNG icons, not SVG
 - Dynamic WeChat Pay certificate management with auto-refresh
 - Payment notification webhook with timestamp validation
+- 小程序禁止直接使用 `console.*`，统一用 `miniprogram/utils/logger.js`（提交检查会忽略 `miniprogram/components/mp-html` 与 `miniprogram/node_modules`）。
 
 **复习模式（前端）:**
 - `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 保持 `true`
@@ -569,6 +580,7 @@ npm run test:integration    # Run integration tests with Testcontainers
 - Each test worker gets its own PostgreSQL container
 - Configured for single-worker execution (threads: false, singleFork: true)
 - Database cleanup handled automatically via `integrationSetup.ts` hooks
+- 单文件集成测试需指定配置：`npx vitest run -c vitest.integration.config.ts <file> --testTimeout <ms>`
 
 **Test Infrastructure:**
 - `globalSetup.ts`: Starts Testcontainers and provides helper functions (createTestUser, createTestInventoryItems)
@@ -707,3 +719,17 @@ Host lailinkeji
 3. 刷题全绿时优先检查返回的 `correctOptionIndices` 与数据库 `study_question.answer_json`：
    - `answer_json` 必须与 `options_json` 的选项文本一致（单选/判断只保留一个）。
 4. 若题库文件丢失，导入格式必须包含 `manifest.json`、`units.json`、`questions/*.gift`、`cards/*.tsv`（路径不在仓库则向运维索取）。
+
+### SOP-迁移漂移清理与重建（仅开发库）
+1. 迁移 drift 阻断时，先确认是开发环境数据库。
+2. 执行 `npx prisma migrate reset --force` 清理并重建 schema。
+3. 执行 `npx prisma migrate dev --name <name>` 生成并应用迁移。
+4. 若需要种子数据，确保 `.env` 指向开发库再执行。
+
+### SOP-单文件集成测试执行
+1. 集成测试默认排除 `*.integration.test.ts`，需指定配置。
+2. 使用：`npx vitest run -c vitest.integration.config.ts <file> --testTimeout <ms>`。
+
+### SOP-预提交忽略第三方 mp-html
+1. 在 `miniprogram/.eslintignore` 中加入 `components/mp-html/**`。
+2. 在 `.husky/pre-commit` 的 console 守卫中排除 `mp-html` 目录。

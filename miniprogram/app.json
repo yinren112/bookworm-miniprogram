@@ -34,7 +34,8 @@
         "pages/flashcard/index",
         "pages/quiz/index",
         "pages/cheatsheet/index",
-        "pages/leaderboard/index"
+        "pages/leaderboard/index",
+        "pages/session-complete/index"
       ]
     }
   ],

@@ -407,10 +407,27 @@ export const LeaderboardResponseSchema = Type.Object({
   myStreak: Type.Optional(StreakInfoResponseSchema),
 });
 
+export const ActivityHistoryQuerySchema = Type.Object({
+  days: Type.Optional(Type.Integer({ minimum: 1, maximum: 365, default: 35 })),
+});
+
+export const DailyActivitySchema = Type.Object({
+  date: Type.String({ format: "date" }),
+  count: Type.Integer({ minimum: 0 }),
+  level: Type.Integer({ minimum: 0, maximum: 3 }),
+});
+
+export const ActivityHistoryResponseSchema = Type.Object({
+  days: Type.Array(DailyActivitySchema),
+  totalDays: Type.Integer({ minimum: 0 }),
+  totalCount: Type.Integer({ minimum: 0 }),
+});
+
 // Phase 5 types
 export type LeaderboardQuery = Static<typeof LeaderboardQuerySchema>;
 export type StreakInfoResponse = Static<typeof StreakInfoResponseSchema>;
 export type LeaderboardResponse = Static<typeof LeaderboardResponseSchema>;
+export type ActivityHistoryQuery = Static<typeof ActivityHistoryQuerySchema>;
 
 // ============================================
 // 课程包导入 Schema (Phase 6)

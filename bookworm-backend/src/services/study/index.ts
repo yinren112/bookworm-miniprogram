@@ -109,3 +109,11 @@ export {
   type PackageFiles,
   type CourseVersionInfo,
 } from "./importService";
+
+// 学习活动服务（热力图）
+export {
+  getActivityHistory,
+  type DailyActivity,
+  type ActivityHistory,
+} from "./activityService";
+

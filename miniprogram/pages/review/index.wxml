@@ -60,6 +60,11 @@
       </view>
       <text class="streak-sub">保持热度，从未止步</text>
     </view>
+    <view class="heatmap-grid" wx:if="{{heatmapData.length > 0}}">
+      <block wx:for="{{heatmapData}}" wx:key="index">
+        <view class="heatmap-cell level-{{item.level}}"></view>
+      </block>
+    </view>
   </view>
   <!-- 课程列表 -->
   <view class="courses-section">

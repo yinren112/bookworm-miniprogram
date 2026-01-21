@@ -430,7 +430,8 @@ setCourseStatus(db, courseId, status): Promise<void>
       "pages/flashcard/index",
       "pages/quiz/index",
       "pages/cheatsheet/index",
-      "pages/leaderboard/index"
+      "pages/leaderboard/index",
+      "pages/session-complete/index"
     ]
   }],
   "preloadRule": {
@@ -454,7 +455,8 @@ miniprogram/subpackages/review/
 │   ├── flashcard/      ✅ 卡片页 - 翻转 + 四档反馈
 │   ├── quiz/           ✅ 题目页 - 选择/判断/填空
 │   ├── cheatsheet/     ✅ 急救包 - PDF/图片预览
-│   └── leaderboard/    ✅ 周榜页 - Top 50 + 我的排名
+│   ├── leaderboard/    ✅ 周榜页 - Top 50 + 我的排名
+│   └── session-complete/ ✅ 结算页 - 复习完成统计
 ├── components/
 │   └── report-issue/   ✅ 纠错弹窗
 └── utils/
@@ -468,6 +470,7 @@ bookworm-backend/src/services/study/
 ├── cheatsheetService.ts ✅ 急救包服务
 ├── feedbackService.ts  ✅ 纠错反馈服务
 ├── streakService.ts    ✅ 连续学习服务
+├── activityService.ts  ✅ 学习活动热力图
 └── importService.ts    ✅ 课程包导入器
 ```
 
@@ -508,6 +511,11 @@ bookworm-backend/src/services/study/
 | GET | `/api/study/streak` | ✅ | 获取连续学习信息 |
 | GET | `/api/study/leaderboard` | ✅ | 获取周榜 |
 
+### Phase 5.5 (热力图)
+| 方法 | 端点 | 状态 | 说明 |
+|------|------|------|------|
+| GET | `/api/study/activity-history` | ✅ | 获取学习活动历史 |
+
 ### Phase 6 (导入器)
 | 方法 | 端点 | 状态 | 说明 |
 |------|------|------|------|
@@ -545,6 +553,10 @@ bookworm-backend/src/services/study/
 - Phase 3-4 前端完成: quiz, cheatsheet 页面 + report-issue 组件
 - 修复 feedbackService.ts 类型错误
 - 添加 @types/uuid 依赖
+
+### 2026-01-22
+- 新增学习活动热力图接口与前端接入
+- 新增复习完成结算页与跳转
 
 ### 2025-12-XX (之前)
 - Phase 1-2 完成: 数据模型、课程服务、卡片排程

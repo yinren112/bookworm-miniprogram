@@ -1,7 +1,8 @@
 ﻿# Repository Guidelines
 
 ## 项目结构与模块组织
-- `miniprogram/`：微信小程序前端；`pages/`当前承载复习主页(`pages/review`)与个人中心(`pages/profile`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载刷题/背卡等复习子页面；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
+- `miniprogram/`：微信小程序前端；`pages/`当前承载复习主页(`pages/review`)与个人中心(`pages/profile`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载刷题/背卡等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
+- `miniprogram/components/mp-html/`：第三方富文本组件，保持原样，不做规则性格式化或 ESLint 改造。
 - `bookworm-backend/`：Fastify + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
 - 根目录脚本`test_metrics.sh`与`update_user_metrics.js`用于观测性验证，改动前须先与运维同步。
 
@@ -15,11 +16,13 @@
 - 全局采用两空格缩进与 UTF-8 编码；JavaScript/TypeScript 遵循 ESLint 规则，对`_ignored`等前缀允许未使用变量，对`any`仅警告。
 - 函数与变量使用驼峰，跨模块构件用帕斯卡命名（例如`OrderTimeline`），页面目录保持短横线风格（`order-detail`）。
 - TypeScript 必须显式导出类型；配置常量统一放入`miniprogram/utils/constants.js`或`bookworm-backend/src/constants.ts`。
+- 小程序禁止直接使用 `console.*`，统一用 `miniprogram/utils/logger.js`。
 
 ## 测试准则
 - 新增单元测试需在`src/tests`中镜像源码层级（如`services/orderService.test.ts`）；集成测试文件以`.integration.test.ts`结尾并复用`integrationSetup.ts`。
 - 服务层覆盖率目标不低于约定阈值，若暂无法覆盖需在 PR 中记录原因。
 - 小程序改动必须附带人工验证说明（设备、账号）及 UI 截图影响。
+- 如需单文件集成测试，使用 `npx vitest run -c vitest.integration.config.ts <file> --testTimeout <ms>`。
 
 ## 提交与 Pull Request
 - 提交消息遵循 Conventional Commits（`feat:`, `fix:`, `perf:`, `build:` 等），标题不超过 72 个字符，正文引用相关需求或缺陷编号。
@@ -38,6 +41,11 @@
 - `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 需保持 `true`。
 - `miniprogram/utils/payment.js` 在复习模式下阻断 `createOrderAndPay`。
 - `pages/profile/index` 隐藏手机号授权与员工操作入口，分享指向复习首页。
+
+## 复习星标
+- 数据模型：后端使用单表 `user_starred_item`（`userId`、`type`、`contentId?`、`questionId?`）。
+- 接口：`POST /study/star`、`DELETE /study/star`、`GET /study/starred-items`。
+- 响应结构：`{ items: [{ type, contentId?, questionId? }] }`，前端通过 `starItem/unstarItem/getStarredItems` 调用。
 
 ## 沟通方式与角色定义
 - 所有协作者必须以中文思考、讨论与记录；命令及代码标识保持原文。

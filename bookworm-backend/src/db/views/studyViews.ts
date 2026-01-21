@@ -275,6 +275,14 @@ export const cardStateSessionView = {
   boxLevel: true,
 } as const satisfies Prisma.UserCardStateSelect;
 
+export const cardStateActivityView = {
+  lastAnsweredAt: true,
+} as const satisfies Prisma.UserCardStateSelect;
+
+export const questionAttemptActivityView = {
+  attemptedAt: true,
+} as const satisfies Prisma.UserQuestionAttemptSelect;
+
 // ============================================
 // UserStudyStreak 视图选择器（周榜用）
 // ============================================
