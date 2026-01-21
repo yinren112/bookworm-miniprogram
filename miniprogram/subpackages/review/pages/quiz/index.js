@@ -2,6 +2,7 @@
 // 刷题闯关页
 
 const { startQuiz, submitQuizAnswer, starItem, unstarItem, getStarredItems } = require("../../utils/study-api");
+const logger = require("../../../../utils/logger");
 
 Page({
   data: {
@@ -87,7 +88,7 @@ Page({
         });
         starredItems = buildQuestionStarredMap(starredRes?.items || []);
       } catch (err) {
-        console.error("Failed to load starred items:", err);
+        logger.error("Failed to load starred items:", err);
       }
 
       this.setData({
@@ -111,7 +112,7 @@ Page({
         optionStates: buildOptionStates(questions[0]?.options || [], [], []),
       });
     } catch (err) {
-      console.error("Failed to start quiz:", err);
+      logger.error("Failed to start quiz:", err);
       this.setData({ loading: false });
       wx.showToast({
         title: "加载失败",
@@ -141,7 +142,7 @@ Page({
          this.setData({ starredItems });
        })
        .catch((err) => {
-         console.error("Failed to update star:", err);
+         logger.error("Failed to update star:", err);
          this.setData({ isStarred: !newVal });
          wx.showToast({
            title: "星标同步失败",
@@ -288,7 +289,7 @@ Page({
       // 触觉反馈
       wx.vibrateShort({ type: result.isCorrect ? "light" : "medium" });
     } catch (err) {
-      console.error("Failed to submit answer:", err);
+      logger.error("Failed to submit answer:", err);
       wx.showToast({
         title: "提交失败",
         icon: "none",

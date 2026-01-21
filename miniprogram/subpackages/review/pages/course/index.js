@@ -2,6 +2,7 @@
 // 课程详情页
 
 const { getCourseDetail, enrollCourse, getTodayQueue } = require('../../utils/study-api');
+const logger = require('../../../../utils/logger');
 
 Page({
   data: {
@@ -50,7 +51,7 @@ Page({
         this.loadTodayQueue();
       }
     } catch (err) {
-      console.error('Failed to load course:', err);
+      logger.error('Failed to load course:', err);
       this.setData({ loading: false });
       wx.showToast({
         title: '加载失败',
@@ -66,7 +67,7 @@ Page({
         todaySummary: res.summary,
       });
     } catch (err) {
-      console.error('Failed to load today queue:', err);
+      logger.error('Failed to load today queue:', err);
     }
   },
 
@@ -84,7 +85,7 @@ Page({
       this.loadCourse();
     } catch (err) {
       wx.hideLoading();
-      console.error('Failed to enroll course:', err);
+      logger.error('Failed to enroll course:', err);
       wx.showToast({
         title: '注册失败',
         icon: 'none',

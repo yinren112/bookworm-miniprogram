@@ -2,6 +2,7 @@
 // 卡片复习页
 
 const { startSession, submitCardAnswer, starItem, unstarItem, getStarredItems } = require('../../utils/study-api');
+const logger = require('../../../../utils/logger');
 
 // Swipe constants
 const SWIPE_THRESHOLD = 80; // px to trigger
@@ -81,7 +82,7 @@ Page({
         });
         starredItems = buildStarredMap(starredRes?.items || [], 'card');
       } catch (err) {
-        console.error('Failed to load starred items:', err);
+        logger.error('Failed to load starred items:', err);
       }
 
       const firstCard = cards[0];
@@ -101,7 +102,7 @@ Page({
         swipeOpacityKnew: 0,
       });
     } catch (err) {
-      console.error('Failed to startSession:', err);
+      logger.error('Failed to startSession:', err);
       this.setData({ loading: false });
       wx.showToast({
         title: '加载失败',
@@ -280,7 +281,7 @@ Page({
             }, 50);
         }
       } catch (err) {
-        console.error('Failed to submit feedback:', err);
+        logger.error('Failed to submit feedback:', err);
         wx.showToast({
             title: '同步失败',
             icon: 'none'
@@ -330,7 +331,7 @@ Page({
           this.setData({ starredItems });
         })
         .catch((err) => {
-          console.error('Failed to update star:', err);
+          logger.error('Failed to update star:', err);
           this.setData({ isStarred: !newVal });
           wx.showToast({
             title: '星标同步失败',

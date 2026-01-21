@@ -2,6 +2,7 @@
 // 复习首页
 
 const { getCourses, getTodayQueue, getStreakInfo } = require('../../utils/study-api');
+const logger = require('../../utils/logger');
 
 Page({
   data: {
@@ -51,7 +52,7 @@ Page({
           try {
              const recRes = await getCourses({ limit: 3 }); 
              recommendedCourses = recRes.courses || [];
-          } catch (e) { console.error(e); }
+          } catch (e) { logger.error('Failed to load recommended courses:', e); }
       }
 
       let todaySummary = null;
@@ -62,7 +63,7 @@ Page({
           const queueRes = await getTodayQueue(currentCourse.courseKey);
           todaySummary = queueRes.summary || null;
         } catch (err) {
-          console.error('Failed to get today queue:', err);
+          logger.error('Failed to get today queue:', err);
         }
       }
 
@@ -71,7 +72,7 @@ Page({
       try {
         streakInfo = await getStreakInfo();
       } catch (err) {
-        console.error('Failed to get streak info:', err);
+        logger.error('Failed to get streak info:', err);
       }
 
       this.setData({
@@ -83,7 +84,7 @@ Page({
         loading: false,
       });
     } catch (err) {
-      console.error('Failed to load courses:', err);
+      logger.error('Failed to load courses:', err);
       this.setData({ loading: false });
       wx.showToast({
         title: '加载失败',

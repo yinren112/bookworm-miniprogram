@@ -2,6 +2,7 @@
 // 纠错弹窗组件
 
 const { submitFeedback } = require('../../utils/study-api');
+const logger = require('../../../../utils/logger');
 
 Component({
   properties: {
@@ -119,7 +120,7 @@ Component({
         this.triggerEvent('close');
         this.triggerEvent('success');
       } catch (err) {
-        console.error('Failed to submit feedback:', err);
+        logger.error('Failed to submit feedback:', err);
         this.setData({ submitting: false });
         wx.showToast({
           title: '提交失败，请重试',

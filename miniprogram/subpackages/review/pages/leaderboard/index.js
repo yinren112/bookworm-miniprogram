@@ -2,6 +2,7 @@
 // 周榜页面
 
 const { getLeaderboard } = require('../../utils/study-api');
+const logger = require('../../../../utils/logger');
 
 Page({
   data: {
@@ -35,7 +36,7 @@ Page({
         loading: false,
       });
     } catch (err) {
-      console.error('Failed to load leaderboard:', err);
+      logger.error('Failed to load leaderboard:', err);
       this.setData({ loading: false });
       wx.showToast({
         title: '加载失败',
