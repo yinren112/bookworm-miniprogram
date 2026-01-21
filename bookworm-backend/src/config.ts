@@ -132,10 +132,18 @@ if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
     errors.push(
       "WX_APP_ID must be set to a valid WeChat app ID in production.",
     );
+  } else if (config.WX_APP_ID.startsWith("dummy")) {
+    errors.push(
+      "WX_APP_ID must not use dummy values in production.",
+    );
   }
   if (!config.WX_APP_SECRET || config.WX_APP_SECRET === "test-app-secret") {
     errors.push(
       "WX_APP_SECRET must be set to a valid WeChat app secret in production.",
+    );
+  } else if (config.WX_APP_SECRET.startsWith("dummy")) {
+    errors.push(
+      "WX_APP_SECRET must not use dummy values in production.",
     );
   }
 

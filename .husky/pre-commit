@@ -15,7 +15,7 @@ cd ..
 
 # Console.* guard for miniprogram (except whitelisted files)
 echo "  → Console.* guard..."
-if grep -R --line-number --binary-files=without-match -E "console\.(log|error|warn|info|debug)" miniprogram | grep -v "miniprogram/utils/logger.js" | grep -v "miniprogram/config.js" | grep -v "eslint-disable no-console"; then
+if grep -R --line-number --binary-files=without-match -E "console\.(log|error|warn|info|debug)" miniprogram | grep -v "miniprogram/utils/logger.js" | grep -v "miniprogram/config.js" | grep -v "miniprogram/components/mp-html" | grep -v "eslint-disable no-console"; then
   echo "❌ ERROR: Found forbidden console.* usage in miniprogram (except logger.js and config.js)"
   echo "   Please use logger.debug/info/warn/error instead."
   exit 1

@@ -285,8 +285,10 @@ exports[`API Contract Tests > Order APIs > POST /api/orders/create - 创建订�
 
 exports[`API Contract Tests > User APIs > GET /api/users/me - 获取当前用户信息 1`] = `
 {
+  "avatar_url": null,
   "createdAt": "[DYNAMIC_TIMESTAMP]",
   "id": "[DYNAMIC_ID]",
+  "nickname": "Test USER User",
   "phone_number": "[DYNAMIC_PHONE]",
   "role": "USER",
 }

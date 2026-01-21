@@ -12,6 +12,7 @@ page {
   --success-color: #28a745;
   --error-color: #dc3545;
   --warning-color: #ffc107;
+  --bg-primary: #F3FBF6; /* User requested variable */
 
   /* 排版 (Typography) */
   --font-size-display: 48rpx;
@@ -49,14 +50,13 @@ page {
   --radius-m: 32rpx;
   --radius-s: 16rpx;
 
-  /* 凸起效果 - 阴影带一点点青色倾向，更通透 */
-  /* 优化：大幅增加阴影的扩散半径 (60rpx -> 40rpx) 和不透明度，模拟强光源 */
+  /* 凸起效果 - 阴影带一点点青色倾向，更通透 - Optimized */
   --shadow-clay-out: 
-    20rpx 20rpx 60rpx rgba(160, 180, 170, 0.5), 
-    -20rpx -20rpx 60rpx rgba(255, 255, 255, 1);
+    16rpx 16rpx 40rpx rgba(160, 180, 170, 0.35), 
+    -16rpx -16rpx 40rpx rgba(255, 255, 255, 0.9);
   
   /* 凹陷效果 */
-  --shadow-clay-in: inset 10rpx 10rpx 20rpx rgba(160, 180, 170, 0.25), inset -10rpx -10rpx 20rpx rgba(255, 255, 255, 0.9);
+  --shadow-clay-in: inset 8rpx 8rpx 16rpx rgba(160, 180, 170, 0.2), inset -8rpx -8rpx 16rpx rgba(255, 255, 255, 0.8);
 
   /* 基础样式 */
   font-family: 'Nunito', 'PingFang SC', system-ui, sans-serif;
@@ -249,3 +249,63 @@ page {
 }
 
 .clay-btn-primary::after { border: none; }
+
+/* --- 5. Dark Mode (Midnight Forest Theme) --- */
+@media (prefers-color-scheme: dark) {
+  page {
+    /* Midnight Forest - Deep Dark Green */
+    --clay-bg-gradient: linear-gradient(135deg, #0b2d1f 0%, #0d3a28 100%);
+    --clay-bg: #0b2d1f;
+    --bg-primary: #0b2d1f;
+    --clay-text-main: #e2e8f0;    /* Slate-200 */
+    --clay-text-light: #94a3b8;   /* Slate-400 */
+    --clay-card-bg: #113023;      /* Dark Forest Card */
+    
+    --background-color: #0b2d1f;
+    --card-background: #113023;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+
+    /* Dark Mode Shadows: Deeper, subtler glow */
+    --shadow-clay-out: 
+      16rpx 16rpx 40rpx rgba(0, 0, 0, 0.5), 
+      -8rpx -8rpx 30rpx rgba(255, 255, 255, 0.04);
+      
+    --shadow-clay-in: 
+      inset 8rpx 8rpx 16rpx rgba(0, 0, 0, 0.5), 
+      inset -8rpx -8rpx 16rpx rgba(255, 255, 255, 0.04);
+  }
+
+  .clay-card, .card {
+    box-shadow: var(--shadow-clay-out);
+    border: 1rpx solid rgba(255, 255, 255, 0.05);
+    background: var(--clay-card-bg);
+  }
+
+  .card-front, .card-back {
+    background: linear-gradient(135deg, #113023 0%, #16402e 100%);
+  }
+  
+  .card-label, .card-hint, .loading-text, .empty-text, .complete-desc {
+    color: var(--clay-text-light);
+  }
+  
+  .card-text, .complete-title {
+    color: var(--clay-text-main);
+  }
+  
+  .feedback-btn {
+    background: #1a4231;
+    box-shadow: 
+      6rpx 6rpx 16rpx rgba(0, 0, 0, 0.4), 
+      -2rpx -2rpx 10rpx rgba(255, 255, 255, 0.05);
+  }
+  
+  /* Adjust feedback colors for dark mode */
+  .feedback-btn.forgot { background: #451e1e; color: #ff8a80; }
+  .feedback-btn.fuzzy { background: #453010; color: #ffd180; }
+  .feedback-btn.knew { background: #1b3a24; color: #a5d6a7; }
+  .feedback-btn.perfect { background: #102a45; color: #90caf9; }
+  
+  .report-btn { color: #566960; }
+}

@@ -20,6 +20,8 @@ export const userPublicView = {
   role: true,
   created_at: true,
   phone_number: true,
+  nickname: true,
+  avatar_url: true,
 } as const satisfies Prisma.UserSelect;
 
 /**

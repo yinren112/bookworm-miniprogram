@@ -10,6 +10,7 @@ import {
   wrongItemListInclude,
 } from "../../db/views";
 import { recordActivity } from "./streakService";
+import { log } from "../../lib/logger";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -212,12 +213,15 @@ export async function submitQuizAnswer(
   );
 
   if (QUIZ_DEBUG) {
-    console.log("[QUIZ_DEBUG] Question ID:", questionId);
-    console.log("[QUIZ_DEBUG] question.questionType:", question.questionType);
-    console.log("[QUIZ_DEBUG] question.answerJson:", question.answerJson);
-    console.log("[QUIZ_DEBUG] question.optionsJson:", question.optionsJson);
-    console.log("[QUIZ_DEBUG] chosenAnswer:", chosenAnswer);
-    console.log("[QUIZ_DEBUG] isCorrect:", isCorrect);
+    log.debug({
+      tag: "QUIZ_DEBUG",
+      questionId,
+      questionType: question.questionType,
+      answerJson: question.answerJson,
+      optionsJson: question.optionsJson,
+      chosenAnswer,
+      isCorrect,
+    });
   }
 
   // 记录答题尝试（首次提交）

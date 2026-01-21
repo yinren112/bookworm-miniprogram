@@ -358,6 +358,11 @@ const contentToSeed = [
 ];
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+    console.error('Refusing to run seed in production or staging.');
+    process.exit(1);
+  }
+
   console.log('Start seeding...');
 
   // To ensure idempotency, we first clean up the tables that represent physical items.

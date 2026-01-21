@@ -19,6 +19,9 @@
         <view class="progress-circle">
           <text class="progress-number">{{todaySummary.dueCards || 0}}</text>
           <text class="progress-label">待复习</text>
+          <view class="estimate-badge" wx:if="{{todaySummary.dueCards > 0 && todaySummary.estimatedMinutes}}">
+            <text>约 {{todaySummary.estimatedMinutes}} 分钟</text>
+          </view>
         </view>
       </view>
       <view class="hero-stats">
@@ -48,37 +51,57 @@
     </view>
   </view>
   <!-- 连续学习 -->
-  <view class="streak-section clay-card" wx:if="{{!loading && streakInfo}}" bindtap="navigateToLeaderboard">
-    <view class="streak-icon-wrapper">
-      <text class="streak-emoji">{{streakInfo.isStudiedToday ? '🔥' : '🧊'}}</text>
-    </view>
-    <view class="streak-meta">
-      <text class="streak-title">连续学习 {{streakInfo.currentStreak}} 天</text>
-      <text class="streak-sub">{{streakInfo.isStudiedToday ? '保持火热状态！' : '今天还没开始哦'}}</text>
-    </view>
-    <view class="streak-arrow">
-      <text>🏆 周榜</text>
+  <!-- Streak Heatmap Section -->
+  <view class="streak-section clay-card-sm" wx:if="{{!loading}}" bindtap="navigateToLeaderboard">
+    <view class="streak-header">
+      <view class="streak-title-group">
+        <text class="streak-days">{{streakInfo.currentStreak || 0}}</text>
+        <text class="streak-label">天连续学习</text>
+      </view>
+      <text class="streak-sub">保持热度，从未止步</text>
     </view>
   </view>
   <!-- 课程列表 -->
   <view class="courses-section">
     <text class="section-heading">我的课程</text>
-    <view class="course-list" wx:if="{{!loading}}">
-      <view class="course-card clay-card-sm" wx:for="{{courses}}" wx:key="id" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
-        <view class="course-icon-placeholder">{{item.title[0]}}</view>
-        <view class="course-details">
-          <text class="course-name">{{item.title}}</text>
-          <view class="course-tags">
-            <text class="mini-tag">{{item.totalCards || 0}} 卡片</text>
+    <block wx:if="{{!loading && courses.length > 0}}">
+      <view class="course-list">
+        <view class="course-card clay-card-sm" wx:for="{{courses}}" wx:key="id" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
+          <view class="course-icon-placeholder">{{item.title[0]}}</view>
+          <view class="course-details">
+            <text class="course-name">{{item.title}}</text>
+            <view class="course-tags">
+              <text class="mini-tag">{{item.totalCards || 0}} 卡片</text>
+            </view>
+          </view>
+          <view class="course-enter-btn">
+            <text>进入</text>
           </view>
         </view>
-        <view class="course-enter-btn">
-          <text>进入</text>
-        </view>
       </view>
-      <view class="empty-state" wx:if="{{courses.length === 0}}">
-        <text class="empty-text">还没有课程，快去探索吧</text>
+    </block>
+    <!-- Empty State -->
+    <block wx:if="{{!loading && courses.length === 0}}">
+      <view class="empty-state">
+        <text class="empty-text">还没有加入任何课程</text>
+        <block wx:if="{{recommendedCourses.length > 0}}">
+          <view class="recommend-divider">
+            <text>为您推荐</text>
+          </view>
+          <view class="course-list">
+            <block wx:for="{{recommendedCourses}}" wx:key="id">
+              <view class="course-card clay-card-sm" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
+                <view class="course-icon-placeholder">{{item.title[0]}}</view>
+                <view class="course-details">
+                  <text class="course-name">{{item.title}}</text>
+                  <text class="mini-tag">热门推荐</text>
+                </view>
+                <view class="course-enter-btn">查看</view>
+              </view>
+            </block>
+          </view>
+        </block>
       </view>
-    </view>
+    </block>
   </view>
 </view>

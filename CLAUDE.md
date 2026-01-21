@@ -669,6 +669,35 @@ docker-compose -f docker-compose.staging.yml up -d
 - Configure database transaction retry parameters
 - Set PAYMENT_TIMESTAMP_TOLERANCE_SECONDS appropriately
 
+### Production Server Access (Lailin Tech)
+
+**Server Info**:
+- **Host**: `lailinkeji` (43.136.168.150)
+- **User**: deploy
+- **Key**: `C:\Users\wapadil\.ssh\lailinkeji_nopass`
+- **Backend Path**: `/srv/bookworm/bookworm-backend`
+
+**Maintenance Commands**:
+```bash
+# Restart Backend
+ssh lailinkeji "sudo systemctl restart bookworm-backend"
+
+# View Logs
+ssh lailinkeji "sudo journalctl -u bookworm-backend -f"
+
+# Reload Nginx
+ssh lailinkeji "sudo systemctl reload nginx"
+```
+
+**SSH Configuration**:
+Ensure your `~/.ssh/config` has:
+```
+Host lailinkeji
+    HostName 43.136.168.150
+    User deploy
+    IdentityFile C:\Users\wapadil\.ssh\lailinkeji_nopass
+```
+
 ## 历史经验SOP:
 
 ### SOP-复习模块500与题库数据校验

@@ -2,6 +2,7 @@
 // 急救包页面
 
 const { getCheatSheets } = require('../../utils/study-api');
+const logger = require('../../utils/logger');
 
 Page({
   data: {
@@ -57,7 +58,7 @@ Page({
         loading: false,
       });
     } catch (err) {
-      console.error('Failed to load cheatsheets:', err);
+      logger.error('Failed to load cheatsheets:', err);
       this.setData({ loading: false });
       wx.showToast({
         title: '加载失败',
@@ -93,11 +94,8 @@ Page({
             wx.openDocument({
               filePath: res.tempFilePath,
               showMenu: true,
-              success: () => {
-                console.log('Document opened');
-              },
               fail: (err) => {
-                console.error('Failed to open document:', err);
+                logger.error('Failed to open document:', err);
                 wx.showToast({
                   title: '打开失败',
                   icon: 'none',
@@ -113,7 +111,7 @@ Page({
         },
         fail: (err) => {
           wx.hideLoading();
-          console.error('Failed to download:', err);
+          logger.error('Failed to download:', err);
           wx.showToast({
             title: '下载失败',
             icon: 'none',
@@ -125,14 +123,13 @@ Page({
       const imageUrls = this.data.cheatSheets
         .filter((cs) => cs.assetTypeNormalized === 'image')
         .map((cs) => cs.url);
-      const currentIndex = imageUrls.indexOf(item.url);
 
       wx.previewImage({
         urls: imageUrls,
         current: item.url,
         showmenu: true,
         fail: (err) => {
-          console.error('Failed to preview image:', err);
+          logger.error('Failed to preview image:', err);
           wx.showToast({
             title: '预览失败',
             icon: 'none',

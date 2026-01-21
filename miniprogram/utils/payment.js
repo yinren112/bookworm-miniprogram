@@ -2,6 +2,7 @@ const { request } = require('./api');
 const ui = require('./ui');
 const { extractErrorMessage } = require('./error');
 const { APP_CONFIG } = require('../config');
+const logger = require('./logger');
 
 function requestPayment(params) {
   return new Promise((resolve, reject) => {
@@ -15,7 +16,7 @@ function requestPayment(params) {
 
 async function createOrderAndPay(inventoryItemIds) {
   if (APP_CONFIG.REVIEW_ONLY_MODE) {
-    console.warn('[Payment] Blocked: Review-only mode is enabled');
+    logger.warn('Payment blocked: review-only mode is enabled');
     return Promise.reject({
       errMsg: 'requestPayment:fail review mode',
       reviewModeBlocked: true

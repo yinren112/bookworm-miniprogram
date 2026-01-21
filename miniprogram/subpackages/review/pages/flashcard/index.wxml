@@ -10,7 +10,13 @@
   </view>
   <!-- 卡片区域 -->
   <view class="card-wrapper" wx:if="{{!loading && currentCard}}">
-    <view class="card-container {{isFlipped ? 'flipped' : ''}}" bindtap="flipCard">
+    <!-- Star Button (Pinned to wrapper) -->
+    <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
+      <text class="star-icon">{{isStarred ? '★' : '☆'}}</text>
+    </view>
+    <!-- Card Container with Swipe Gestures and Style Binding -->
+    <!-- Note: class 'flipped' is still useful for CSS-only flips, but we also bind 'style' for swipe transforms -->
+    <view class="card-container {{isFlipped ? 'flipped' : ''}} {{swipeClass}}" style="{{cardStyle}}" bindtap="flipCard" bindtouchstart="touchStart" bindtouchmove="touchMove" bindtouchend="touchEnd">
       <!-- 正面 -->
       <view class="card card-front clay-card">
         <view class="card-label">问题</view>
@@ -18,7 +24,7 @@
           <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
         </view>
         <view class="card-hint">
-          <text>点击翻转查看答案</text>
+          <text>点击翻转 / 左右滑动</text>
         </view>
       </view>
       <!-- 背面 -->
@@ -28,26 +34,36 @@
           <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
         </view>
       </view>
+      <!-- Swipe Indicators (Overlay) -->
+      <view class="swipe-indicator forgot-overlay" style="opacity: {{swipeOpacityForgot}}">
+        <text>😓 忘了</text>
+      </view>
+      <view class="swipe-indicator knew-overlay" style="opacity: {{swipeOpacityKnew}}">
+        <text>😊 记得</text>
+      </view>
     </view>
   </view>
   <!-- 反馈按钮 -->
-  <view class="feedback-buttons" wx:if="{{!loading && currentCard && isFlipped}}">
-    <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
-      <text class="btn-emoji">😓</text>
-      <text class="btn-label">忘了</text>
-    </button>
-    <button class="feedback-btn fuzzy" bindtap="submitFeedback" data-rating="FUZZY">
-      <text class="btn-emoji">🤔</text>
-      <text class="btn-label">模糊</text>
-    </button>
-    <button class="feedback-btn knew" bindtap="submitFeedback" data-rating="KNEW">
-      <text class="btn-emoji">😊</text>
-      <text class="btn-label">记得</text>
-    </button>
-    <button class="feedback-btn perfect" bindtap="submitFeedback" data-rating="PERFECT">
-      <text class="btn-emoji">🎉</text>
-      <text class="btn-label">完美</text>
-    </button>
+  <!-- 反馈按钮 (Bottom Golden Zone) -->
+  <view class="feedback-zone" wx:if="{{!loading && currentCard && isFlipped}}">
+    <view class="feedback-buttons">
+      <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
+        <text class="btn-emoji">😓</text>
+        <text class="btn-label">忘了</text>
+      </button>
+      <button class="feedback-btn fuzzy" bindtap="submitFeedback" data-rating="FUZZY">
+        <text class="btn-emoji">🤔</text>
+        <text class="btn-label">模糊</text>
+      </button>
+      <button class="feedback-btn knew" bindtap="submitFeedback" data-rating="KNEW">
+        <text class="btn-emoji">😊</text>
+        <text class="btn-label">记得</text>
+      </button>
+      <button class="feedback-btn perfect" bindtap="submitFeedback" data-rating="PERFECT">
+        <text class="btn-emoji">🎉</text>
+        <text class="btn-label">完美</text>
+      </button>
+    </view>
   </view>
   <!-- 翻转提示 -->
   <view class="flip-hint" wx:if="{{!loading && currentCard && !isFlipped}}">

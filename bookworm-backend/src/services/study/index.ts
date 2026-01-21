@@ -74,6 +74,16 @@ export {
   type LeaderboardEntry,
 } from "./streakService";
 
+// 星标收藏服务
+export {
+  starItem,
+  unstarItem,
+  getStarredItems,
+  type StarType,
+  type StarredItem,
+  type StarItemInput,
+} from "./starService";
+
 // 课程包导入服务
 export {
   // 解析器

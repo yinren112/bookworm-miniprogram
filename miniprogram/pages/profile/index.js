@@ -9,7 +9,8 @@ const { APP_CONFIG } = require('../../config');
 Page({
   data: {
     userInfo: {
-      nickName: '微信用户',
+      nickName: '',
+      avatarUrl: '',
       role: 'USER' // 默认角色
     },
     serviceInfo: {
@@ -28,8 +29,12 @@ Page({
   async fetchUserInfo() {
     try {
       const userData = await getCurrentUser();
+      const nickName = userData.nickname || '微信用户';
+      const avatarUrl = userData.avatar_url || '';
       this.setData({
         'userInfo.role': userData.role,
+        'userInfo.nickName': nickName,
+        'userInfo.avatarUrl': avatarUrl,
         hasPhoneNumber: !!userData.phone_number
       });
     } catch (error) {

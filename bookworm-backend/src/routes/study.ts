@@ -3,7 +3,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { FeedbackRating, FeedbackReasonType } from "@prisma/client";
 import prisma from "../db";
-import { cardIdOnlyView, courseIdOnlyView } from "../db/views";
+import { cardIdOnlyView, courseIdOnlyView, questionIdOnlyView } from "../db/views";
 import { ApiError } from "../errors";
 import { CourseStatus } from "@prisma/client";
 import {
@@ -25,6 +25,9 @@ import {
   getCheatSheetById,
   createFeedback,
   getUserFeedbacks,
+  starItem,
+  unstarItem,
+  getStarredItems,
   // Phase 5: Streak & Leaderboard
   getStreakInfo,
   getWeeklyLeaderboard,
@@ -73,6 +76,10 @@ import {
   CreateFeedbackBody,
   GetFeedbacksQuerySchema,
   GetFeedbacksQuery,
+  StarItemBodySchema,
+  StarItemBody,
+  StarredItemsQuerySchema,
+  StarredItemsQuery,
   // Phase 5 schemas
   LeaderboardQuerySchema,
   LeaderboardQuery,
@@ -569,6 +576,133 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
           resolvedAt: item.resolvedAt?.toISOString() || null,
         })),
         total: result.total,
+      });
+    },
+  );
+
+  // ============================================
+  // Phase 4.5: 星标收藏端点
+  // ============================================
+
+  // POST /api/study/star - 星标收藏
+  fastify.post<{ Body: StarItemBody }>(
+    "/api/study/star",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        body: StarItemBodySchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { type } = request.body;
+
+      if (type === "card") {
+        const { contentId } = request.body;
+        const card = await prisma.studyCard.findFirst({
+          where: { contentId },
+          select: cardIdOnlyView,
+        });
+
+        if (!card) {
+          throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+        }
+
+        await starItem(prisma, userId, { type: "card", contentId });
+      } else {
+        const { questionId } = request.body;
+        const question = await prisma.studyQuestion.findUnique({
+          where: { id: questionId },
+          select: questionIdOnlyView,
+        });
+
+        if (!question) {
+          throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
+        }
+
+        await starItem(prisma, userId, { type: "question", questionId });
+      }
+
+      reply.send({ success: true });
+    },
+  );
+
+  // DELETE /api/study/star - 取消星标
+  fastify.delete<{ Body: StarItemBody }>(
+    "/api/study/star",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        body: StarItemBodySchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { type } = request.body;
+
+      if (type === "card") {
+        const { contentId } = request.body;
+        const card = await prisma.studyCard.findFirst({
+          where: { contentId },
+          select: cardIdOnlyView,
+        });
+
+        if (!card) {
+          throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+        }
+
+        await unstarItem(prisma, userId, { type: "card", contentId });
+      } else {
+        const { questionId } = request.body;
+        const question = await prisma.studyQuestion.findUnique({
+          where: { id: questionId },
+          select: questionIdOnlyView,
+        });
+
+        if (!question) {
+          throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
+        }
+
+        await unstarItem(prisma, userId, { type: "question", questionId });
+      }
+
+      reply.send({ success: true });
+    },
+  );
+
+  // GET /api/study/starred-items - 获取星标列表
+  fastify.get<{ Querystring: StarredItemsQuery }>(
+    "/api/study/starred-items",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        querystring: StarredItemsQuerySchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { type, courseKey } = request.query;
+
+      let courseId: number | undefined;
+      if (courseKey) {
+        const course = await getCourseByKey(prisma, courseKey);
+        if (!course) {
+          throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
+        }
+        courseId = course.id;
+      }
+
+      const items = await getStarredItems(prisma, userId, {
+        type,
+        courseId,
+      });
+
+      reply.send({
+        items: items.map((item) => ({
+          type: item.type,
+          contentId: item.contentId,
+          questionId: item.questionId,
+        })),
       });
     },
   );

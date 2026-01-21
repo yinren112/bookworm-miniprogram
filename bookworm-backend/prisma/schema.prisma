@@ -90,6 +90,7 @@ model User {
   wrongItems        UserWrongItem[]
   studyStreak       UserStudyStreak?
   studyFeedbacks    StudyFeedback[]
+  starredItems      UserStarredItem[]
 
   @@index([phone_number])
 }
@@ -401,6 +402,11 @@ enum CourseStatus {
   ARCHIVED
 }
 
+enum StarredItemType {
+  card
+  question
+}
+
 // ============================================
 // 复习系统 - 内容侧模型 (Content Models)
 // ============================================
@@ -487,6 +493,7 @@ model StudyQuestion {
   attempts   UserQuestionAttempt[]
   wrongItems UserWrongItem[]
   feedbacks  StudyFeedback[]       @relation("QuestionFeedbacks")
+  starredItems UserStarredItem[]   @relation("QuestionStarredItems")
 
   @@unique([unitId, contentId])
   @@index([unitId, sortOrder])
@@ -617,6 +624,24 @@ model UserStudyStreak {
 
   @@index([weeklyPoints]) // 周榜排序
   @@map("user_study_streak")
+}
+
+model UserStarredItem {
+  id         Int             @id @default(autoincrement())
+  userId     Int             @map("user_id")
+  type       StarredItemType
+  contentId  String?         @map("content_id") @db.VarChar(100)
+  questionId Int?            @map("question_id")
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question StudyQuestion? @relation("QuestionStarredItems", fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, contentId], map: "uniq_user_starred_content")
+  @@unique([userId, type, questionId], map: "uniq_user_starred_question")
+  @@index([userId])
+  @@index([type])
+  @@map("user_starred_item")
 }
 
 model StudyFeedback {

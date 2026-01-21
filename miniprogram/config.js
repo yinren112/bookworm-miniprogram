@@ -8,21 +8,24 @@
  * @returns {string} API base URL
  */
 function getApiBaseUrl() {
+  const urls = {
+    'develop': 'http://localhost:8080/api',
+    'trial': 'https://api-staging.lailinkeji.com/api',
+    'release': 'https://api.lailinkeji.com/api'
+  };
+
   try {
     const accountInfo = wx.getAccountInfoSync();
     const envVersion = accountInfo.miniProgram.envVersion;
 
-    const urls = {
-      'develop': 'http://localhost:8080/api',
-      'trial': 'https://api-staging.lailinkeji.com/api',
-      'release': 'https://api.lailinkeji.com/api'
-    };
-
-    return urls[envVersion] || urls.develop;
+    if (!urls[envVersion]) {
+      console.warn('[WARN] Unknown envVersion, fallback to release:', envVersion);
+    }
+    return urls[envVersion] || urls.release;
   } catch (e) {
     // Inline warn to avoid circular dependency with logger.js
-    console.warn('[WARN] Failed to get environment, using default:', e);
-    return 'http://localhost:8080/api';
+    console.warn('[WARN] Failed to get environment, fallback to release:', e);
+    return urls.release;
   }
 }
 

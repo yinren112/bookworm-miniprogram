@@ -19,6 +19,10 @@
     <view class="question-type-tag {{currentQuestion.questionType.toLowerCase()}}">
       <text>{{questionTypeLabels[currentQuestion.questionType]}}</text>
     </view>
+    <!-- Star Button -->
+    <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
+      <text class="star-icon">{{isStarred ? '★' : '☆'}}</text>
+    </view>
     <!-- 题干 -->
     <view class="question-stem">
       <mp-html content="{{currentQuestion.stem}}" markdown="{{true}}" />

@@ -301,6 +301,57 @@ const getLeaderboard = (options = {}) => {
   });
 };
 
+// ============================================
+// Phase 4.5: 星标收藏 API
+// ============================================
+
+/**
+ * 星标收藏
+ * @param {Object} data - 收藏数据
+ * @param {string} data.type - card | question
+ * @param {string} [data.contentId] - 卡片 contentId
+ * @param {number} [data.questionId] - 题目 ID
+ */
+const starItem = (data) => {
+  return request({
+    url: '/study/star',
+    method: 'POST',
+    data,
+    requireAuth: true,
+  });
+};
+
+/**
+ * 取消星标
+ * @param {Object} data - 取消收藏数据
+ */
+const unstarItem = (data) => {
+  return request({
+    url: '/study/star',
+    method: 'DELETE',
+    data,
+    requireAuth: true,
+  });
+};
+
+/**
+ * 获取星标列表
+ * @param {Object} options - 查询选项
+ * @param {string} [options.type] - card | question
+ * @param {string} [options.courseKey] - 课程标识
+ */
+const getStarredItems = (options = {}) => {
+  const queryString = buildQueryString({
+    type: options.type,
+    courseKey: options.courseKey,
+  });
+  return request({
+    url: `/study/starred-items${queryString}`,
+    method: 'GET',
+    requireAuth: true,
+  });
+};
+
 module.exports = {
   // Phase 2: 课程和卡片
   getCourses,
@@ -323,4 +374,7 @@ module.exports = {
   // Phase 5: Streak 与周榜
   getStreakInfo,
   getLeaderboard,
+  starItem,
+  unstarItem,
+  getStarredItems,
 };

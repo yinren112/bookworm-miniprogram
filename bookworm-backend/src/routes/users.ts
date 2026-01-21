@@ -10,6 +10,8 @@ const UserResponseSchema = Type.Object({
   role: Type.String(),
   createdAt: Type.String(),
   phone_number: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  nickname: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  avatar_url: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 const usersRoutes: FastifyPluginAsync = async (fastify) => {
@@ -55,6 +57,8 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
         role: user.role,
         createdAt: user.created_at.toISOString(),
         phone_number: user.phone_number,
+        nickname: user.nickname,
+        avatar_url: user.avatar_url,
       };
 
       // 注意：响应数据不需要脱敏（已由 Pino redaction 处理）

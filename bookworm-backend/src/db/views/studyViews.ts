@@ -126,6 +126,14 @@ export const cardIdOnlyView = {
 } as const satisfies Prisma.StudyCardSelect;
 
 /**
+ * 仅卡片 contentId
+ * Used by: starService
+ */
+export const cardContentIdView = {
+  contentId: true,
+} as const satisfies Prisma.StudyCardSelect;
+
+/**
  * 卡片课程 ID（关联查询用）
  * Used by: cardScheduler
  */

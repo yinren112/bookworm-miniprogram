@@ -68,4 +68,44 @@ describe("config production validation", () => {
 
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
+
+  it("should fail when WX_APP_ID is dummy in production", async () => {
+    process.env.WX_APP_ID = "dummy-app-id";
+
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn().mockReturnValue(true),
+    }));
+
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((code?: number) => {
+        throw new Error(`process.exit:${code}`);
+      }) as never);
+
+    await expect(async () => {
+      await import("../config");
+    }).rejects.toThrow("process.exit:1");
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("should fail when WX_APP_SECRET is dummy in production", async () => {
+    process.env.WX_APP_SECRET = "dummy-app-secret";
+
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn().mockReturnValue(true),
+    }));
+
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((code?: number) => {
+        throw new Error(`process.exit:${code}`);
+      }) as never);
+
+    await expect(async () => {
+      await import("../config");
+    }).rejects.toThrow("process.exit:1");
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
 });

@@ -1,7 +1,7 @@
 // pages/review/index.js
 // 复习首页
 
-const { getCourses, getTodayQueue, enrollCourse, getStreakInfo } = require('../../utils/study-api');
+const { getCourses, getTodayQueue, getStreakInfo } = require('../../utils/study-api');
 
 Page({
   data: {
@@ -11,6 +11,7 @@ Page({
     todaySummary: null,
     todayDate: '',
     streakInfo: null,
+    recommendedCourses: [],
   },
 
   onLoad() {
@@ -44,6 +45,15 @@ Page({
       const enrolledCourses = courses.filter(c => c.enrolled);
       const currentCourse = enrolledCourses[0] || null;
 
+      // Empty State: If no enrolled courses, fetch recommendations
+      let recommendedCourses = [];
+      if (enrolledCourses.length === 0) {
+          try {
+             const recRes = await getCourses({ limit: 3 }); 
+             recommendedCourses = recRes.courses || [];
+          } catch (e) { console.error(e); }
+      }
+
       let todaySummary = null;
 
       // 如果有已注册课程，获取今日队列
@@ -65,10 +75,11 @@ Page({
       }
 
       this.setData({
-        courses,
+        courses: enrolledCourses,
         currentCourse,
         todaySummary,
         streakInfo,
+        recommendedCourses, 
         loading: false,
       });
     } catch (err) {

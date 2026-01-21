@@ -222,7 +222,7 @@ export async function getWeeklyLeaderboard(
   return entries.map((entry, index) => ({
     rank: index + 1,
     userId: entry.userId,
-    nickname: entry.user.nickname || `用户${entry.userId}`,
+    nickname: entry.user.nickname || "匿名用户",
     avatarUrl: entry.user.avatar_url,
     weeklyPoints: entry.weeklyPoints,
     currentStreak: entry.currentStreak,

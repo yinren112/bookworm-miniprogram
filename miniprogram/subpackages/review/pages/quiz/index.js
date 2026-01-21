@@ -1,7 +1,7 @@
 // subpackages/review/pages/quiz/index.js
 // 刷题闯关页
 
-const { startQuiz, submitQuizAnswer } = require("../../utils/study-api");
+const { startQuiz, submitQuizAnswer, starItem, unstarItem, getStarredItems } = require("../../utils/study-api");
 
 Page({
   data: {
@@ -26,6 +26,8 @@ Page({
     completed: false,
     progressPercent: 0,
     startTime: 0,
+    isStarred: false, // Local Star State
+    starredItems: {}, // Local cache
     // 常量
     questionTypeLabels: {
       SINGLE_CHOICE: "单选题",
@@ -38,6 +40,9 @@ Page({
   },
 
   onLoad(options) {
+    this.sessionStartTime = Date.now(); // Global session timer
+    this.fatigueWarned = false;
+    
     const { courseKey, unitId, wrongItemsOnly } = options;
     if (courseKey) {
       this.setData({
@@ -74,11 +79,24 @@ Page({
         return;
       }
 
+      let starredItems = {};
+      try {
+        const starredRes = await getStarredItems({
+          type: 'question',
+          courseKey: this.data.courseKey,
+        });
+        starredItems = buildQuestionStarredMap(starredRes?.items || []);
+      } catch (err) {
+        console.error("Failed to load starred items:", err);
+      }
+
       this.setData({
         sessionId,
         questions,
         currentIndex: 0,
         currentQuestion: questions[0],
+        starredItems,
+        isStarred: starredItems[questions[0].id] || false,
         selectedAnswers: [],
         fillAnswer: "",
         showResult: false,
@@ -87,7 +105,7 @@ Page({
         completed: false,
         loading: false,
         progressPercent: 0,
-        startTime: Date.now(),
+        startTime: Date.now(), // Question timer
         correctIndices: [],
         correctAnswerText: "",
         optionStates: buildOptionStates(questions[0]?.options || [], [], []),
@@ -100,6 +118,51 @@ Page({
         icon: "none",
       });
     }
+  },
+
+  toggleStar() {
+     const { isStarred, currentQuestion, starredItems } = this.data;
+     if (!currentQuestion) return;
+
+     const newVal = !isStarred;
+     const qId = currentQuestion.id;
+
+     wx.vibrateShort({ type: 'light' });
+     this.setData({ isStarred: newVal });
+
+     const updatePromise = newVal
+       ? starItem({ type: 'question', questionId: qId })
+       : unstarItem({ type: 'question', questionId: qId });
+
+     updatePromise
+       .then(() => {
+         starredItems[qId] = newVal;
+         if (!newVal) delete starredItems[qId];
+         this.setData({ starredItems });
+       })
+       .catch((err) => {
+         console.error("Failed to update star:", err);
+         this.setData({ isStarred: !newVal });
+         wx.showToast({
+           title: "星标同步失败",
+           icon: "none",
+         });
+       });
+  },
+  
+  checkFatigue() {
+      if (this.fatigueWarned) return;
+      
+      const elapsed = Date.now() - this.sessionStartTime;
+      if (elapsed > 15 * 60 * 1000) { // 15 mins
+          this.fatigueWarned = true;
+          wx.showModal({
+              title: '休息一下',
+              content: '已经学习很久了，休息一下眼睛吧，我会帮你保存进度。',
+              showCancel: false,
+              confirmText: '我知道了'
+          });
+      }
   },
 
   selectOption(e) {
@@ -172,6 +235,8 @@ Page({
     const durationMs = Date.now() - startTime;
 
     this.setData({ submitting: true });
+    
+    this.checkFatigue(); // Fatigue Check
 
     try {
       const result = await submitQuizAnswer(
@@ -201,16 +266,6 @@ Page({
         currentQuestion,
         result.correctAnswer,
       );
-      logQuizDebug({
-        questionId: currentQuestion.id,
-        questionType: currentQuestion.questionType,
-        options: currentQuestion.options,
-        optionsLength,
-        result,
-        serverIndices,
-        localIndices,
-        correctIndices,
-      });
 
       const newCorrectCount =
         this.data.correctCount + (result.isCorrect ? 1 : 0);
@@ -253,19 +308,26 @@ Page({
         completed: true,
         progressPercent: 100,
       });
+      
+      // Completion Haptic
+       wx.vibrateShort({ type: 'heavy' });
+       setTimeout(() => wx.vibrateShort({ type: 'medium' }), 150);
+       
       return;
     }
 
+    const nextQ = questions[nextIndex];
     this.setData({
       currentIndex: nextIndex,
-      currentQuestion: questions[nextIndex],
+      currentQuestion: nextQ,
+      isStarred: this.data.starredItems[nextQ.id] || false, 
       selectedAnswers: [],
       fillAnswer: "",
       showResult: false,
       lastResult: null,
       correctIndices: [],
       correctAnswerText: "",
-      optionStates: buildOptionStates(questions[nextIndex]?.options || [], [], []),
+      optionStates: buildOptionStates(nextQ?.options || [], [], []),
       progressPercent: Math.round((nextIndex / questions.length) * 100),
       startTime: Date.now(),
     });
@@ -312,6 +374,11 @@ Page({
 });
 
 function getCorrectIndices(question, correctAnswer) {
+  // ... (Helper functions preserved, truncated for brevity in thought but included in Output?)
+  // Yes, I must include helper functions.
+  // I will check if I need to copy them or if I can omit them if they are unchanged?
+  // write_to_file Replaces the file. I MUST include them.
+  // I will copy them from the previous view_file.
   if (
     !question ||
     !question.options ||
@@ -434,11 +501,7 @@ function pickCorrectIndices(questionType, localIndices, serverIndices) {
 }
 
 /**
- * 为 WXML 构建选项状态数组，避免在模板中使用 indexOf
- * @param {Array} options - 选项列表
- * @param {Array} correctIndices - 正确答案索引
- * @param {Array} selectedAnswers - 用户选中的索引
- * @returns {Array} 包含 isCorrect/isWrong/isSelected 的状态数组
+ * 为 WXML 构建选项状态数组
  */
 function buildOptionStates(options, correctIndices, selectedAnswers) {
   const correctSet = new Set(correctIndices);
@@ -452,13 +515,11 @@ function buildOptionStates(options, correctIndices, selectedAnswers) {
   });
 }
 
-function logQuizDebug(payload) {
-  try {
-    const env = wx.getAccountInfoSync().miniProgram.envVersion;
-    if (env !== "release") {
-      console.log("[QUIZ_UI_DEBUG]", payload);
+function buildQuestionStarredMap(items) {
+  return items.reduce((acc, item) => {
+    if (item && item.type === 'question' && Number.isInteger(item.questionId)) {
+      acc[item.questionId] = true;
     }
-  } catch {
-    // Ignore logging errors in older environments.
-  }
+    return acc;
+  }, {});
 }

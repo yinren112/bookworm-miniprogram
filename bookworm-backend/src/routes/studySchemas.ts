@@ -303,6 +303,49 @@ export const FeedbackRecordSchema = Type.Object({
 });
 
 // ============================================
+// 星标收藏 Schema (Phase 4.5)
+// ============================================
+
+const StarTypeSchema = Type.Union([
+  Type.Literal("card"),
+  Type.Literal("question"),
+]);
+
+export const StarCardBodySchema = Type.Object({
+  type: Type.Literal("card"),
+  contentId: Type.String({ minLength: 1, maxLength: 100 }),
+});
+
+export const StarQuestionBodySchema = Type.Object({
+  type: Type.Literal("question"),
+  questionId: Type.Integer({ minimum: 1 }),
+});
+
+export const StarItemBodySchema = Type.Union([
+  StarCardBodySchema,
+  StarQuestionBodySchema,
+]);
+
+export const StarredItemsQuerySchema = Type.Object({
+  type: Type.Optional(StarTypeSchema),
+  courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+});
+
+export const StarredCardSchema = Type.Object({
+  type: Type.Literal("card"),
+  contentId: Type.String(),
+});
+
+export const StarredQuestionSchema = Type.Object({
+  type: Type.Literal("question"),
+  questionId: Type.Integer(),
+});
+
+export const StarredItemsResponseSchema = Type.Object({
+  items: Type.Array(Type.Union([StarredCardSchema, StarredQuestionSchema])),
+});
+
+// ============================================
 // 导出类型
 // ============================================
 
@@ -327,6 +370,8 @@ export type GetCheatSheetsQuery = Static<typeof GetCheatSheetsQuerySchema>;
 export type CheatSheetParams = Static<typeof CheatSheetParamsSchema>;
 export type CreateFeedbackBody = Static<typeof CreateFeedbackBodySchema>;
 export type GetFeedbacksQuery = Static<typeof GetFeedbacksQuerySchema>;
+export type StarItemBody = Static<typeof StarItemBodySchema>;
+export type StarredItemsQuery = Static<typeof StarredItemsQuerySchema>;
 
 // ============================================
 // Streak 与周榜 Schema (Phase 5)
