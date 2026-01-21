@@ -100,11 +100,15 @@ export async function getCourseList(
 export async function getCourseByKey(
   dbCtx: DbCtx,
   courseKey: string,
-  userId?: number,
+  options: { userId?: number; publishedOnly?: boolean; latestVersion?: boolean } = {},
 ): Promise<CourseDetail | null> {
+  const { userId, publishedOnly = true, latestVersion = true } = options;
   /* eslint-disable local-rules/no-prisma-raw-select -- complex nested query with _count */
   const course = await dbCtx.studyCourse.findFirst({
-    where: { courseKey },
+    where: {
+      courseKey,
+      ...(publishedOnly ? { status: CourseStatus.PUBLISHED } : {}),
+    },
     select: {
       ...courseSelectPublic,
       units: {
@@ -126,6 +130,7 @@ export async function getCourseByKey(
           }
         : false,
     },
+    orderBy: latestVersion ? { contentVersion: "desc" } : undefined,
   });
   /* eslint-enable local-rules/no-prisma-raw-select */
 

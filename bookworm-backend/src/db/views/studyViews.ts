@@ -245,6 +245,10 @@ export const enrollmentSelectPublic = {
   completedCards: true,
 } as const satisfies Prisma.UserCourseEnrollmentSelect;
 
+export const enrollmentCourseIdView = {
+  courseId: true,
+} as const satisfies Prisma.UserCourseEnrollmentSelect;
+
 // ============================================
 // UserCardState 视图选择器
 // ============================================

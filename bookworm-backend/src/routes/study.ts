@@ -3,7 +3,12 @@
 import { FastifyPluginAsync } from "fastify";
 import { FeedbackRating, FeedbackReasonType } from "@prisma/client";
 import prisma from "../db";
-import { cardIdOnlyView, courseIdOnlyView, questionIdOnlyView } from "../db/views";
+import {
+  cardIdOnlyView,
+  courseIdOnlyView,
+  questionIdOnlyView,
+  enrollmentCourseIdView,
+} from "../db/views";
 import { ApiError } from "../errors";
 import { CourseStatus } from "@prisma/client";
 import {
@@ -100,6 +105,89 @@ import {
 } from "./studySchemas";
 
 const studyRoutes: FastifyPluginAsync = async function (fastify) {
+  const resolveCardByContentId = async (
+    userId: number,
+    contentId: string,
+    courseKey?: string,
+  ) => {
+    let courseIds: number[] = [];
+    if (courseKey) {
+      const course = await getCourseByKey(prisma, courseKey);
+      if (!course) {
+        throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
+      }
+      courseIds = [course.id];
+    } else {
+      const enrollments = await prisma.userCourseEnrollment.findMany({
+        where: { userId },
+        select: enrollmentCourseIdView,
+      });
+      courseIds = enrollments.map((enrollment) => enrollment.courseId);
+    }
+
+    if (courseIds.length === 0) {
+      throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+    }
+
+    const cards = await prisma.studyCard.findMany({
+      where: {
+        contentId,
+        courseId: { in: courseIds },
+      },
+      select: cardIdOnlyView,
+      take: 2,
+    });
+
+    if (cards.length === 0) {
+      throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+    }
+
+    if (cards.length > 1) {
+      throw new ApiError(409, "Card contentId is not unique", "CARD_CONTENT_ID_NOT_UNIQUE");
+    }
+
+    return cards[0];
+  };
+
+  const resolveQuestionById = async (
+    userId: number,
+    questionId: number,
+    courseKey?: string,
+  ) => {
+    let courseIds: number[] = [];
+    if (courseKey) {
+      const course = await getCourseByKey(prisma, courseKey);
+      if (!course) {
+        throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
+      }
+      courseIds = [course.id];
+    } else {
+      const enrollments = await prisma.userCourseEnrollment.findMany({
+        where: { userId },
+        select: enrollmentCourseIdView,
+      });
+      courseIds = enrollments.map((enrollment) => enrollment.courseId);
+    }
+
+    if (courseIds.length === 0) {
+      throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
+    }
+
+    const question = await prisma.studyQuestion.findFirst({
+      where: {
+        id: questionId,
+        courseId: { in: courseIds },
+      },
+      select: questionIdOnlyView,
+    });
+
+    if (!question) {
+      throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
+    }
+
+    return question;
+  };
+
   // ============================================
   // 课程端点
   // ============================================
@@ -144,7 +232,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const userId = request.user!.userId;
       const { courseKey } = request.params;
 
-      const course = await getCourseByKey(prisma, courseKey, userId);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
 
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
@@ -267,28 +355,28 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
     async (request, reply) => {
       const userId = request.user!.userId;
       const { contentId } = request.params;
-      const { rating, sessionId } = request.body;
+      const { rating, sessionId, courseKey } = request.body;
 
-      // 根据 contentId 查找卡片
-      const card = await prisma.studyCard.findFirst({
-        where: { contentId },
-        select: cardIdOnlyView,
-      });
-
-      if (!card) {
-        throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
-      }
+      const card = await resolveCardByContentId(userId, contentId, courseKey);
 
       // 转换 rating 字符串为枚举
       const ratingEnum = rating as FeedbackRating;
 
-      const update = await submitCardFeedback(
-        prisma,
-        userId,
-        card.id,
-        sessionId,
-        ratingEnum,
-      );
+      let update;
+      try {
+        update = await submitCardFeedback(
+          prisma,
+          userId,
+          card.id,
+          sessionId,
+          ratingEnum,
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === "CARD_DAILY_LIMIT_REACHED") {
+          throw new ApiError(429, "Card daily limit reached", "CARD_DAILY_LIMIT_REACHED");
+        }
+        throw error;
+      }
 
       reply.send({
         cardId: update.cardId,
@@ -533,6 +621,32 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         throw new ApiError(400, "Either cardId or questionId is required", "FEEDBACK_TARGET_REQUIRED");
       }
 
+      if (cardId) {
+        const card = await prisma.studyCard.findFirst({
+          where: {
+            id: cardId,
+            courseId: course.id,
+          },
+          select: cardIdOnlyView,
+        });
+        if (!card) {
+          throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+        }
+      }
+
+      if (questionId) {
+        const question = await prisma.studyQuestion.findFirst({
+          where: {
+            id: questionId,
+            courseId: course.id,
+          },
+          select: questionIdOnlyView,
+        });
+        if (!question) {
+          throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
+        }
+      }
+
       try {
         const feedback = await createFeedback(prisma, {
           userId,
@@ -603,27 +717,13 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const { type } = request.body;
 
       if (type === "card") {
-        const { contentId } = request.body;
-        const card = await prisma.studyCard.findFirst({
-          where: { contentId },
-          select: cardIdOnlyView,
-        });
-
-        if (!card) {
-          throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
-        }
+        const { contentId, courseKey } = request.body;
+        await resolveCardByContentId(userId, contentId, courseKey);
 
         await starItem(prisma, userId, { type: "card", contentId });
       } else {
-        const { questionId } = request.body;
-        const question = await prisma.studyQuestion.findUnique({
-          where: { id: questionId },
-          select: questionIdOnlyView,
-        });
-
-        if (!question) {
-          throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
-        }
+        const { questionId, courseKey } = request.body;
+        await resolveQuestionById(userId, questionId, courseKey);
 
         await starItem(prisma, userId, { type: "question", questionId });
       }
@@ -646,27 +746,13 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const { type } = request.body;
 
       if (type === "card") {
-        const { contentId } = request.body;
-        const card = await prisma.studyCard.findFirst({
-          where: { contentId },
-          select: cardIdOnlyView,
-        });
-
-        if (!card) {
-          throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
-        }
+        const { contentId, courseKey } = request.body;
+        await resolveCardByContentId(userId, contentId, courseKey);
 
         await unstarItem(prisma, userId, { type: "card", contentId });
       } else {
-        const { questionId } = request.body;
-        const question = await prisma.studyQuestion.findUnique({
-          where: { id: questionId },
-          select: questionIdOnlyView,
-        });
-
-        if (!question) {
-          throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
-        }
+        const { questionId, courseKey } = request.body;
+        await resolveQuestionById(userId, questionId, courseKey);
 
         await unstarItem(prisma, userId, { type: "question", questionId });
       }
@@ -686,7 +772,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
     },
     async (request, reply) => {
       const userId = request.user!.userId;
-      const { type, courseKey } = request.query;
+      const { type, courseKey, limit, offset } = request.query;
 
       let courseId: number | undefined;
       if (courseKey) {
@@ -697,17 +783,20 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         courseId = course.id;
       }
 
-      const items = await getStarredItems(prisma, userId, {
+      const result = await getStarredItems(prisma, userId, {
         type,
         courseId,
+        limit,
+        offset,
       });
 
       reply.send({
-        items: items.map((item) => ({
+        items: result.items.map((item) => ({
           type: item.type,
           contentId: item.contentId,
           questionId: item.questionId,
         })),
+        total: result.total,
       });
     },
   );

@@ -61,6 +61,7 @@ export const CardAnswerBodySchema = Type.Object({
     description: "Session UUID v4",
   }),
   rating: FeedbackRatingSchema,
+  courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
 });
 
 // ============================================
@@ -314,11 +315,13 @@ const StarTypeSchema = Type.Union([
 export const StarCardBodySchema = Type.Object({
   type: Type.Literal("card"),
   contentId: Type.String({ minLength: 1, maxLength: 100 }),
+  courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
 });
 
 export const StarQuestionBodySchema = Type.Object({
   type: Type.Literal("question"),
   questionId: Type.Integer({ minimum: 1 }),
+  courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
 });
 
 export const StarItemBodySchema = Type.Union([
@@ -329,6 +332,8 @@ export const StarItemBodySchema = Type.Union([
 export const StarredItemsQuerySchema = Type.Object({
   type: Type.Optional(StarTypeSchema),
   courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50, default: 20 })),
+  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
 });
 
 export const StarredCardSchema = Type.Object({
@@ -343,6 +348,7 @@ export const StarredQuestionSchema = Type.Object({
 
 export const StarredItemsResponseSchema = Type.Object({
   items: Type.Array(Type.Union([StarredCardSchema, StarredQuestionSchema])),
+  total: Type.Integer(),
 });
 
 // ============================================

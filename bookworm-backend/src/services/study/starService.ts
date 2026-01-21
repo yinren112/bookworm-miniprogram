@@ -81,25 +81,37 @@ export async function unstarItem(
 export async function getStarredItems(
   db: DbCtx,
   userId: number,
-  options: { type?: StarType; courseId?: number } = {},
-): Promise<StarredItem[]> {
-  const { type, courseId } = options;
+  options: { type?: StarType; courseId?: number; limit?: number; offset?: number } = {},
+): Promise<{ items: StarredItem[]; total: number }> {
+  const { type, courseId, limit, offset } = options;
 
-  const items = await db.userStarredItem.findMany({
-    where: {
-      userId,
-      ...(type ? { type } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const whereClause = {
+    userId,
+    ...(type ? { type } : {}),
+  };
+
+  const [items, total] = await Promise.all([
+    db.userStarredItem.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      take: courseId ? undefined : limit,
+      skip: courseId ? undefined : offset,
+    }),
+    db.userStarredItem.count({
+      where: whereClause,
+    }),
+  ]);
 
   if (!courseId) {
-    return items.map((item) => ({
-      type: item.type,
-      contentId: item.contentId ?? undefined,
-      questionId: item.questionId ?? undefined,
-      createdAt: item.createdAt,
-    }));
+    return {
+      items: items.map((item) => ({
+        type: item.type,
+        contentId: item.contentId ?? undefined,
+        questionId: item.questionId ?? undefined,
+        createdAt: item.createdAt,
+      })),
+      total,
+    };
   }
 
   const cardContentIds = items
@@ -133,17 +145,26 @@ export async function getStarredItems(
     questions.forEach((question) => validQuestionIds.add(question.id));
   }
 
-  return items
+  const filteredItems = items
     .filter((item) => {
       if (item.type === "card") {
         return item.contentId && validCardContentIds.has(item.contentId);
       }
       return item.questionId && validQuestionIds.has(item.questionId);
-    })
-    .map((item) => ({
-      type: item.type,
-      contentId: item.contentId ?? undefined,
-      questionId: item.questionId ?? undefined,
-      createdAt: item.createdAt,
-    }));
+    });
+
+  const start = offset ?? 0;
+  const end = limit ? start + limit : undefined;
+
+  return {
+    items: filteredItems
+      .slice(start, end)
+      .map((item) => ({
+        type: item.type,
+        contentId: item.contentId ?? undefined,
+        questionId: item.questionId ?? undefined,
+        createdAt: item.createdAt,
+      })),
+    total: filteredItems.length,
+  };
 }

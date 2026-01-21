@@ -227,7 +227,7 @@ The system follows a strict "books as atomic inventory items" model where each i
 **Page Structure:**
 - `pages/review/` - 复习首页（主包，TabBar）
 - `pages/profile/` - 个人中心（TabBar，复习模式隐藏交易入口）
-- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/周榜）
+- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/周榜/结算）
 - `pages/customer-service/` - Customer support (WeChat ID copy)
 - `pages/webview/` - Generic WebView for dynamic content loading
 - `pages/review-entry/` - Legacy redirect page (not registered in review-only TabBar)
@@ -498,6 +498,7 @@ WX_APP_SECRET=test-app-secret
 - `POST /study/star` - Add starred item (type: card | question)
 - `DELETE /study/star` - Remove starred item (type: card | question)
 - `GET /study/starred-items` - Get starred items (filter by type/courseKey)
+- `GET /study/activity-history` - Get study activity history for heatmap
 
 **System APIs:**
 - `GET /metrics` - Prometheus metrics for monitoring

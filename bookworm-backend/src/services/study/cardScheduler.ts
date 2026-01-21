@@ -308,6 +308,15 @@ export async function submitCardFeedback(
       };
     }
 
+    if (
+      cardState &&
+      cardState.lastAnsweredAt &&
+      cardState.lastAnsweredAt >= todayStart &&
+      cardState.todayShownCount >= MAX_DAILY_ATTEMPTS
+    ) {
+      throw new Error("CARD_DAILY_LIMIT_REACHED");
+    }
+
     let created = false;
 
     if (!cardState) {

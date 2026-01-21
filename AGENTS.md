@@ -1,7 +1,7 @@
-﻿# Repository Guidelines
+# Repository Guidelines
 
 ## 项目结构与模块组织
-- `miniprogram/`：微信小程序前端；`pages/`当前承载复习主页(`pages/review`)与个人中心(`pages/profile`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载刷题/背卡等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
+- `miniprogram/`：微信小程序前端；`pages/`当前承载复习主页(`pages/review`)与个人中心(`pages/profile`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载刷题/背卡/结算等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
 - `miniprogram/components/mp-html/`：第三方富文本组件，保持原样，不做规则性格式化或 ESLint 改造。
 - `bookworm-backend/`：Fastify + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
 - 根目录脚本`test_metrics.sh`与`update_user_metrics.js`用于观测性验证，改动前须先与运维同步。
@@ -46,6 +46,9 @@
 - 数据模型：后端使用单表 `user_starred_item`（`userId`、`type`、`contentId?`、`questionId?`）。
 - 接口：`POST /study/star`、`DELETE /study/star`、`GET /study/starred-items`。
 - 响应结构：`{ items: [{ type, contentId?, questionId? }] }`，前端通过 `starItem/unstarItem/getStarredItems` 调用。
+
+## 学习活动热力图
+- 接口：`GET /study/activity-history`，用于获取热力图活动数据。
 
 ## 沟通方式与角色定义
 - 所有协作者必须以中文思考、讨论与记录；命令及代码标识保持原文。
