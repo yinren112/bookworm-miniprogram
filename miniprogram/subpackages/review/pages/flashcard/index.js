@@ -16,7 +16,7 @@ Page({
     courseKey: '',
     unitId: null,
     sessionId: '',
-    cards: [],
+    cardsLength: 0,
     currentIndex: 0,
     currentCard: null,
     isFlipped: false,
@@ -69,9 +69,10 @@ Page({
       const { sessionId, cards } = res;
 
       if (!cards || cards.length === 0) {
+        this._cards = [];
         this.setData({
           loading: false,
-          cards: [],
+          cardsLength: 0,
         });
         return;
       }
@@ -87,10 +88,13 @@ Page({
         logger.error('Failed to load starred items:', err);
       }
 
+      // 存入实例字段，避免大数组 setData
+      this._cards = cards;
       const firstCard = cards[0];
+
       this.setData({
         sessionId,
-        cards,
+        cardsLength: cards.length,
         currentIndex: 0,
         currentCard: firstCard,
         starredItems,
@@ -175,7 +179,8 @@ Page({
   },
   
   async submitRating(rating) {
-      const { currentCard, sessionId, currentIndex, cards } = this.data;
+      const { currentCard, sessionId, currentIndex } = this.data;
+      const cards = this._cards || [];
       if (!currentCard) return;
 
       this.setData({ submitting: true });
@@ -224,7 +229,7 @@ Page({
                 currentCard: nextCard,
                 isStarred: this.data.starredItems[nextCard.contentId] || false,
                 isFlipped: false,
-                progressPercent: Math.round((nextIndex / cards.length) * 100)
+                progressPercent: Math.round((nextIndex / this.data.cardsLength) * 100)
             });
             
 
@@ -310,6 +315,11 @@ Page({
 
   onReportSuccess() {
     // 反馈提交成功后的回调
+  },
+
+  onUnload() {
+    // 释放音效实例，避免长期资源占用
+    soundManager.destroyAll();
   },
 
   onShareAppMessage() {

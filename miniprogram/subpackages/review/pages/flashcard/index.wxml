@@ -7,7 +7,7 @@
     <view class="progress-fill" style="width: {{progressPercent}}%"></view>
   </view>
   <view class="progress-text">
-    <text>{{currentIndex + 1}} / {{cards.length}}</text>
+    <text>{{currentIndex + 1}} / {{cardsLength}}</text>
   </view>
   <!-- 卡片区域 -->
   <view class="card-wrapper" wx:if="{{!loading && currentCard}}">
@@ -91,12 +91,12 @@
     <text class="complete-title">太棒了!</text>
     <text class="complete-desc">这一轮你完成了！</text>
     <view class="complete-stats">
-      <text>攻克了 {{cards.length}} 张卡片</text>
+      <text>攻克了 {{cardsLength}} 张卡片</text>
     </view>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
   <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{!loading && !completed && cards.length === 0}}">
+  <view class="empty-state" wx:if="{{!loading && !completed && cardsLength === 0}}">
     <text class="empty-text">今天的卡片都复习完了，休息一下吧</text>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>

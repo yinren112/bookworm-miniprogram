@@ -41,6 +41,7 @@ Page({
    */
   onLoad() {
     this._isPageActive = true;
+    this._acquirableCount = 0; // 增量计数器
     const currentYear = new Date().getFullYear();
     const yearRange = [];
     for (let i = 0; i < 10; i++) {
@@ -170,8 +171,17 @@ Page({
       individualPriceCents: 0   // 单本价格(分)
     };
     const scannedItems = [...this.data.scannedItems, enrichedItem];
-    this.setData({ scannedItems });
-    this.updateSummary();
+    
+    // 增量更新计数
+    if (enrichedItem.status === 'acquirable') {
+      this._acquirableCount++;
+    }
+    
+    this.setData({
+      scannedItems,
+      summary: { count: this._acquirableCount },
+      hasRejectedItems: this.data.hasRejectedItems || enrichedItem.status === 'rejected'
+    });
   },
 
   /**
@@ -179,10 +189,22 @@ Page({
    */
   onRemoveItem(e) {
     const index = e.currentTarget.dataset.index;
+    const removedItem = this.data.scannedItems[index];
     const scannedItems = [...this.data.scannedItems];
     scannedItems.splice(index, 1);
-    this.setData({ scannedItems });
-    this.updateSummary();
+    
+    // 增量更新计数
+    if (removedItem.status === 'acquirable') {
+      this._acquirableCount--;
+    }
+    // hasRejectedItems 需要重新计算（因为可能移除了唯一的 rejected 项）
+    const hasRejectedItems = scannedItems.some(item => item.status === 'rejected');
+    
+    this.setData({
+      scannedItems,
+      summary: { count: this._acquirableCount },
+      hasRejectedItems
+    });
   },
 
   /**
@@ -225,19 +247,7 @@ Page({
   /**
    * 更新汇总信息
    */
-  updateSummary() {
-    const acquirableItems = this.data.scannedItems.filter(
-      item => item.status === 'acquirable'
-    );
-
-    const count = acquirableItems.length;
-    const hasRejectedItems = this.data.scannedItems.some(item => item.status === 'rejected');
-
-    this.setData({
-      summary: { count },
-      hasRejectedItems
-    });
-  },
+  // updateSummary 已移除，改用增量计算
 
   /**
    * 定价模式切换
@@ -331,8 +341,11 @@ Page({
    */
   onClearRejected() {
     const validItems = this.data.scannedItems.filter(item => item.status === 'acquirable');
+    // 重置增量计数器
+    this._acquirableCount = validItems.length;
     this.setData({
       scannedItems: validItems,
+      summary: { count: this._acquirableCount },
       hasRejectedItems: false
     });
     wx.showToast({ title: '已清理', icon: 'success' });

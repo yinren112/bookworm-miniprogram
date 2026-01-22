@@ -2,12 +2,12 @@
 <!-- 刷题闯关页 -->
 <view class="container">
   <!-- 进度条 -->
-  <view class="progress-section" wx:if="{{!loading && !completed && questions.length > 0}}">
+  <view class="progress-section" wx:if="{{!loading && !completed && questionsLength > 0}}">
     <view class="progress-bar">
       <view class="progress-fill" style="width: {{progressPercent}}%"></view>
     </view>
     <view class="progress-info">
-      <text class="progress-text">{{currentIndex + 1}} / {{questions.length}}</text>
+      <text class="progress-text">{{currentIndex + 1}} / {{questionsLength}}</text>
       <text class="accuracy-text" wx:if="{{answeredCount > 0}}">
         正确率 {{Math.round(correctCount / answeredCount * 100)}}%
       </text>
@@ -78,7 +78,7 @@
   <!-- 下一题按钮 -->
   <view class="action-section" wx:if="{{showResult && !completed}}">
     <button class="next-btn clay-btn-primary" bindtap="nextQuestion">
-      {{currentIndex < questions.length - 1 ? '下一题' : '查看结果'}}
+      {{currentIndex < questionsLength - 1 ? '下一题' : '查看结果'}}
     </button>
   </view>
   <!-- 加载状态 -->
@@ -89,7 +89,7 @@
   <view class="complete-state" wx:if="{{!loading && completed}}">
     <view class="complete-icon"></view>
     <text class="complete-title">
-      {{correctCount === questions.length ? '全对！你是学霸！' : (correctCount >= questions.length * 0.6 ? '不错哦，及格了！' : '还需努力，再来一轮？')}}
+      {{correctCount === questionsLength ? '全对！你是学霸！' : (correctCount >= questionsLength * 0.6 ? '不错哦，及格了！' : '还需努力，再来一轮？')}}
     </text>
     <view class="stats-card clay-card">
       <view class="stat-row">
@@ -98,22 +98,22 @@
       </view>
       <view class="stat-row">
         <text class="stat-label">答错</text>
-        <text class="stat-value wrong">{{questions.length - correctCount}}</text>
+        <text class="stat-value wrong">{{questionsLength - correctCount}}</text>
       </view>
       <view class="stat-row">
         <text class="stat-label">正确率</text>
-        <text class="stat-value">{{Math.round(correctCount / questions.length * 100)}}%</text>
+        <text class="stat-value">{{Math.round(correctCount / questionsLength * 100)}}%</text>
       </view>
     </view>
     <view class="complete-actions">
-      <button class="retry-btn" bindtap="retryQuiz" wx:if="{{correctCount < questions.length}}">
+      <button class="retry-btn" bindtap="retryQuiz" wx:if="{{correctCount < questionsLength}}">
         错题再练
       </button>
       <button class="back-btn clay-btn-primary" bindtap="goBack">返回课程</button>
     </view>
   </view>
   <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{!loading && !completed && questions.length === 0}}">
+  <view class="empty-state" wx:if="{{!loading && !completed && questionsLength === 0}}">
     <text class="empty-text">题库空空，老师还没出题呢</text>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>

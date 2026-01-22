@@ -2,6 +2,7 @@
 // 复习首页
 
 const { getCourses, getTodayQueue, getStreakInfo, getActivityHistory } = require('../../utils/study-api');
+const { swrFetch } = require('../../utils/cache');
 const logger = require('../../utils/logger');
 
 Page({
@@ -39,8 +40,19 @@ Page({
     this.setData({ loading: true });
 
     try {
-      // 加载所有课程
-      const coursesRes = await getCourses();
+      // 并行请求：课程、streak（带缓存）、热力图（带缓存）
+      const [coursesRes, streakInfo, activityRes] = await Promise.all([
+        getCourses(),
+        swrFetch('review:streak', () => getStreakInfo(), { ttlMs: 300000 }).catch(err => {
+          logger.error('Failed to get streak info:', err);
+          return null;
+        }),
+        swrFetch('review:activity', () => getActivityHistory({ days: 35 }), { ttlMs: 300000 }).catch(err => {
+          logger.error('Failed to get activity history:', err);
+          return { days: [] };
+        })
+      ]);
+
       const courses = coursesRes.courses || [];
 
       // 找到已注册的课程
@@ -68,22 +80,8 @@ Page({
         }
       }
 
-      // 获取 streak 信息
-      let streakInfo = null;
-      try {
-        streakInfo = await getStreakInfo();
-      } catch (err) {
-        logger.error('Failed to get streak info:', err);
-      }
-
-      // 获取热力图数据
-      let heatmapData = [];
-      try {
-        const activityRes = await getActivityHistory({ days: 35 });
-        heatmapData = (activityRes.days || []).map(d => ({ level: d.level }));
-      } catch (err) {
-        logger.error('Failed to get activity history:', err);
-      }
+      // 处理热力图数据
+      const heatmapData = (activityRes?.days || []).map(d => ({ level: d.level }));
 
       this.setData({
         courses: enrolledCourses,

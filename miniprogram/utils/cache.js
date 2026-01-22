@@ -2,7 +2,7 @@
 const logger = require('./logger');
 
 /**
- * 从本地存储获取缓存项
+ * 从本地存储获取缓存项（同步版本）
  * @param {string} key - 缓存键
  * @returns {Object|null} - { data, timestamp } 或 null
  */
@@ -15,6 +15,27 @@ function get(key) {
     logger.error('[cache] get failed', key, error);
     return null;
   }
+}
+
+/**
+ * 从本地存储获取缓存项（异步版本，避免阻塞主线程）
+ * @param {string} key - 缓存键
+ * @returns {Promise<Object|null>} - { data, timestamp } 或 null
+ */
+function getAsync(key) {
+  return new Promise((resolve) => {
+    wx.getStorage({
+      key,
+      success: (res) => {
+        try {
+          resolve(res.data ? JSON.parse(res.data) : null);
+        } catch {
+          resolve(null);
+        }
+      },
+      fail: () => resolve(null)
+    });
+  });
 }
 
 /**
@@ -66,7 +87,7 @@ function isExpired(cachedItem) {
  * @returns {Promise<*>} - 返回数据（缓存或新数据）
  */
 async function swrFetch(key, fetcher, { ttlMs = 30000, forceRefresh = false, onBackgroundUpdate = null } = {}) {
-  const cached = get(key);
+  const cached = await getAsync(key);
 
   // 如果强制刷新，直接拉新数据
   if (forceRefresh) {
@@ -140,6 +161,7 @@ function clear() {
 
 module.exports = {
   get,
+  getAsync,
   setWithTTL,
   swrFetch,
   remove,

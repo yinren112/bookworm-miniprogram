@@ -12,7 +12,7 @@ Page({
     unitId: null,
     wrongItemsOnly: false,
     sessionId: "",
-    questions: [],
+    questionsLength: 0,
     currentIndex: 0,
     currentQuestion: null,
     selectedAnswers: [],
@@ -73,9 +73,10 @@ Page({
       const { sessionId, questions } = res;
 
       if (!questions || questions.length === 0) {
+        this._questions = [];
         this.setData({
           loading: false,
-          questions: [],
+          questionsLength: 0,
         });
         return;
       }
@@ -91,9 +92,12 @@ Page({
         logger.error("Failed to load starred items:", err);
       }
 
+      // 存入实例字段，避免大数组 setData
+      this._questions = questions;
+
       this.setData({
         sessionId,
-        questions,
+        questionsLength: questions.length,
         currentIndex: 0,
         currentQuestion: questions[0],
         starredItems,
@@ -300,7 +304,8 @@ Page({
   },
 
   nextQuestion() {
-    const { currentIndex, questions } = this.data;
+    const { currentIndex } = this.data;
+    const questions = this._questions || [];
     const nextIndex = currentIndex + 1;
 
     if (nextIndex >= questions.length) {
@@ -329,13 +334,14 @@ Page({
       correctIndices: [],
       correctAnswerText: "",
       optionStates: buildOptionStates(nextQ?.options || [], [], []),
-      progressPercent: Math.round((nextIndex / questions.length) * 100),
+      progressPercent: Math.round((nextIndex / this.data.questionsLength) * 100),
       startTime: Date.now(),
     });
   },
 
   retryQuiz() {
     // 重做错题
+    this._questions = [];
     this.setData({
       wrongItemsOnly: true,
     });
