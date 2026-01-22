@@ -1,5 +1,6 @@
 <!-- subpackages/review/pages/flashcard/index.wxml -->
 <!-- 卡片复习页 -->
+<wxs src="../../utils/swipe-gesture.wxs" module="gesture" />
 <view class="container">
   <!-- 进度条 -->
   <view class="progress-bar">
@@ -14,9 +15,8 @@
     <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
       <text class="star-icon">{{isStarred ? '★' : '☆'}}</text>
     </view>
-    <!-- Card Container with Swipe Gestures and Style Binding -->
-    <!-- Note: class 'flipped' is still useful for CSS-only flips, but we also bind 'style' for swipe transforms -->
-    <view class="card-container {{isFlipped ? 'flipped' : ''}} {{swipeClass}}" style="{{cardStyle}}" bindtap="flipCard" bindtouchstart="touchStart" bindtouchmove="touchMove" bindtouchend="touchEnd">
+    <!-- Card Container with WXS Swipe Gestures -->
+    <view id="swipe-card" class="card-container {{isFlipped ? 'flipped' : ''}}" data-screen-width="{{screenWidth}}" bindtap="flipCard" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
       <!-- 正面 -->
       <view class="card card-front clay-card">
         <view class="card-label">问题</view>
@@ -34,12 +34,18 @@
           <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
         </view>
       </view>
-      <!-- Swipe Indicators (Overlay) -->
-      <view class="swipe-indicator forgot-overlay" style="opacity: {{swipeOpacityForgot}}">
+      <!-- 4档 Swipe Indicators -->
+      <view id="indicator-left-light" class="swipe-indicator fuzzy-overlay">
+        <text>🤔 模糊</text>
+      </view>
+      <view id="indicator-left-heavy" class="swipe-indicator forgot-overlay">
         <text>😓 忘了</text>
       </view>
-      <view class="swipe-indicator knew-overlay" style="opacity: {{swipeOpacityKnew}}">
+      <view id="indicator-right-light" class="swipe-indicator knew-overlay">
         <text>😊 记得</text>
+      </view>
+      <view id="indicator-right-heavy" class="swipe-indicator perfect-overlay">
+        <text>🎉 完美</text>
       </view>
     </view>
   </view>

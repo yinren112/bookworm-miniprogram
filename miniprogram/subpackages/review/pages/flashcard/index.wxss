@@ -146,7 +146,7 @@
   z-index: 1;
 }
 
-/* Swipe Overlay Indicators */
+/* Swipe Overlay Indicators - 4 Levels */
 .swipe-indicator {
   position: absolute;
   top: 40rpx;
@@ -157,23 +157,44 @@
   font-weight: bold;
   opacity: 0;
   z-index: 10;
-  transform: rotate(0deg);
   pointer-events: none;
+  transition: opacity 0.1s ease;
+}
+
+/* Left side indicators (negative swipe) */
+.fuzzy-overlay {
+  right: 40rpx;
+  border-color: #FB8C00;
+  color: #FB8C00;
+  background: rgba(255, 243, 224, 0.9);
+  transform: rotate(12deg);
 }
 
 .forgot-overlay {
   right: 40rpx;
   border-color: #E53935;
   color: #E53935;
+  background: rgba(255, 235, 238, 0.9);
   transform: rotate(15deg);
 }
 
+/* Right side indicators (positive swipe) */
 .knew-overlay {
   left: 40rpx;
   border-color: #43A047;
   color: #43A047;
+  background: rgba(232, 245, 233, 0.9);
+  transform: rotate(-12deg);
+}
+
+.perfect-overlay {
+  left: 40rpx;
+  border-color: #1E88E5;
+  color: #1E88E5;
+  background: rgba(227, 242, 253, 0.9);
   transform: rotate(-15deg);
 }
+
 
 .card-label {
   font-size: 24rpx;

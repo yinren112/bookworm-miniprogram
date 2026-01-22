@@ -3,10 +3,11 @@
 
 const { startSession, submitCardAnswer, starItem, unstarItem, getStarredItems } = require('../../utils/study-api');
 const logger = require('../../../../utils/logger');
-
-// Swipe constants
-const SWIPE_THRESHOLD = 80; // px to trigger
-const ROTATE_FACTOR = 0.1; // degrees per px
+const haptic = require('../../../../utils/haptic');
+const soundManager = require('../../../../utils/sound-manager');
+// Swipe thresholds - kept for reference (actual logic in WXS)
+// const T1_RATIO = 0.22;  // Light threshold
+// const T2_RATIO = 0.42;  // Heavy threshold
 
 Page({
   data: {
@@ -23,20 +24,21 @@ Page({
     progressPercent: 0,
     showReportModal: false,
     
-    // Swipe & Interaction Data
-    startX: 0,
-    startY: 0,
-    cardStyle: '', // transform style
-    swipeClass: '', // animation class
-    swipeOpacityForgot: 0,
-    swipeOpacityKnew: 0,
-    isStarred: false, // Local state for current card
-    starredItems: {}, // Local cache of starred items
+    // Screen width for WXS gesture module
+    screenWidth: 375,
+    
+    // Starred state
+    isStarred: false,
+    starredItems: {},
   },
 
   onLoad(options) {
     this.startTime = Date.now(); // Session Timer
     this.fatigueWarned = false;
+    
+    // Get screen width for WXS gesture module
+    const sysInfo = wx.getSystemInfoSync();
+    this.setData({ screenWidth: sysInfo.windowWidth });
     
     const { courseKey, unitId } = options;
     if (courseKey) {
@@ -116,104 +118,59 @@ Page({
     if (this.data.isFlipped) return;
 
     // 触觉反馈 (Light)
-    this.triggerHaptic('light');
+    haptic.trigger('light');
 
     this.setData({ isFlipped: true });
   },
 
-  // --- Interaction: Swipe ---
-  touchStart(e) {
-    if (this.data.submitting || this.data.completed ||  !this.data.currentCard) return;
-    
-    // Tinder style: always allow swipe
-    const touch = e.touches[0];
-    this.setData({
-      startX: touch.clientX,
-      startY: touch.clientY,
-      swipeClass: '' 
-    });
-  },
-
-  touchMove(e) {
-    if (this.data.submitting || this.data.completed || !this.data.currentCard) return;
-    
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - this.data.startX;
-
-    // Rotation
-    const rotate = deltaX * ROTATE_FACTOR;
-    
-    // Indicators
-    let opacityForgot = 0;
-    let opacityKnew = 0;
-    
-    if (deltaX < 0) {
-        opacityForgot = Math.min(Math.abs(deltaX) / (SWIPE_THRESHOLD * 1.5), 1);
-    } else {
-        opacityKnew = Math.min(Math.abs(deltaX) / (SWIPE_THRESHOLD * 1.5), 1);
-    }
-
-    // Apply transform 
-    let baseTransform = this.data.isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
-    
-    this.setData({
-        cardStyle: `transform: ${baseTransform} translateX(${deltaX}px) rotate(${rotate}deg);`,
-        swipeOpacityForgot: opacityForgot,
-        swipeOpacityKnew: opacityKnew
-    });
-  },
-
-  touchEnd(e) {
+  // --- WXS Swipe Callbacks ---
+  /**
+   * WXS 滑动提交回调
+   * @param {Object} e - 包含 rating, level, dx
+   */
+  onSwipeCommit(e) {
     if (this.data.submitting || this.data.completed) return;
     
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - this.data.startX;
+    const { rating, level } = e;
     
-    if (deltaX > SWIPE_THRESHOLD) {
-        this.completeSwipe('KNEW');
-    } else if (deltaX < -SWIPE_THRESHOLD) {
-        this.completeSwipe('FORGOT');
+    // 触觉反馈
+    if (rating === 'FORGOT') {
+      haptic.trigger('heavy');
+    } else if (level === 'heavy') {
+      haptic.trigger('medium');
     } else {
-        this.resetSwipe();
+      haptic.trigger('light');
     }
-  },
-  
-  resetSwipe() {
-    this.setData({
-        swipeClass: 'reset-anim', 
-        cardStyle: '', 
-        swipeOpacityForgot: 0,
-        swipeOpacityKnew: 0
-    });
-  },
-  
-  completeSwipe(rating) {
-     const isRight = rating === 'KNEW' || rating === 'PERFECT';
-     const screenWidth = wx.getSystemInfoSync().windowWidth;
-     const endX = isRight ? screenWidth + 100 : -screenWidth - 100;
-     const rotate = isRight ? 20 : -20;
-     
-     let baseTransform = this.data.isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
-     
-     // Animate off screen
-     this.setData({
-         swipeClass: 'swipe-anim',
-         cardStyle: `transform: ${baseTransform} translateX(${endX}px) rotate(${rotate}deg); opacity: 0;`,
-         submitting: true 
-     });
-     
-     this.triggerHaptic(rating === 'FORGOT' ? 'heavy' : 'success');
-     
-     setTimeout(() => {
-         this.submitRating(rating);
-     }, 300);
+    
+    // 音效反馈
+    if (level === 'heavy') {
+      soundManager.play('swipe_heavy');
+    } else {
+      soundManager.play('swipe_light');
+    }
+    
+    this.setData({ submitting: true });
+    
+    // 延迟提交，让飞出动画完成
+    setTimeout(() => {
+      this.submitRating(rating);
+    }, 300);
   },
 
-  // --- Interaction: Feedback Submit ---
+  /**
+   * WXS 滑动取消回调（回弹）
+   * @param {Object} e - 包含 dx
+   */
+  onSwipeCancel() {
+    // 可选埋点 - WXS 回弹取消时调用
+  },
+
+  // --- Interaction: Feedback Submit (Button fallback) ---
   async submitFeedback(e) {
     if (this.data.submitting) return;
     const { rating } = e.currentTarget.dataset;
-    this.triggerHaptic(rating === 'FORGOT' ? 'heavy' : 'light');
+    haptic.trigger(rating === 'FORGOT' ? 'heavy' : 'light');
+    soundManager.play('swipe_light');
     this.submitRating(rating);
   },
   
@@ -248,7 +205,8 @@ Page({
         const isLastCard = nextIndex >= cards.length;
 
         if (isLastCard) {
-            this.triggerHaptic('celebration');
+            haptic.trigger('celebration');
+            soundManager.play('celebration');
             
             // 计算统计数据
             const durationSeconds = Math.floor((Date.now() - this.startTime) / 1000);
@@ -266,20 +224,10 @@ Page({
                 currentCard: nextCard,
                 isStarred: this.data.starredItems[nextCard.contentId] || false,
                 isFlipped: false,
-                progressPercent: Math.round((nextIndex / cards.length) * 100),
-                // Reset card position
-                cardStyle: 'transform: translateX(0) scale(0.9); opacity: 0; transition: none;', 
-                swipeOpacityForgot: 0,
-                swipeOpacityKnew: 0
+                progressPercent: Math.round((nextIndex / cards.length) * 100)
             });
             
-            // Fade in next card
-            setTimeout(() => {
-                this.setData({
-                    cardStyle: '', // Remove overrides, let CSS handle it
-                    swipeClass: 'reset-anim'
-                });
-            }, 50);
+
         }
       } catch (err) {
         logger.error('Failed to submit feedback:', err);
@@ -287,7 +235,6 @@ Page({
             title: '同步失败',
             icon: 'none'
         });
-        this.resetSwipe();
       } finally {
         this.setData({ submitting: false });
       }
@@ -316,7 +263,7 @@ Page({
       const newVal = !isStarred;
       const contentId = currentCard.contentId;
       
-      this.triggerHaptic('light');
+      haptic.trigger('light');
 
       // Optimistic update
       this.setData({ isStarred: newVal });
@@ -341,31 +288,6 @@ Page({
         });
   },
 
-  // --- Haptics ---
-  triggerHaptic(type) {
-      if (!wx.vibrateShort) return; 
-      
-      switch(type) {
-          case 'success':
-          case 'light':
-             wx.vibrateShort({ type: 'light' });
-             break;
-          case 'medium':
-             wx.vibrateShort({ type: 'medium' });
-             break;
-          case 'heavy':
-             wx.vibrateShort({ type: 'heavy' }); 
-             break;
-          case 'celebration':
-             wx.vibrateShort({ type: 'heavy' });
-             setTimeout(() => wx.vibrateShort({ type: 'medium' }), 150);
-             setTimeout(() => wx.vibrateShort({ type: 'light' }), 300);
-             break;
-          default:
-             wx.vibrateShort();
-      }
-  },
-
   goBack() {
     const pages = getCurrentPages();
     if (pages.length > 1) {
@@ -378,7 +300,7 @@ Page({
   },
 
   openReportModal() {
-    this.triggerHaptic('light');
+    haptic.trigger('light');
     this.setData({ showReportModal: true });
   },
 

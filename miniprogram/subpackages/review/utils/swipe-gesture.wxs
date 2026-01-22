@@ -1,0 +1,223 @@
+/**
+ * 闪卡滑动手势处理模块 (WXS)
+ * 在渲染层直接响应触摸事件，避免逻辑层通信延迟
+ * 
+ * 功能：
+ * - 水平拖拽跟手
+ * - 双阈值4档判定（FUZZY/FORGOT/KNEW/PERFECT）
+ * - 视觉指示器渐显
+ * - 飞出/回弹动效
+ */
+
+// 阈值配置（相对于屏宽的比例）
+var T1_RATIO = 0.22;  // 轻档判定
+var T2_RATIO = 0.42;  // 重档判定
+var DIRECTION_LOCK_RATIO = 1.2;  // abs(dx) > 1.2 * abs(dy) 锁定水平
+
+// 旋转因子
+var ROTATE_FACTOR = 0.08;  // degrees per px
+
+// 状态存储
+var state = {
+  startX: 0,
+  startY: 0,
+  isHorizontalLocked: false,
+  isDragging: false,
+  screenWidth: 375
+};
+
+/**
+ * 触摸开始
+ */
+function touchStart(e, ins) {
+  if (!e.touches || e.touches.length === 0) return;
+  
+  var touch = e.touches[0];
+  state.startX = touch.clientX;
+  state.startY = touch.clientY;
+  state.isHorizontalLocked = false;
+  state.isDragging = true;
+  
+  // 获取屏幕宽度
+  state.screenWidth = e.target.dataset.screenWidth || 375;
+  
+  // 移除过渡动画以实现即时跟手
+  var card = ins.selectComponent('#swipe-card');
+  if (card) {
+    card.setStyle({
+      transition: 'none'
+    });
+  }
+}
+
+/**
+ * 触摸移动 - 核心跟手逻辑
+ */
+function touchMove(e, ins) {
+  if (!state.isDragging) return;
+  if (!e.touches || e.touches.length === 0) return;
+  
+  var touch = e.touches[0];
+  var dx = touch.clientX - state.startX;
+  var dy = touch.clientY - state.startY;
+  
+  // 方向锁定检测
+  if (!state.isHorizontalLocked) {
+    var absDx = Math.abs(dx);
+    var absDy = Math.abs(dy);
+    
+    // 如果水平位移不够明显，不处理
+    if (absDx < 10 && absDy < 10) return;
+    
+    // 锁定水平方向
+    if (absDx > absDy * DIRECTION_LOCK_RATIO) {
+      state.isHorizontalLocked = true;
+    } else {
+      // 垂直方向，不处理滑动
+      return;
+    }
+  }
+  
+  // 计算旋转角度
+  var rotate = dx * ROTATE_FACTOR;
+  
+  // 计算阈值
+  var t1 = state.screenWidth * T1_RATIO;
+  var t2 = state.screenWidth * T2_RATIO;
+  // 确定档位和方向
+  var direction = dx < 0 ? 'left' : 'right';
+  var level = 'none';
+  if (absDx >= t2) {
+    level = 'heavy';
+  } else if (absDx >= t1) {
+    level = 'light';
+  }
+  
+  // 计算透明度（0-1）
+  var opacity = 0;
+  if (absDx > 0) {
+    opacity = Math.min(absDx / (t1 * 1.2), 1);
+  }
+  
+  // 设置卡片变换
+  var card = ins.selectComponent('#swipe-card');
+  if (card) {
+    card.setStyle({
+      transform: 'translateX(' + dx + 'px) rotate(' + rotate + 'deg)',
+      transition: 'none'
+    });
+  }
+  
+  // 更新指示器透明度
+  updateIndicators(ins, direction, level, opacity);
+}
+
+/**
+ * 更新4个指示器的透明度
+ */
+function updateIndicators(ins, direction, level, opacity) {
+  // 左侧指示器
+  var leftLight = ins.selectComponent('#indicator-left-light');
+  var leftHeavy = ins.selectComponent('#indicator-left-heavy');
+  var rightLight = ins.selectComponent('#indicator-right-light');
+  var rightHeavy = ins.selectComponent('#indicator-right-heavy');
+  
+  // 重置所有
+  var hideStyle = { opacity: 0 };
+  if (leftLight) leftLight.setStyle(hideStyle);
+  if (leftHeavy) leftHeavy.setStyle(hideStyle);
+  if (rightLight) rightLight.setStyle(hideStyle);
+  if (rightHeavy) rightHeavy.setStyle(hideStyle);
+  
+  // 显示对应指示器
+  if (direction === 'left') {
+    if (level === 'heavy' && leftHeavy) {
+      leftHeavy.setStyle({ opacity: opacity });
+    } else if (level === 'light' && leftLight) {
+      leftLight.setStyle({ opacity: opacity });
+    }
+  } else if (direction === 'right') {
+    if (level === 'heavy' && rightHeavy) {
+      rightHeavy.setStyle({ opacity: opacity });
+    } else if (level === 'light' && rightLight) {
+      rightLight.setStyle({ opacity: opacity });
+    }
+  }
+}
+
+/**
+ * 触摸结束 - 判定结果
+ */
+function touchEnd(e, ins) {
+  if (!state.isDragging) return;
+  state.isDragging = false;
+  
+  if (!e.changedTouches || e.changedTouches.length === 0) return;
+  
+  var touch = e.changedTouches[0];
+  var dx = touch.clientX - state.startX;
+  var absDx = Math.abs(dx);
+  
+  // 计算阈值
+  var t1 = state.screenWidth * T1_RATIO;
+  var t2 = state.screenWidth * T2_RATIO;
+  
+  // 判定结果
+  var direction = dx < 0 ? 'left' : 'right';
+  var level = 'none';
+  var rating = null;
+  
+  if (absDx >= t2) {
+    level = 'heavy';
+    rating = direction === 'left' ? 'FORGOT' : 'PERFECT';
+  } else if (absDx >= t1) {
+    level = 'light';
+    rating = direction === 'left' ? 'FUZZY' : 'KNEW';
+  }
+  
+  var card = ins.selectComponent('#swipe-card');
+  
+  if (rating) {
+    // 触发提交：飞出动画
+    var endX = direction === 'right' ? state.screenWidth + 100 : -state.screenWidth - 100;
+    var endRotate = direction === 'right' ? 20 : -20;
+    
+    if (card) {
+      card.setStyle({
+        transform: 'translateX(' + endX + 'px) rotate(' + endRotate + 'deg)',
+        opacity: 0,
+        transition: 'transform 0.3s ease-out, opacity 0.3s ease-out'
+      });
+    }
+    
+    // 通知逻辑层
+    ins.callMethod('onSwipeCommit', {
+      rating: rating,
+      level: level,
+      dx: dx
+    });
+  } else {
+    // 回弹动画
+    if (card) {
+      card.setStyle({
+        transform: 'translateX(0) rotate(0deg)',
+        opacity: 1,
+        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+      });
+    }
+    
+    // 隐藏所有指示器
+    updateIndicators(ins, 'none', 'none', 0);
+    
+    // 通知逻辑层（可选埋点）
+    ins.callMethod('onSwipeCancel', {
+      dx: dx
+    });
+  }
+}
+
+module.exports = {
+  touchStart: touchStart,
+  touchMove: touchMove,
+  touchEnd: touchEnd
+};
