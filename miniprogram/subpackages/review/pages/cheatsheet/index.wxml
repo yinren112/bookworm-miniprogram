@@ -1,27 +1,18 @@
 <!-- subpackages/review/pages/cheatsheet/index.wxml -->
 <!-- 急救包页面 -->
-
 <view class="container">
   <!-- 页面标题 -->
   <view class="page-header" wx:if="{{!loading}}">
     <text class="page-title">急救包</text>
-    <text class="page-subtitle">考前速查，快速回顾重点</text>
+    <text class="page-subtitle">考前救命！快速回顾核心知识点</text>
   </view>
-
   <!-- 资源列表 -->
   <view class="cheatsheet-list" wx:if="{{!loading && cheatSheets.length > 0}}">
-    <view
-      class="cheatsheet-item clay-card"
-      wx:for="{{cheatSheets}}"
-      wx:key="id"
-      bindtap="previewCheatSheet"
-      data-index="{{index}}"
-    >
+    <view class="cheatsheet-item clay-card" wx:for="{{cheatSheets}}" wx:key="id" bindtap="previewCheatSheet" data-index="{{index}}">
       <!-- 图标区域 -->
       <view class="item-icon {{item.assetTypeNormalized}}">
         <text>{{assetTypeIcons[item.assetTypeNormalized] || '📎'}}</text>
       </view>
-
       <!-- 内容区域 -->
       <view class="item-content">
         <text class="item-title">{{item.title}}</text>
@@ -30,15 +21,9 @@
           <text class="item-version" wx:if="{{item.version}}">v{{item.version}}</text>
         </view>
       </view>
-
       <!-- 操作区域 -->
       <view class="item-actions">
-        <view
-          class="action-btn save"
-          catchtap="saveCheatSheet"
-          data-index="{{index}}"
-          wx:if="{{item.assetTypeNormalized === 'image'}}"
-        >
+        <view class="action-btn save" catchtap="saveCheatSheet" data-index="{{index}}" wx:if="{{item.assetTypeNormalized === 'image'}}">
           <text>保存</text>
         </view>
         <view class="action-btn preview">
@@ -47,21 +32,18 @@
       </view>
     </view>
   </view>
-
   <!-- 加载状态 -->
   <view class="loading-state" wx:if="{{loading}}">
-    <text class="loading-text">加载中...</text>
+    <text class="loading-text">正在加载急救包...</text>
   </view>
-
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{!loading && cheatSheets.length === 0}}">
-    <view class="empty-icon">📦</view>
-    <text class="empty-text">暂无急救包资源</text>
+    <view class="empty-icon"></view>
+    <text class="empty-text">急救包还是空的，老师正在准备中</text>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
-
   <!-- 底部提示 -->
   <view class="footer-tip" wx:if="{{!loading && cheatSheets.length > 0}}">
-    <text>长按图片可保存到相册</text>
+    <text>小贴士：长按图片可保存</text>
   </view>
 </view>

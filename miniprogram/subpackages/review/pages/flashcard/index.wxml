@@ -19,33 +19,33 @@
     <view id="swipe-card" class="card-container {{isFlipped ? 'flipped' : ''}}" data-screen-width="{{screenWidth}}" bindtap="flipCard" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
       <!-- 正面 -->
       <view class="card card-front clay-card">
-        <view class="card-label">问题</view>
+        <view class="card-label">Q</view>
         <view class="card-content">
           <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
         </view>
         <view class="card-hint">
-          <text>点击翻转 / 左右滑动</text>
+          <text>轻触翻牌</text>
         </view>
       </view>
       <!-- 背面 -->
       <view class="card card-back clay-card">
-        <view class="card-label">答案</view>
+        <view class="card-label">A</view>
         <view class="card-content">
           <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
         </view>
       </view>
       <!-- 4档 Swipe Indicators -->
       <view id="indicator-left-light" class="swipe-indicator fuzzy-overlay">
-        <text>🤔 模糊</text>
+        <text>有点模糊</text>
       </view>
       <view id="indicator-left-heavy" class="swipe-indicator forgot-overlay">
-        <text>😓 忘了</text>
+        <text>想不起来</text>
       </view>
       <view id="indicator-right-light" class="swipe-indicator knew-overlay">
-        <text>😊 记得</text>
+        <text>记住了</text>
       </view>
       <view id="indicator-right-heavy" class="swipe-indicator perfect-overlay">
-        <text>🎉 完美</text>
+        <text>完全掌握</text>
       </view>
     </view>
   </view>
@@ -54,20 +54,20 @@
   <view class="feedback-zone" wx:if="{{!loading && currentCard && isFlipped}}">
     <view class="feedback-buttons">
       <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
-        <text class="btn-emoji">😓</text>
-        <text class="btn-label">忘了</text>
+        <text class="btn-emoji"></text>
+        <text class="btn-label">想不起来</text>
       </button>
       <button class="feedback-btn fuzzy" bindtap="submitFeedback" data-rating="FUZZY">
-        <text class="btn-emoji">🤔</text>
-        <text class="btn-label">模糊</text>
+        <text class="btn-emoji"></text>
+        <text class="btn-label">有点模糊</text>
       </button>
       <button class="feedback-btn knew" bindtap="submitFeedback" data-rating="KNEW">
-        <text class="btn-emoji">😊</text>
-        <text class="btn-label">记得</text>
+        <text class="btn-emoji"></text>
+        <text class="btn-label">记住了</text>
       </button>
       <button class="feedback-btn perfect" bindtap="submitFeedback" data-rating="PERFECT">
-        <text class="btn-emoji">🎉</text>
-        <text class="btn-label">完美</text>
+        <text class="btn-emoji"></text>
+        <text class="btn-label">完全掌握</text>
       </button>
     </view>
   </view>
@@ -78,26 +78,26 @@
   <!-- 纠错按钮 -->
   <view class="report-btn-wrapper" wx:if="{{!loading && currentCard}}">
     <view class="report-btn" bindtap="openReportModal">
-      <text>🚨 内容有误？点击反馈</text>
+      <text>发现问题？帮我们改进</text>
     </view>
   </view>
   <!-- 加载状态 -->
   <view class="loading-state" wx:if="{{loading}}">
-    <text class="loading-text">加载卡片中...</text>
+    <text class="loading-text">正在加载知识卡片...</text>
   </view>
   <!-- 完成状态 -->
   <view class="complete-state" wx:if="{{!loading && completed}}">
-    <view class="complete-icon">🎊</view>
+    <view class=\"complete-icon\"></view>", "StartLine": 90, "TargetContent": "    <view class=\"complete-icon\">\ud83c\udf8a</view>
     <text class="complete-title">太棒了!</text>
-    <text class="complete-desc">本次复习已完成</text>
+    <text class="complete-desc">这一轮你完成了！</text>
     <view class="complete-stats">
-      <text>复习了 {{cards.length}} 张卡片</text>
+      <text>攻克了 {{cards.length}} 张卡片</text>
     </view>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{!loading && !completed && cards.length === 0}}">
-    <text class="empty-text">暂无待复习的卡片</text>
+    <text class="empty-text">今天的卡片都复习完了，休息一下吧</text>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
   <!-- 纠错弹窗 -->

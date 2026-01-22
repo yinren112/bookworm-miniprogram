@@ -8,18 +8,11 @@
       <!-- 这里我们先用精致的默认头像 -->
     </view>
     <text class="username">{{userInfo.nickName || '微信用户'}}</text>
-
     <!-- Phone Number Authorization Button -->
-    <button
-      wx:if="{{!isReviewMode && !hasPhoneNumber}}"
-      class="auth-phone-button"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="onGetPhoneNumber"
-    >
+    <button wx:if="{{!isReviewMode && !hasPhoneNumber}}" class="auth-phone-button" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber">
       授权手机号（关联卖书记录）
     </button>
   </view>
-
   <!-- Review System Entry -->
   <view class="review-entry-card card" bindtap="goToReview">
     <view class="review-entry-content">
@@ -28,12 +21,11 @@
       </view>
       <view class="review-text-wrapper">
         <text class="review-title">复习助手</text>
-        <text class="review-desc">背单词、刷题、查资料</text>
+        <text class="review-desc">背卡片、练习题、查资料</text>
       </view>
     </view>
     <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
   </view>
-
   <!-- Staff Operations Section - Only visible for STAFF role -->
   <view wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
     <view class="section-title">
@@ -48,7 +40,6 @@
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </navigator>
   </view>
-
   <view class="menu-card card">
     <view class="menu-item" bindtap="copyWechatId" hover-class="item-hover">
       <text class="menu-text">联系客服</text>
@@ -71,7 +62,6 @@
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </view>
   </view>
-
   <view class="support-info">
     <text>客服微信: {{serviceInfo.wechatId}} (点击复制)</text>
     <text>服务时间: {{serviceInfo.time}}</text>

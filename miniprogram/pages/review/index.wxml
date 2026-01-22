@@ -3,8 +3,8 @@
 <view class="container">
   <!-- 头部问候 -->
   <view class="header-section">
-    <text class="greeting-text">你好，同学 👋</text>
-    <text class="greeting-sub">今天也要坚持学习哦</text>
+    <text class="greeting-text">你好，同学</text>
+    <text class="greeting-sub">每天进步一点点，你比昨天更强了</text>
   </view>
   <!-- 今日任务 Hero Card -->
   <view class="hero-card clay-card">
@@ -18,7 +18,7 @@
         <!-- 简单的圆形进度可视化，这里用CSS实现 -->
         <view class="progress-circle">
           <text class="progress-number">{{todaySummary.dueCards || 0}}</text>
-          <text class="progress-label">待复习</text>
+          <text class="progress-label">今日待攻克</text>
           <view class="estimate-badge" wx:if="{{todaySummary.dueCards > 0 && todaySummary.estimatedMinutes}}">
             <text>约 {{todaySummary.estimatedMinutes}} 分钟</text>
           </view>
@@ -38,16 +38,16 @@
     </view>
     <view class="hero-actions" wx:if="{{!loading && currentCourse}}">
       <button class="hero-btn primary" bindtap="startReview">
-        <text>开始背卡</text>
+        <text>开启今日背卡</text>
         <text class="icon">📚</text>
       </button>
       <button class="hero-btn secondary" bindtap="startQuiz">
-        <text>刷题闯关</text>
-        <text class="icon">📝</text>
+        <text>来挑战刷题</text>
+        <text class="icon">🎯</text>
       </button>
     </view>
     <view class="loading-state" wx:if="{{loading}}">
-      <text class="loading-text">加载数据中...</text>
+      <text class="loading-text">正在加载学习数据...</text>
     </view>
   </view>
   <!-- 连续学习 -->
@@ -58,7 +58,7 @@
         <text class="streak-days">{{streakInfo.currentStreak || 0}}</text>
         <text class="streak-label">天连续学习</text>
       </view>
-      <text class="streak-sub">保持热度，从未止步</text>
+      <text class="streak-sub">连续打卡中，保持火力！</text>
     </view>
     <view class="heatmap-grid" wx:if="{{heatmapData.length > 0}}">
       <block wx:for="{{heatmapData}}" wx:key="index">
@@ -88,7 +88,7 @@
     <!-- Empty State -->
     <block wx:if="{{!loading && courses.length === 0}}">
       <view class="empty-state">
-        <text class="empty-text">还没有加入任何课程</text>
+        <text class="empty-text">课程库空空如也，来探索第一门课吧</text>
         <block wx:if="{{recommendedCourses.length > 0}}">
           <view class="recommend-divider">
             <text>为您推荐</text>
@@ -101,7 +101,7 @@
                   <text class="course-name">{{item.title}}</text>
                   <text class="mini-tag">热门推荐</text>
                 </view>
-                <view class="course-enter-btn">查看</view>
+                <view class="course-enter-btn">去学习</view>
               </view>
             </block>
           </view>

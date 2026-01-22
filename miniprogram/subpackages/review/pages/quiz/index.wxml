@@ -53,7 +53,7 @@
     <!-- 结果反馈 -->
     <view class="result-section" wx:if="{{showResult}}">
       <view class="result-badge {{lastResult.isCorrect ? 'correct' : 'wrong'}}">
-        <text>{{lastResult.isCorrect ? '回答正确' : '回答错误'}}</text>
+        <text>{{lastResult.isCorrect ? '答对了！' : '差一点，下次一定'}}</text>
       </view>
       <view class="explanation" wx:if="{{lastResult.explanation}}">
         <text class="explanation-label">解析：</text>
@@ -71,7 +71,7 @@
     <!-- 纠错按钮 -->
     <view class="report-btn-wrapper">
       <view class="report-btn" bindtap="openReportModal">
-        <text>🚨 内容有误？点击反馈</text>
+        <text>发现问题？帮我们改进</text>
       </view>
     </view>
   </view>
@@ -83,15 +83,13 @@
   </view>
   <!-- 加载状态 -->
   <view class="loading-state" wx:if="{{loading}}">
-    <text class="loading-text">加载题目中...</text>
+    <text class="loading-text">正在加载题库...</text>
   </view>
   <!-- 完成状态 -->
   <view class="complete-state" wx:if="{{!loading && completed}}">
-    <view class="complete-icon">
-      {{correctCount === questions.length ? '🏆' : (correctCount >= questions.length * 0.6 ? '🎉' : '💪')}}
-    </view>
+    <view class="complete-icon"></view>
     <text class="complete-title">
-      {{correctCount === questions.length ? '满分通关!' : (correctCount >= questions.length * 0.6 ? '答题完成!' : '继续加油!')}}
+      {{correctCount === questions.length ? '全对！你是学霸！' : (correctCount >= questions.length * 0.6 ? '不错哦，及格了！' : '还需努力，再来一轮？')}}
     </text>
     <view class="stats-card clay-card">
       <view class="stat-row">
@@ -109,14 +107,14 @@
     </view>
     <view class="complete-actions">
       <button class="retry-btn" bindtap="retryQuiz" wx:if="{{correctCount < questions.length}}">
-        重做错题
+        错题再练
       </button>
       <button class="back-btn clay-btn-primary" bindtap="goBack">返回课程</button>
     </view>
   </view>
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{!loading && !completed && questions.length === 0}}">
-    <text class="empty-text">暂无题目</text>
+    <text class="empty-text">题库空空，老师还没出题呢</text>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
   <!-- 纠错弹窗 -->
