@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-01-23
+
+### Added
+- **Review Module Upgrade**: WXS-driven flashcard swiping with dual-threshold feedback.
+- **Multi-sensory Feedback**: Integrated haptic (vibration) and audio feedback for flashcard actions.
+- **Improved Performance**: `setData` payload optimization for Quiz and Flashcard pages.
+- **SWR Caching**: Implemented stale-while-revalidate caching for Review module API calls.
+
+### Changed
+- **UI/UX Refinement**: Removed all emojis from frontend UI for a professional aesthetic.
+- **Copywriting Optimization**: Unified and improved all frontend copywriting based on brand guidelines.
+- **Code Quality**: Enforced high-performance coding patterns and cleaned up ESM-related linting warnings.
 
 ## [1.0.1] - 2025-10-22
 

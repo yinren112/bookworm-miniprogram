@@ -11,21 +11,22 @@ Bookworm 是一个基于微信小程序的校园二手教材交易平台，采�
 - **并发安全**: 使用 PostgreSQL advisory locks 和事务级约束防止超卖
 - **支付集成**: 微信支付 Native 模式，支持主动查单和退款流程
 - **推荐系统**: 基于学生专业和年级的个性化教材推荐
+- **复习与互动模块**: WXS 驱动的卡片滑动交互，支持双级阈值反馈、震动/音效等高交互学习体验
 - **监控与可观测**: Prometheus 指标 + 结构化日志
 
 ## 技术架构
 
 ### 技术栈
 
-| 层级 | 技术选型 | 说明 |
-|------|---------|------|
-| **前端** | 微信小程序原生框架 | 9个页面 + TabBar导航 |
-| **后端** | Fastify + TypeScript | RESTful API + 插件化架构 |
+| 层级       | 技术选型                    | 说明                       |
+| ---------- | --------------------------- | -------------------------- |
+| **前端**   | 微信小程序原生框架          | 9个页面 + TabBar导航       |
+| **后端**   | Fastify + TypeScript        | RESTful API + 插件化架构   |
 | **数据库** | PostgreSQL 15+ + Prisma ORM | 14个模型 + pg_trgm全文搜索 |
-| **支付** | 微信支付 API v3 | Native支付 + 自动证书刷新 |
-| **测试** | Vitest + Testcontainers | 单元测试 + 隔离集成测试 |
-| **监控** | Prometheus + Grafana | 业务指标 + 系统监控 |
-| **构建** | Docker多阶段构建 | 生产环境镜像优化 |
+| **支付**   | 微信支付 API v3             | Native支付 + 自动证书刷新  |
+| **测试**   | Vitest + Testcontainers     | 单元测试 + 隔离集成测试    |
+| **监控**   | Prometheus + Grafana        | 业务指标 + 系统监控        |
+| **构建**   | Docker多阶段构建            | 生产环境镜像优化           |
 
 ### 架构原则
 
@@ -252,18 +253,23 @@ curl http://localhost:8080/metrics
 ## 常见问题
 
 ### Q: 为什么添加 `"type": "module"` 到 package.json？
+
 **A**: 为了消除 ESLint 的 `MODULE_TYPELESS_PACKAGE_JSON` 性能警告。项目的 `eslint.config.js` 使用 ES 模块语法，声明模块类型可避免 Node.js 重复解析。
 
 ### Q: Prisma 配置弃用警告如何处理？
+
 **A**: Prisma 6.16.2 的 `package.json#prisma` 字段在 Prisma 7 将被移除。虽然官方建议迁移到 `prisma.config.ts`，但当前版本尚未完全支持该功能，因此保留原配置直到 Prisma 7 正式发布。
 
 ### Q: 如何运行集成测试？
+
 **A**: 集成测试使用 Testcontainers 动态创建隔离的 PostgreSQL 容器，无需手动配置测试数据库：
+
 ```bash
 npm run test:integration
 ```
 
 ### Q: TabBar 图标为什么必须是 PNG？
+
 **A**: 微信小程序的 TabBar 仅支持 PNG 格式图标，不支持 SVG。图标尺寸推荐 81x81px。
 
 ## 贡献指南
@@ -290,5 +296,5 @@ npm run test:integration
 
 ---
 
-**最后更新**: 2025-10-24
-**当前版本**: Backend 1.0.1 | Miniprogram 1.0.1
+**最后更新**: 2026-01-23
+**当前版本**: Backend 1.1.0 | Miniprogram 1.1.0
