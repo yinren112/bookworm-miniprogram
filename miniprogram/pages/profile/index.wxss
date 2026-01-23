@@ -215,10 +215,12 @@
   display: block;
 }
 
-/* Icon Text for Staff Menu */
-.icon-text {
+/* Icon Image for Staff Menu */
+.icon-image {
   margin-right: 16rpx;
-  font-size: 36rpx;
+  width: 40rpx;
+  height: 40rpx;
+  vertical-align: middle;
 }
 
 .menu-content {
@@ -261,7 +263,8 @@
 }
 
 .review-icon {
-  font-size: 44rpx;
+  width: 56rpx;
+  height: 56rpx;
 }
 
 .review-text-wrapper {

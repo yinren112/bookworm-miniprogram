@@ -2,7 +2,7 @@
 <view class="page">
     <!-- 庆祝动画区域 -->
     <view class="celebration-area">
-        <view class="celebration-icon"></view>
+        <image class="celebration-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
         <view class="celebration-title">太棒了！</view>
         <view class="celebration-subtitle">今日任务达成！</view>
     </view>
@@ -10,26 +10,26 @@
     <view class="stats-card clay-card">
         <view class="stats-title">本轮战绩</view>
         <view class="stat-row">
-            <view class="stat-icon"></view>
+            <image class="stat-icon" src="/images/icons/review/flashcards.svg" mode="aspectFit" />
             <view class="stat-label">攻克卡片</view>
             <view class="stat-value">{{cardCount}} 张</view>
         </view>
         <view class="stat-row">
-            <view class="stat-icon"></view>
+            <image class="stat-icon" src="/images/icons/review/clock.svg" mode="aspectFit" />
             <view class="stat-label">耗时</view>
             <view class="stat-value">
                 {{durationSeconds < 60 ? durationSeconds + '秒' : (durationSeconds / 60 | 0) + '分钟'}}
             </view>
         </view>
         <view class="stat-row" wx:if="{{starredCount > 0}}">
-            <view class="stat-icon"></view>
+            <image class="stat-icon" src="/images/icons/review/star-filled.svg" mode="aspectFit" />
             <view class="stat-label">星标收藏</view>
             <view class="stat-value">{{starredCount}} 张</view>
         </view>
     </view>
     <!-- 连续学习 -->
     <view class="streak-card clay-card" wx:if="{{!loading}}">
-        <view class="streak-flame"></view>
+        <image class="streak-flame" src="/images/icons/review/flame.svg" mode="aspectFit" />
         <view class="streak-info">
             <view class="streak-current">
                 <text class="streak-number">{{currentStreak}}</text>

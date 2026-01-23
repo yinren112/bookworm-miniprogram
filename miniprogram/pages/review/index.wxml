@@ -39,11 +39,11 @@
     <view class="hero-actions" wx:if="{{!loading && currentCourse}}">
       <button class="hero-btn primary" bindtap="startReview">
         <text>开启今日背卡</text>
-        <text class="icon">📚</text>
+        <image class="btn-icon" src="/images/icons/review/book.svg" mode="aspectFit" />
       </button>
       <button class="hero-btn secondary" bindtap="startQuiz">
         <text>来挑战刷题</text>
-        <text class="icon">🎯</text>
+        <image class="btn-icon" src="/images/icons/review/quiz.svg" mode="aspectFit" />
       </button>
     </view>
     <view class="loading-state" wx:if="{{loading}}">
@@ -55,6 +55,7 @@
   <view class="streak-section clay-card-sm" wx:if="{{!loading}}" bindtap="navigateToLeaderboard">
     <view class="streak-header">
       <view class="streak-title-group">
+        <image class="streak-flame-icon" src="/images/icons/review/flame.svg" mode="aspectFit" />
         <text class="streak-days">{{streakInfo.currentStreak || 0}}</text>
         <text class="streak-label">天连续学习</text>
       </view>

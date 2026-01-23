@@ -21,7 +21,7 @@
     </view>
     <!-- Star Button -->
     <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
-      <text class="star-icon">{{isStarred ? '★' : '☆'}}</text>
+      <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
     </view>
     <!-- 题干 -->
     <view class="question-stem">
@@ -87,7 +87,7 @@
   </view>
   <!-- 完成状态 -->
   <view class="complete-state" wx:if="{{!loading && completed}}">
-    <view class="complete-icon"></view>
+    <image class="complete-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
     <text class="complete-title">
       {{correctCount === questionsLength ? '全对！你是学霸！' : (correctCount >= questionsLength * 0.6 ? '不错哦，及格了！' : '还需努力，再来一轮？')}}
     </text>

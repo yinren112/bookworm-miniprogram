@@ -15,6 +15,7 @@ import {
   getCourseList,
   getCourseByKey,
   enrollCourse,
+  updateEnrollmentExamDate,
   getUserEnrolledCourses,
   getTodayQueueSummary,
   startCardSession,
@@ -55,6 +56,8 @@ import {
   EnrollCourseParams,
   EnrollCourseBodySchema,
   EnrollCourseBody,
+  UpdateExamDateBodySchema,
+  UpdateExamDateBody,
   TodayQueueQuerySchema,
   TodayQueueQuery,
   StartSessionBodySchema,
@@ -277,6 +280,52 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         }
         throw error;
       }
+    },
+  );
+
+  // PATCH /api/study/courses/:courseKey/exam-date - 更新考试日期
+  fastify.patch<{ Params: EnrollCourseParams; Body: UpdateExamDateBody }>(
+    "/api/study/courses/:courseKey/exam-date",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        params: EnrollCourseParamsSchema,
+        body: UpdateExamDateBodySchema,
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { courseKey } = request.params;
+      const { examDate } = request.body;
+
+      const course = await getCourseByKey(prisma, courseKey, { userId });
+      if (!course) {
+        throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
+      }
+
+      if (!course.enrollment) {
+        await enrollCourse(prisma, userId, course.id);
+      }
+
+      let parsedExamDate: Date | null = null;
+      if (examDate !== null) {
+        const date = new Date(`${examDate}T00:00:00+08:00`);
+        if (Number.isNaN(date.getTime())) {
+          throw new ApiError(400, "Invalid exam date", "INVALID_EXAM_DATE");
+        }
+        parsedExamDate = date;
+      }
+
+      const updated = await updateEnrollmentExamDate(
+        prisma,
+        userId,
+        course.id,
+        parsedExamDate,
+      );
+
+      reply.send({
+        examDate: updated ? updated.toISOString() : null,
+      });
     },
   );
 

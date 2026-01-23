@@ -4,19 +4,19 @@
 .container {
   padding: 24rpx;
   min-height: 100vh;
-  background: var(--bg-primary, #F3FBF6); /* Softer mint background */
+  background: var(--bg-primary, #f3fbf6); /* Softer mint background */
 }
 
 /* 粘土风格卡片 - Light Clay Spec */
 .clay-card {
-  background: #FFFFFF;
+  background: #ffffff;
   border-radius: 32rpx; /* Larger border radius */
   padding: 32rpx;
   margin-bottom: 24rpx;
   /* P1: Soft Drop Shadow + Inner Shine for pneumorphism/clay effect */
   box-shadow:
     16rpx 16rpx 32rpx rgba(44, 95, 45, 0.08),
-    -8rpx -8rpx 20rpx rgba(255, 255, 255, 1.0),
+    -8rpx -8rpx 20rpx rgba(255, 255, 255, 1),
     inset 2rpx 2rpx 4rpx rgba(255, 255, 255, 0.8),
     inset -2rpx -2rpx 4rpx rgba(44, 95, 45, 0.02);
   border: 1rpx solid rgba(255, 255, 255, 0.6);
@@ -34,20 +34,20 @@
 /* 课程头部 */
 .course-header {
   /* Subtle gradient */
-  background: linear-gradient(135deg, #FFFFFF 0%, #F5FBF7 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f5fbf7 100%);
 }
 
 .course-title {
   font-size: 40rpx;
   font-weight: 800; /* Bolder */
-  color: #1A2E22; /* Darker green-black */
+  color: #1a2e22; /* Darker green-black */
   display: block;
   margin-bottom: 16rpx;
 }
 
 .course-desc {
   font-size: 28rpx;
-  color: #6B7C72;
+  color: #6b7c72;
   display: block;
   margin-bottom: 32rpx;
   line-height: 1.6; /* Increased line height */
@@ -58,7 +58,47 @@
   justify-content: space-around;
   padding: 24rpx 0 0 0;
   /* Remove top border for cleaner look */
-  border-top: none; 
+  border-top: none;
+}
+
+.exam-row {
+  margin-top: 24rpx;
+  padding-top: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  border-top: 1rpx dashed rgba(44, 95, 45, 0.12);
+}
+
+.exam-label {
+  font-size: 26rpx;
+  color: #6b7c72;
+}
+
+.exam-picker {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 12rpx 20rpx;
+  background: #f2f7f3;
+  border-radius: 24rpx;
+}
+
+.exam-value {
+  font-size: 26rpx;
+  color: #1a2e22;
+}
+
+.exam-action {
+  font-size: 24rpx;
+  color: #2c5f2d;
+  font-weight: 600;
+}
+
+.exam-clear {
+  font-size: 24rpx;
+  color: #8fa396;
+  padding: 8rpx 12rpx;
 }
 
 .meta-item {
@@ -68,16 +108,23 @@
   flex: 1;
 }
 
+.meta-icon {
+  width: 48rpx;
+  height: 48rpx;
+  margin-bottom: 8rpx;
+  opacity: 0.8;
+}
+
 .meta-value {
   font-size: 40rpx;
   font-weight: 700;
   /* P3: Unified numbers color or specific logic */
-  color: #2c5f2d; 
+  color: #2c5f2d;
 }
 
 .meta-label {
   font-size: 24rpx;
-  color: #8FA396;
+  color: #8fa396;
   margin-top: 8rpx;
   font-weight: 500;
 }
@@ -86,7 +133,7 @@
 
 /* 今日队列 */
 .queue-section {
-  background: #FFFFFF;
+  background: #ffffff;
 }
 
 .queue-header {
@@ -96,7 +143,7 @@
 .queue-title {
   font-size: 34rpx;
   font-weight: 700;
-  color: #1A2E22;
+  color: #1a2e22;
 }
 
 .queue-stats {
@@ -118,7 +165,7 @@
 }
 
 .queue-number.pending {
-  color: #FF9800; /* Keep orange for pending */
+  color: #ff9800; /* Keep orange for pending */
 }
 
 .queue-number.new {
@@ -126,12 +173,12 @@
 }
 
 .queue-number.done {
-  color: #8FA396; /* Muted for done */
+  color: #8fa396; /* Muted for done */
 }
 
 .queue-label {
   font-size: 26rpx;
-  color: #8FA396;
+  color: #8fa396;
   margin-top: 8rpx;
 }
 
@@ -144,7 +191,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #2c5f2d 0%, #447045 100%);
-  color: #FFFFFF;
+  color: #ffffff;
   font-size: 32rpx;
   font-weight: 600;
   border-radius: 48rpx; /* Pill shape */
@@ -184,7 +231,7 @@
 .section-title {
   font-size: 34rpx;
   font-weight: 700;
-  color: #1A2E22;
+  color: #1a2e22;
 }
 
 /* 学习工具栏 - Refined */
@@ -224,7 +271,7 @@
 .tool-label {
   font-size: 26rpx;
   font-weight: 600;
-  color: #4A5D50;
+  color: #4a5d50;
 }
 
 /* 章节目录 - Refined List */
@@ -237,58 +284,74 @@
 .unit-item {
   display: flex;
   flex-direction: row;
+  justify-content: space-between;
   align-items: center;
-  padding: 32rpx;
-  transition: all 0.2s;
+  padding: 36rpx;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.unit-main {
+.card-hover {
+  transform: scale(0.98);
+  box-shadow: inset 2rpx 2rpx 6rpx rgba(44, 95, 45, 0.05) !important;
+  background: #f9fdf9 !important;
+}
+
+.unit-left-group {
   display: flex;
   align-items: center;
-  width: 100%;
+  flex: 1;
 }
 
 .unit-order {
-  width: 80rpx;
-  height: 80rpx;
-  /* P2: Circle background */
-  background: #E8F5E9;
+  width: 96rpx;
+  height: 96rpx;
+  background: #e8f5e9;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 32rpx;
-  box-shadow: inset 2rpx 2rpx 4rpx rgba(44, 95, 45, 0.05); /* Subtle depth in circle */
+  flex-shrink: 0;
+  /* Inner shadow for depth */
+  box-shadow:
+    inset 4rpx 4rpx 8rpx rgba(44, 95, 45, 0.08),
+    inset -4rpx -4rpx 8rpx rgba(255, 255, 255, 0.8);
 }
 
 .order-text {
-  font-size: 32rpx;
-  font-weight: 700;
+  font-size: 36rpx;
+  font-weight: 800;
   color: #2c5f2d;
-  line-height: 1; /* Fix vertical alignment */
+  letter-spacing: -1rpx;
+  line-height: 1;
+  text-align: center;
 }
 
 .unit-info {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 8rpx;
 }
 
 .unit-title {
   font-size: 32rpx;
-  font-weight: 600;
-  color: #1A2E22;
+  font-weight: 700;
+  color: #1a2e22;
+  letter-spacing: 1rpx;
 }
 
-.unit-stats {
-  display: flex;
-  gap: 16rpx;
+.unit-subtitle {
+  font-size: 24rpx;
+  color: #8fa396;
+  font-weight: 500;
 }
 
-.unit-cards {
-  font-size: 26rpx;
-  color: #8FA396;
+.unit-arrow {
+  width: 32rpx;
+  height: 32rpx;
+  opacity: 0.3;
+  margin-left: 16rpx;
 }
 
 /* Empty State */
@@ -301,23 +364,25 @@
 
 .empty-text {
   font-size: 28rpx;
-  color: #B8C4BC;
+  color: #b8c4bc;
 }
 
 /* Loading & Error */
-.loading-state, .error-state {
+.loading-state,
+.error-state {
   padding: 120rpx 0;
   display: flex;
   justify-content: center;
 }
 
-.loading-text, .error-text {
-  color: #8FA396;
+.loading-text,
+.error-text {
+  color: #8fa396;
   font-size: 28rpx;
 }
 
 .retry-btn {
   margin-top: 24rpx;
-  background: #E8F5E9;
+  background: #e8f5e9;
   color: #2c5f2d;
 }

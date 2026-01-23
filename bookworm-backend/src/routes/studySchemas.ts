@@ -38,6 +38,14 @@ export const EnrollCourseBodySchema = Type.Object({
   sourceScene: Type.Optional(Type.String({ maxLength: 32 })),
 });
 
+// PATCH /api/study/courses/:courseKey/exam-date
+export const UpdateExamDateBodySchema = Type.Object({
+  examDate: Type.Union([
+    Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+    Type.Null(),
+  ]),
+});
+
 // GET /api/study/today
 export const TodayQueueQuerySchema = Type.Object({
   courseKey: Type.String({ minLength: 1, maxLength: 100 }),
@@ -103,6 +111,7 @@ export const CourseDetailSchema = Type.Object({
       enrolledAt: Type.String({ format: "date-time" }),
       lastStudiedAt: Type.Union([Type.String({ format: "date-time" }), Type.Null()]),
       completedCards: Type.Integer(),
+      examDate: Type.Union([Type.String({ format: "date-time" }), Type.Null()]),
     }),
     Type.Null(),
   ])),
@@ -359,6 +368,7 @@ export type GetCoursesQuery = Static<typeof GetCoursesQuerySchema>;
 export type CourseKeyParams = Static<typeof CourseKeyParamsSchema>;
 export type EnrollCourseParams = Static<typeof EnrollCourseParamsSchema>;
 export type EnrollCourseBody = Static<typeof EnrollCourseBodySchema>;
+export type UpdateExamDateBody = Static<typeof UpdateExamDateBodySchema>;
 export type TodayQueueQuery = Static<typeof TodayQueueQuerySchema>;
 export type StartSessionBody = Static<typeof StartSessionBodySchema>;
 export type CardAnswerParams = Static<typeof CardAnswerParamsSchema>;

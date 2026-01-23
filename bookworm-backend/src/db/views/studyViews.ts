@@ -243,6 +243,7 @@ export const enrollmentSelectPublic = {
   enrolledAt: true,
   lastStudiedAt: true,
   completedCards: true,
+  examDate: true,
 } as const satisfies Prisma.UserCourseEnrollmentSelect;
 
 export const enrollmentCourseIdView = {

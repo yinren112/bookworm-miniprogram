@@ -29,6 +29,21 @@ export function getBeijingTodayStart(): Date {
 }
 
 /**
+ * 获取指定日期的北京时间起始时刻 (00:00:00)
+ */
+export function getBeijingDateStart(date: Date): Date {
+  const beijingDate = toBeijingDate(date);
+  return new Date(
+    Date.UTC(
+      beijingDate.getFullYear(),
+      beijingDate.getMonth(),
+      beijingDate.getDate(),
+      0, 0, 0, 0
+    ) - BEIJING_OFFSET_MS
+  );
+}
+
+/**
  * 获取今天的日期（仅日期部分，用于比较）
  * 返回一个 Date 对象，其 year/month/date 表示北京时间的今天
  */

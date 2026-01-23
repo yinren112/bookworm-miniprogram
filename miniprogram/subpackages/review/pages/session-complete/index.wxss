@@ -20,9 +20,9 @@
 }
 
 .celebration-icon {
-  font-size: 120rpx;
+  width: 120rpx;
+  height: 120rpx;
   margin-bottom: 24rpx;
-  animation: bounce 1s ease infinite;
 }
 
 @keyframes bounce {
@@ -82,7 +82,8 @@
 }
 
 .stat-icon {
-  font-size: 36rpx;
+  width: 36rpx;
+  height: 36rpx;
   margin-right: 20rpx;
 }
 
@@ -111,7 +112,8 @@
 }
 
 .streak-flame {
-  font-size: 64rpx;
+  width: 64rpx;
+  height: 64rpx;
 }
 
 .streak-info {

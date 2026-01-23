@@ -13,7 +13,7 @@
   <view class="card-wrapper" wx:if="{{!loading && currentCard}}">
     <!-- Star Button (Pinned to wrapper) -->
     <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
-      <text class="star-icon">{{isStarred ? '★' : '☆'}}</text>
+      <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
     </view>
     <!-- Card Container with WXS Swipe Gestures -->
     <view id="swipe-card" class="card-container {{isFlipped ? 'flipped' : ''}}" data-screen-width="{{screenWidth}}" bindtap="flipCard" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
@@ -54,19 +54,19 @@
   <view class="feedback-zone" wx:if="{{!loading && currentCard && isFlipped}}">
     <view class="feedback-buttons">
       <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
-        <text class="btn-emoji"></text>
+        <image class="btn-icon" src="/images/icons/review/forgot.svg" mode="aspectFit" />
         <text class="btn-label">想不起来</text>
       </button>
       <button class="feedback-btn fuzzy" bindtap="submitFeedback" data-rating="FUZZY">
-        <text class="btn-emoji"></text>
+        <image class="btn-icon" src="/images/icons/review/fuzzy.svg" mode="aspectFit" />
         <text class="btn-label">有点模糊</text>
       </button>
       <button class="feedback-btn knew" bindtap="submitFeedback" data-rating="KNEW">
-        <text class="btn-emoji"></text>
+        <image class="btn-icon" src="/images/icons/review/knew.svg" mode="aspectFit" />
         <text class="btn-label">记住了</text>
       </button>
       <button class="feedback-btn perfect" bindtap="submitFeedback" data-rating="PERFECT">
-        <text class="btn-emoji"></text>
+        <image class="btn-icon" src="/images/icons/review/perfect.svg" mode="aspectFit" />
         <text class="btn-label">完全掌握</text>
       </button>
     </view>
@@ -87,7 +87,7 @@
   </view>
   <!-- 完成状态 -->
   <view class="complete-state" wx:if="{{!loading && completed}}">
-    <view class=\"complete-icon\"></view>", "StartLine": 90, "TargetContent": "    <view class=\"complete-icon\">\ud83c\udf8a</view>
+    <image class="complete-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
     <text class="complete-title">太棒了!</text>
     <text class="complete-desc">这一轮你完成了！</text>
     <view class="complete-stats">

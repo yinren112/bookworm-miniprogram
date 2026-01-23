@@ -38,7 +38,7 @@
   </view>
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{!loading && cheatSheets.length === 0}}">
-    <view class="empty-icon"></view>
+    <image class="empty-icon" src="/images/icons/review/cheatsheet.svg" mode="aspectFit" />
     <text class="empty-text">急救包还是空的，老师正在准备中</text>
     <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>

@@ -58,7 +58,7 @@
           <text class="points-label">积分</text>
         </view>
         <view class="streak" wx:if="{{item.currentStreak > 0}}">
-          <text class="streak-icon"></text>
+          <image class="streak-icon" src="/images/icons/review/flame.svg" mode="aspectFit" />
           <text class="streak-value">{{item.currentStreak}}</text>
         </view>
       </view>
@@ -70,7 +70,7 @@
   </view>
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{!loading && items.length === 0}}">
-    <view class="empty-icon"></view>
+    <image class="empty-icon" src="/images/icons/review/trophy.svg" mode="aspectFit" />
     <text class="empty-text">本周还没人上榜</text>
     <text class="empty-hint">快来占领榜首！</text>
     <button class="start-btn" bindtap="goBack">开始学习</button>

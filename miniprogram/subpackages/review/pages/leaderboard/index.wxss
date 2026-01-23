@@ -236,7 +236,8 @@
 }
 
 .streak-icon {
-  font-size: 20rpx;
+  width: 24rpx;
+  height: 24rpx;
 }
 
 .streak-value {
@@ -269,7 +270,8 @@
 }
 
 .empty-icon {
-  font-size: 100rpx;
+  width: 100rpx;
+  height: 100rpx;
   margin-bottom: 16rpx;
 }
 

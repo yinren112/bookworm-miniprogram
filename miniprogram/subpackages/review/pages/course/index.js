@@ -1,7 +1,7 @@
 // subpackages/review/pages/course/index.js
 // 课程详情页
 
-const { getCourseDetail, enrollCourse, getTodayQueue } = require('../../utils/study-api');
+const { getCourseDetail, enrollCourse, getTodayQueue, updateExamDate } = require('../../utils/study-api');
 const logger = require('../../../../utils/logger');
 
 Page({
@@ -33,6 +33,9 @@ Page({
     try {
       const res = await getCourseDetail(this.data.courseKey);
       const course = res.course;
+      if (course?.enrollment?.examDate) {
+        course.enrollment.examDate = normalizeExamDate(course.enrollment.examDate);
+      }
 
       // 设置导航栏标题
       if (course) {
@@ -90,6 +93,57 @@ Page({
         title: '注册失败',
         icon: 'none',
       });
+    }
+  },
+
+  async onExamDateChange(e) {
+    const examDate = e.detail.value;
+    if (!examDate) return;
+    if (!this.data.course?.enrollment) return;
+
+    wx.showLoading({ title: '保存中...' });
+    try {
+      const res = await updateExamDate(this.data.courseKey, examDate);
+      const savedExamDate = res.examDate ? normalizeExamDate(res.examDate) : examDate;
+      this.setData({
+        'course.enrollment.examDate': savedExamDate,
+      });
+      wx.showToast({
+        title: '已更新',
+        icon: 'success',
+      });
+    } catch (err) {
+      logger.error('Failed to update exam date:', err);
+      wx.showToast({
+        title: '保存失败',
+        icon: 'none',
+      });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  async clearExamDate() {
+    if (!this.data.course?.enrollment?.examDate) return;
+
+    wx.showLoading({ title: '清除中...' });
+    try {
+      await updateExamDate(this.data.courseKey, null);
+      this.setData({
+        'course.enrollment.examDate': null,
+      });
+      wx.showToast({
+        title: '已清除',
+        icon: 'success',
+      });
+    } catch (err) {
+      logger.error('Failed to clear exam date:', err);
+      wx.showToast({
+        title: '清除失败',
+        icon: 'none',
+      });
+    } finally {
+      wx.hideLoading();
     }
   },
 
@@ -173,3 +227,8 @@ Page({
     });
   },
 });
+
+function normalizeExamDate(value) {
+  if (!value) return value;
+  return value.split('T')[0];
+}

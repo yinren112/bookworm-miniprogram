@@ -66,6 +66,7 @@ bin/
 k6-v0.49.0-windows-amd64/
 k6-v0.49.0-windows-amd64.zip
 review-module-blockers.md
+remotion/
 
 # Temporary docs (task-specific)
 docs/HANDOFF_REVIEW_BUGS.md

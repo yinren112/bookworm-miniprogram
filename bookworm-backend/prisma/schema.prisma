@@ -545,6 +545,7 @@ model UserCourseEnrollment {
   sourceScene    String?   @map("source_scene") @db.VarChar(32) // 来源扫码场景
   lastStudiedAt  DateTime? @map("last_studied_at") @db.Timestamptz(6)
   completedCards Int       @default(0) @map("completed_cards")
+  examDate       DateTime? @map("exam_date") @db.Date
 
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   course StudyCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)

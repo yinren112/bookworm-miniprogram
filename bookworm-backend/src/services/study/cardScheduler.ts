@@ -8,7 +8,7 @@ import {
   cardStateScheduleView,
 } from "../../db/views";
 import { recordActivity } from "./streakService";
-import { getBeijingTodayStart } from "../../utils/timezone";
+import { getBeijingTodayStart, getBeijingDateStart } from "../../utils/timezone";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -40,6 +40,29 @@ export const MAX_DAILY_ATTEMPTS = 3;
 
 // "不会"反馈后的短间隔（5小时，确保当天能再见一次）
 export const FORGOT_INTERVAL_HOURS = 5;
+
+// 考试周排程参数
+export const EXAM_PREP_DAYS = 21;
+export const EXAM_CRAM_DAYS = 7;
+
+const EXAM_INTERVALS: Record<"prep" | "cram", Record<number, number>> = {
+  prep: {
+    1: 1,
+    2: 2,
+    3: 4,
+    4: 7,
+    5: 14,
+  },
+  cram: {
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 3,
+    5: 5,
+  },
+};
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // ============================================
 // 类型定义
@@ -86,8 +109,11 @@ export interface CardStateUpdate {
 export function calculateNextSchedule(
   currentBoxLevel: number,
   rating: FeedbackRating,
+  options: { examDate?: Date | null; now?: Date; todayStart?: Date } = {},
 ): { newBoxLevel: number; nextDueAt: Date } {
-  const now = new Date();
+  const now = options.now ?? new Date();
+  const todayStart = options.todayStart ?? getBeijingTodayStart();
+  const examPhase = getExamPhase(options.examDate ?? null, todayStart);
   let newBoxLevel: number;
   let intervalMs: number;
 
@@ -107,13 +133,13 @@ export function calculateNextSchedule(
     case FeedbackRating.KNEW:
       // 会 -> boxLevel 升1（但不超过5），按新等级间隔
       newBoxLevel = Math.min(5, currentBoxLevel + 1);
-      intervalMs = LEITNER_INTERVALS[newBoxLevel] * 24 * 60 * 60 * 1000;
+      intervalMs = getIntervalDays(newBoxLevel, examPhase) * MS_PER_DAY;
       break;
 
     case FeedbackRating.PERFECT:
       // 很熟 -> boxLevel 升2（但不超过5），按新等级间隔
       newBoxLevel = Math.min(5, currentBoxLevel + 2);
-      intervalMs = LEITNER_INTERVALS[newBoxLevel] * 24 * 60 * 60 * 1000;
+      intervalMs = getIntervalDays(newBoxLevel, examPhase) * MS_PER_DAY;
       break;
 
     default:
@@ -145,7 +171,11 @@ export async function getTodayQueueSummary(
       userId,
       card: { courseId },
       nextDueAt: { lte: now },
-      todayShownCount: { lt: MAX_DAILY_ATTEMPTS },
+      OR: [
+        { lastAnsweredAt: null },
+        { lastAnsweredAt: { lt: todayStart } },
+        { todayShownCount: { lt: MAX_DAILY_ATTEMPTS } },
+      ],
     },
   });
 
@@ -197,6 +227,7 @@ export async function startCardSession(
 ): Promise<CardSession> {
   const { unitId, limit = 20 } = options;
   const now = new Date();
+  const todayStart = getBeijingTodayStart();
   const sessionId = generateSessionId();
 
   // 构建基础查询条件
@@ -211,7 +242,11 @@ export async function startCardSession(
       userId,
       card: cardWhere,
       nextDueAt: { lte: now },
-      todayShownCount: { lt: MAX_DAILY_ATTEMPTS },
+      OR: [
+        { lastAnsweredAt: null },
+        { lastAnsweredAt: { lt: todayStart } },
+        { todayShownCount: { lt: MAX_DAILY_ATTEMPTS } },
+      ],
     },
     // eslint-disable-next-line local-rules/no-prisma-raw-select -- nested card select
     select: {
@@ -292,6 +327,22 @@ export async function submitCardFeedback(
   return withTransaction(dbCtx, async (tx) => {
     const now = new Date();
     const todayStart = getBeijingTodayStart();
+    const card = await tx.studyCard.findUnique({
+      where: { id: cardId },
+      select: cardCourseIdView,
+    });
+
+    if (!card) {
+      throw new Error("CARD_NOT_FOUND");
+    }
+
+    // eslint-disable-next-line local-rules/no-prisma-raw-select -- simple single-field select
+    const enrollment = await tx.userCourseEnrollment.findUnique({
+      where: { userId_courseId: { userId, courseId: card.courseId } },
+      select: { examDate: true },
+    });
+
+    const examDate = enrollment?.examDate ?? null;
 
     let cardState = await tx.userCardState.findUnique({
       where: {
@@ -320,7 +371,11 @@ export async function submitCardFeedback(
     let created = false;
 
     if (!cardState) {
-      const { newBoxLevel, nextDueAt } = calculateNextSchedule(1, rating);
+      const { newBoxLevel, nextDueAt } = calculateNextSchedule(1, rating, {
+        examDate,
+        now,
+        todayStart,
+      });
 
       try {
         cardState = await tx.userCardState.create({
@@ -367,6 +422,11 @@ export async function submitCardFeedback(
       const { newBoxLevel, nextDueAt } = calculateNextSchedule(
         cardState.boxLevel ?? 1,
         rating,
+        {
+          examDate,
+          now,
+          todayStart,
+        },
       );
 
       const updateBase = {
@@ -451,11 +511,6 @@ export async function submitCardFeedback(
       throw new Error("CARD_STATE_NOT_FOUND");
     }
 
-    const card = await tx.studyCard.findUnique({
-      where: { id: cardId },
-      select: cardCourseIdView,
-    });
-
     if (card) {
       await tx.userCourseEnrollment.updateMany({
         where: {
@@ -477,6 +532,41 @@ export async function submitCardFeedback(
       todayShownCount: cardState.todayShownCount,
     };
   });
+}
+
+function getExamPhase(
+  examDate: Date | null,
+  todayStart: Date,
+): "normal" | "prep" | "cram" {
+  if (!examDate) {
+    return "normal";
+  }
+
+  const examStart = getBeijingDateStart(examDate);
+  const diffDays = Math.ceil((examStart.getTime() - todayStart.getTime()) / MS_PER_DAY);
+
+  if (diffDays < 0) {
+    return "normal";
+  }
+
+  if (diffDays <= EXAM_CRAM_DAYS) {
+    return "cram";
+  }
+
+  if (diffDays <= EXAM_PREP_DAYS) {
+    return "prep";
+  }
+
+  return "normal";
+}
+
+function getIntervalDays(boxLevel: number, phase: "normal" | "prep" | "cram"): number {
+  if (phase === "normal") {
+    return LEITNER_INTERVALS[boxLevel];
+  }
+
+  const intervals = EXAM_INTERVALS[phase];
+  return intervals[boxLevel] ?? LEITNER_INTERVALS[boxLevel];
 }
 
 // ============================================

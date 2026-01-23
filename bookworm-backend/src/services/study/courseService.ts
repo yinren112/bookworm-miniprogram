@@ -42,6 +42,7 @@ export interface CourseDetail {
     enrolledAt: Date;
     lastStudiedAt: Date | null;
     completedCards: number;
+    examDate: Date | null;
   } | null;
 }
 
@@ -159,6 +160,7 @@ export async function getCourseByKey(
           enrolledAt: course.enrollments[0].enrolledAt,
           lastStudiedAt: course.enrollments[0].lastStudiedAt,
           completedCards: course.enrollments[0].completedCards,
+          examDate: course.enrollments[0].examDate,
         }
       : null,
   };
@@ -205,6 +207,26 @@ export async function enrollCourse(
     }
     throw error;
   }
+}
+
+// ============================================
+// 考试日期更新
+// ============================================
+
+export async function updateEnrollmentExamDate(
+  dbCtx: DbCtx,
+  userId: number,
+  courseId: number,
+  examDate: Date | null,
+): Promise<Date | null> {
+  // eslint-disable-next-line local-rules/no-prisma-raw-select -- simple single-field select
+  const enrollment = await dbCtx.userCourseEnrollment.update({
+    where: { userId_courseId: { userId, courseId } },
+    data: { examDate },
+    select: { examDate: true },
+  });
+
+  return enrollment.examDate;
 }
 
 // ============================================

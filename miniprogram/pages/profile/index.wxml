@@ -17,7 +17,7 @@
   <view class="review-entry-card card" bindtap="goToReview">
     <view class="review-entry-content">
       <view class="review-icon-wrapper">
-        <text class="review-icon">📚</text>
+        <image class="review-icon" src="/images/icons/review/book.svg" />
       </view>
       <view class="review-text-wrapper">
         <text class="review-title">复习助手</text>
@@ -34,7 +34,7 @@
     </view>
     <navigator url="/pages/acquisition-scan/index" class="menu-item" hover-class="item-hover">
       <view class="menu-content">
-        <text class="icon-text">📷</text>
+        <image class="icon-image" src="/images/icons/camera.svg" />
         <text class="menu-text">按本收购</text>
       </view>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />

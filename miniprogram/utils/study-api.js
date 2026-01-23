@@ -61,6 +61,20 @@ const enrollCourse = (courseKey, sourceScene) => {
 };
 
 /**
+ * 更新考试日期
+ * @param {string} courseKey - 课程标识
+ * @param {string|null} examDate - YYYY-MM-DD 或 null
+ */
+const updateExamDate = (courseKey, examDate) => {
+  return request({
+    url: `/study/courses/${encodeURIComponent(courseKey)}/exam-date`,
+    method: 'PATCH',
+    data: { examDate },
+    requireAuth: true,
+  });
+};
+
+/**
  * 获取今日队列摘要
  * @param {string} courseKey - 课程标识
  */
@@ -373,6 +387,7 @@ module.exports = {
   getCourses,
   getCourseDetail,
   enrollCourse,
+  updateExamDate,
   getTodayQueue,
   startSession,
   submitCardAnswer,

@@ -179,7 +179,8 @@
 }
 
 .empty-icon {
-  font-size: 100rpx;
+  width: 100rpx;
+  height: 100rpx;
 }
 
 .empty-text {

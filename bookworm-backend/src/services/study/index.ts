@@ -6,6 +6,7 @@ export {
   getCourseList,
   getCourseByKey,
   enrollCourse,
+  updateEnrollmentExamDate,
   getUserEnrolledCourses,
   updateCourseTotals,
   courseSelectPublic,
@@ -116,4 +117,3 @@ export {
   type DailyActivity,
   type ActivityHistory,
 } from "./activityService";
-
