@@ -105,7 +105,14 @@
   max-height: 800rpx;
   position: relative;
   transform-style: preserve-3d;
-  /* transition handled in JS or via class */
+  transition: transform 0.5s ease;
+}
+
+.card-swipe {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
 }
 
 /* Reset animation for return to center */

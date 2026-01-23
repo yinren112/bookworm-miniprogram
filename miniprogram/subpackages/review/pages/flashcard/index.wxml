@@ -2,17 +2,7 @@
 <!-- 卡片复习页 -->
 <wxs src="../../utils/swipe-gesture.wxs" module="gesture" />
 <view class="container">
-  <state-view
-    wx:if="{{loading || error || empty}}"
-    status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}"
-    loadingText="正在加载知识卡片..."
-    emptyText="今天的卡片都复习完了，休息一下吧"
-    errorText="加载失败，请重试"
-    actionText="返回首页"
-    bind:action="goBack"
-    bind:retry="loadSession"
-    bind:feedback="onFeedback"
-  />
+  <state-view wx:if="{{loading || error || empty}}" status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}" loadingText="正在加载知识卡片..." emptyText="今天的卡片都复习完了，休息一下吧" errorText="加载失败，请重试" actionText="返回首页" bind:action="goBack" bind:retry="loadSession" bind:feedback="onFeedback" />
   <!-- 进度条 -->
   <view class="progress-header" wx:if="{{!loading && !error && !empty}}">
     <view class="progress-bar">
@@ -30,36 +20,38 @@
       <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
     </view>
     <!-- Card Container with WXS Swipe Gestures -->
-    <view id="swipe-card" class="card-container {{isFlipped ? 'flipped' : ''}}" data-screen-width="{{screenWidth}}" bindtap="flipCard" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
-      <!-- 正面 -->
-      <view class="card card-front clay-card">
-        <view class="card-label">Q</view>
-        <view class="card-content">
-          <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
+    <view class="card-container {{isFlipped ? 'flipped' : ''}}" bindtap="flipCard">
+      <view id="swipe-card" class="card-swipe" data-screen-width="{{screenWidth}}" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
+        <!-- 正面 -->
+        <view class="card card-front clay-card">
+          <view class="card-label">Q</view>
+          <view class="card-content">
+            <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
+          </view>
+          <view class="card-hint">
+            <text>轻触翻牌</text>
+          </view>
         </view>
-        <view class="card-hint">
-          <text>轻触翻牌</text>
+        <!-- 背面 -->
+        <view class="card card-back clay-card">
+          <view class="card-label">A</view>
+          <view class="card-content">
+            <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
+          </view>
         </view>
-      </view>
-      <!-- 背面 -->
-      <view class="card card-back clay-card">
-        <view class="card-label">A</view>
-        <view class="card-content">
-          <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
+        <!-- 4档 Swipe Indicators -->
+        <view id="indicator-left-light" class="swipe-indicator fuzzy-overlay">
+          <text>有点模糊</text>
         </view>
-      </view>
-      <!-- 4档 Swipe Indicators -->
-      <view id="indicator-left-light" class="swipe-indicator fuzzy-overlay">
-        <text>有点模糊</text>
-      </view>
-      <view id="indicator-left-heavy" class="swipe-indicator forgot-overlay">
-        <text>想不起来</text>
-      </view>
-      <view id="indicator-right-light" class="swipe-indicator knew-overlay">
-        <text>记住了</text>
-      </view>
-      <view id="indicator-right-heavy" class="swipe-indicator perfect-overlay">
-        <text>完全掌握</text>
+        <view id="indicator-left-heavy" class="swipe-indicator forgot-overlay">
+          <text>想不起来</text>
+        </view>
+        <view id="indicator-right-light" class="swipe-indicator knew-overlay">
+          <text>记住了</text>
+        </view>
+        <view id="indicator-right-heavy" class="swipe-indicator perfect-overlay">
+          <text>完全掌握</text>
+        </view>
       </view>
     </view>
   </view>

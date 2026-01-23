@@ -27,5 +27,15 @@
     This works for re-subscription.
 
 ## Template Keys
-- **MISSING**: Exact mapping of keys (thing1, time2, etc.) to content.
-- Need to ask user or find in unidentified docs.
+- **MISSING**: Exact mapping of keys (thing1, time2, etc.) to content. (Resolved: User provided keys: `thing2, number1, time5, thing4`)
+
+## Debug Log: Missing Course on Dashboard (2026-01-23)
+- **Symptom**: Frontend Dashboard shows no current course/progress. Backend logic was skipping enrollment checks.
+- **Investigation**:
+  - `getStudyDashboard` logs showed `!course` was true.
+  - Direct database query confirmed `StudyCourse` table was empty (0 records).
+  - Cause: Development database likely reset or fresh, lacking seed data.
+- **Resolution**:
+  - Ran `npm run seed` to restore standard courses (including "MA101 高数").
+  - Manually re-enrolled User ID 1 into Course ID 1 using `enroll_user.ts`.
+- **Status**: Fixed. Dashboard should now populate correctly.
