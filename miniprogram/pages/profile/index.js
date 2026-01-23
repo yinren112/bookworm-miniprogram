@@ -4,6 +4,9 @@ const authGuard = require('../../utils/auth-guard');
 const ui = require('../../utils/ui');
 const logger = require('../../utils/logger');
 const privacy = require('../../utils/privacy');
+const { getStudyReminderStatus, subscribeStudyReminder } = require('../../utils/study-api');
+const { STUDY_REMINDER_TEMPLATE_ID } = require('../../utils/constants');
+const { track } = require('../../utils/track');
 const { APP_CONFIG } = require('../../config');
 
 Page({
@@ -19,11 +22,16 @@ Page({
     },
     hasPhoneNumber: false, // 是否已授权手机号
     isLinking: false,      // 防止重复点击
-    isReviewMode: APP_CONFIG.REVIEW_ONLY_MODE
+    isReviewMode: APP_CONFIG.REVIEW_ONLY_MODE,
+    reminderStatus: 'UNKNOWN',
+    reminderStatusText: '未开启',
+    nextSendAtText: '',
+    reminderLoading: false
   },
 
   onShow() {
     this.fetchUserInfo();
+    this.loadReminderStatus();
   },
 
   async fetchUserInfo() {
@@ -40,6 +48,29 @@ Page({
     } catch (error) {
       logger.error('Failed to fetch user info:', error);
       // 静默失败，保持默认USER角色
+    }
+  },
+
+  async loadReminderStatus() {
+    if (!STUDY_REMINDER_TEMPLATE_ID || STUDY_REMINDER_TEMPLATE_ID === 'TEMPLATE_ID') {
+      this.setData({
+        reminderStatus: 'UNKNOWN',
+        reminderStatusText: '未配置模板',
+        nextSendAtText: ''
+      });
+      return;
+    }
+
+    try {
+      const status = await getStudyReminderStatus({ templateId: STUDY_REMINDER_TEMPLATE_ID });
+      const nextSendAtText = formatDateTime(status.nextSendAt);
+      this.setData({
+        reminderStatus: status.status || 'UNKNOWN',
+        reminderStatusText: formatReminderStatus(status.status),
+        nextSendAtText
+      });
+    } catch (error) {
+      logger.error('Failed to load reminder status:', error);
     }
   },
 
@@ -99,6 +130,51 @@ Page({
       this.setData({ isLinking: false });
     }
   },
+
+  onReminderSubscribe() {
+    if (this.data.reminderLoading) return;
+    if (!STUDY_REMINDER_TEMPLATE_ID || STUDY_REMINDER_TEMPLATE_ID === 'TEMPLATE_ID') {
+      wx.showToast({
+        title: '订阅模板未配置',
+        icon: 'none'
+      });
+      return;
+    }
+
+    this.setData({ reminderLoading: true });
+    track('subscribe_click', { entry: 'profile' });
+
+    wx.requestSubscribeMessage({
+      tmplIds: [STUDY_REMINDER_TEMPLATE_ID],
+      success: async (res) => {
+        const result = res[STUDY_REMINDER_TEMPLATE_ID];
+        const normalized = result === 'accept' ? 'accept' : 'reject';
+        track('subscribe_result', { result: normalized });
+        try {
+          const response = await subscribeStudyReminder({
+            templateId: STUDY_REMINDER_TEMPLATE_ID,
+            result: normalized,
+            timezone: 'Asia/Shanghai'
+          });
+          this.setData({
+            reminderStatus: response.status || 'UNKNOWN',
+            reminderStatusText: formatReminderStatus(response.status),
+            nextSendAtText: formatDateTime(response.nextSendAt)
+          });
+        } catch (err) {
+          logger.error('Subscribe reminder failed:', err);
+          ui.showError('订阅失败，请稍后重试');
+        }
+      },
+      fail: (err) => {
+        logger.error('Subscribe reminder failed:', err);
+        ui.showError('订阅失败，请稍后重试');
+      },
+      complete: () => {
+        this.setData({ reminderLoading: false });
+      }
+    });
+  },
   goToReview() {
     wx.switchTab({
       url: '/pages/review/index'
@@ -137,3 +213,32 @@ Page({
     }
   }
 });
+
+function formatReminderStatus(status) {
+  switch (status) {
+    case 'ACCEPT':
+    case 'ACTIVE':
+      return '已开启'; // 等待发送
+    case 'SENT':
+      return '已发送'; // 需要重新订阅
+    case 'REJECT':
+      return '未开启'; 
+    case 'BAN':
+      return '已停用';
+    case 'FAILED':
+      return '发送失败'; // 允许重试
+    default:
+      return '未开启';
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${month}月${day}日 ${hour}:${minute}`;
+}

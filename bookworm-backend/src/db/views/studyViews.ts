@@ -2,6 +2,7 @@
 // Study 模块数据访问视图选择器
 
 import type { Prisma } from "@prisma/client";
+import { userIdView } from "./userViews";
 
 // ============================================
 // StudyCourse 视图选择器
@@ -313,6 +314,10 @@ export const questionAttemptActivityView = {
   attemptedAt: true,
 } as const satisfies Prisma.UserQuestionAttemptSelect;
 
+export const questionAttemptQuestionIdView = {
+  questionId: true,
+} as const satisfies Prisma.UserQuestionAttemptSelect;
+
 // ============================================
 // UserStudyStreak 视图选择器（周榜用）
 // ============================================
@@ -415,3 +420,9 @@ export const cardStateWithCardInclude = {
     select: cardSelectPublic,
   },
 } as const satisfies Prisma.UserCardStateInclude;
+
+export const reminderSubscriptionWithUserInclude = {
+  user: {
+    select: userIdView,
+  },
+} as const satisfies Prisma.StudyReminderSubscriptionInclude;

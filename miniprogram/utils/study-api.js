@@ -87,6 +87,22 @@ const getTodayQueue = (courseKey) => {
 };
 
 /**
+ * 获取复习首页聚合数据
+ * @param {Object} options - 查询选项
+ * @param {string} [options.courseKey] - 课程标识
+ */
+const getDashboard = (options = {}) => {
+  const queryString = buildQueryString({
+    courseKey: options.courseKey,
+  });
+  return request({
+    url: `/study/dashboard${queryString}`,
+    method: 'GET',
+    requireAuth: true,
+  });
+};
+
+/**
  * 开始学习 session
  * @param {string} courseKey - 课程标识
  * @param {Object} options - 选项
@@ -382,6 +398,38 @@ const getActivityHistory = (options = {}) => {
   });
 };
 
+/**
+ * 订阅复习提醒
+ * @param {Object} payload
+ * @param {string} payload.templateId
+ * @param {string} payload.result - accept | reject
+ * @param {string} [payload.timezone]
+ */
+const subscribeStudyReminder = (payload) => {
+  return request({
+    url: '/study/reminders/subscribe',
+    method: 'POST',
+    data: payload,
+    requireAuth: true,
+  });
+};
+
+/**
+ * 获取复习提醒订阅状态
+ * @param {Object} options
+ * @param {string} [options.templateId]
+ */
+const getStudyReminderStatus = (options = {}) => {
+  const queryString = buildQueryString({
+    templateId: options.templateId,
+  });
+  return request({
+    url: `/study/reminders/status${queryString}`,
+    method: 'GET',
+    requireAuth: true,
+  });
+};
+
 module.exports = {
   // Phase 2: 课程和卡片
   getCourses,
@@ -389,6 +437,7 @@ module.exports = {
   enrollCourse,
   updateExamDate,
   getTodayQueue,
+  getDashboard,
   startSession,
   submitCardAnswer,
   // Phase 3: 刷题
@@ -410,4 +459,6 @@ module.exports = {
   getStarredItems,
   // Phase 5.5: 热力图
   getActivityHistory,
+  subscribeStudyReminder,
+  getStudyReminderStatus,
 };

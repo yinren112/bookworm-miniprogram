@@ -1,50 +1,62 @@
 <!-- pages/session-complete/index.wxml -->
 <view class="page">
-    <!-- 庆祝动画区域 -->
-    <view class="celebration-area">
-        <image class="celebration-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
-        <view class="celebration-title">太棒了！</view>
-        <view class="celebration-subtitle">今日任务达成！</view>
+  <view class="celebration-area">
+    <image class="celebration-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
+    <view class="celebration-title">本次完成总结</view>
+    <view class="celebration-subtitle">做得不错，继续保持</view>
+  </view>
+  <view class="stats-card clay-card">
+    <view class="stats-title">学习数据</view>
+    <view class="stat-grid">
+      <view class="stat-item">
+        <text class="stat-label">完成量</text>
+        <text class="stat-value">{{count}}</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-label">正确率</text>
+        <text class="stat-value">{{mode === 'quiz' ? accuracy + '%' : '--'}}</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-label">耗时</text>
+        <text class="stat-value">{{durationText}}</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-label">明日预计</text>
+        <text class="stat-value">{{nextDueText}}</text>
+      </view>
     </view>
-    <!-- 统计卡片 -->
-    <view class="stats-card clay-card">
-        <view class="stats-title">本轮战绩</view>
-        <view class="stat-row">
-            <image class="stat-icon" src="/images/icons/review/flashcards.svg" mode="aspectFit" />
-            <view class="stat-label">攻克卡片</view>
-            <view class="stat-value">{{cardCount}} 张</view>
-        </view>
-        <view class="stat-row">
-            <image class="stat-icon" src="/images/icons/review/clock.svg" mode="aspectFit" />
-            <view class="stat-label">耗时</view>
-            <view class="stat-value">
-                {{durationSeconds < 60 ? durationSeconds + '秒' : (durationSeconds / 60 | 0) + '分钟'}}
-            </view>
-        </view>
-        <view class="stat-row" wx:if="{{starredCount > 0}}">
-            <image class="stat-icon" src="/images/icons/review/star-filled.svg" mode="aspectFit" />
-            <view class="stat-label">星标收藏</view>
-            <view class="stat-value">{{starredCount}} 张</view>
-        </view>
+    <view class="stat-row" wx:if="{{starredCount > 0}}">
+      <text class="stat-label">星标收藏</text>
+      <text class="stat-value">{{starredCount}} 张</text>
     </view>
-    <!-- 连续学习 -->
-    <view class="streak-card clay-card" wx:if="{{!loading}}">
-        <image class="streak-flame" src="/images/icons/review/flame.svg" mode="aspectFit" />
-        <view class="streak-info">
-            <view class="streak-current">
-                <text class="streak-number">{{currentStreak}}</text>
-                <text class="streak-unit">天</text>
-            </view>
-            <view class="streak-label">连续学习</view>
-        </view>
-        <view class="streak-best" wx:if="{{bestStreak > 0}}">最佳: {{bestStreak}}天</view>
+    <view class="stat-row" wx:if="{{mode === 'quiz'}}">
+      <text class="stat-label">错题数</text>
+      <text class="stat-value">{{wrongCount}} 题</text>
     </view>
-    <!-- 操作按钮 -->
-    <view class="action-area">
-        <button class="action-btn primary" bindtap="continueReview" wx:if="{{remainingCards > 0}}">
-            继续复习
-            <text class="btn-hint">(还有 {{remainingCards}} 张等你挑战)</text>
-        </button>
-        <button class="action-btn secondary" bindtap="goHome">返回首页</button>
+  </view>
+  <view class="streak-card clay-card" wx:if="{{!loading}}">
+    <image class="streak-flame" src="/images/icons/review/flame.svg" mode="aspectFit" />
+    <view class="streak-info">
+      <view class="streak-current">
+        <text class="streak-number">{{currentStreak}}</text>
+        <text class="streak-unit">天连续学习</text>
+      </view>
+      <view class="streak-best" wx:if="{{bestStreak > 0}}">历史最佳 {{bestStreak}} 天</view>
     </view>
+  </view>
+  <view class="shortcut-actions" wx:if="{{wrongCount > 0}}">
+    <button class="shortcut-btn" bindtap="startWrongQuiz">错题强化</button>
+  </view>
+  <view class="action-area">
+    <button class="action-btn primary" bindtap="continueReview" loading="{{actionLoading && actionType === 'continue'}}" disabled="{{actionLoading}}">
+      再来一组
+    </button>
+    <button class="action-btn secondary" bindtap="goHome" loading="{{actionLoading && actionType === 'home'}}" disabled="{{actionLoading}}">
+      回到首页
+    </button>
+    <button class="action-btn ghost" bindtap="onSubscribeReminder" disabled="{{reminderStatus === 'ACCEPT' || reminderStatus === 'ACTIVE' || subscribeLoading}}">
+      {{reminderStatus === 'ACCEPT' || reminderStatus === 'ACTIVE' ? '已订阅下次提醒' : '订阅下次提醒'}}
+    </button>
+    <text class="subscribe-tip">订阅一次收到一次，可在我的里管理</text>
+  </view>
 </view>

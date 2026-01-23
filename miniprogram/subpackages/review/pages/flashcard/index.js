@@ -2,9 +2,11 @@
 // 卡片复习页
 
 const { startSession, submitCardAnswer, starItem, unstarItem, getStarredItems } = require('../../utils/study-api');
+const { getResumeSession, saveResumeSession, clearResumeSession, setLastSessionType } = require('../../utils/study-session');
 const logger = require('../../../../utils/logger');
 const haptic = require('../../../../utils/haptic');
 const soundManager = require('../../../../utils/sound-manager');
+const { track } = require('../../../../utils/track');
 // Swipe thresholds - kept for reference (actual logic in WXS)
 // const T1_RATIO = 0.22;  // Light threshold
 // const T2_RATIO = 0.42;  // Heavy threshold
@@ -12,9 +14,12 @@ const soundManager = require('../../../../utils/sound-manager');
 Page({
   data: {
     loading: true,
+    error: false,
+    empty: false,
     submitting: false, // 防重复提交
     courseKey: '',
     unitId: null,
+    limit: null,
     sessionId: '',
     cardsLength: 0,
     currentIndex: 0,
@@ -22,33 +27,45 @@ Page({
     isFlipped: false,
     completed: false,
     progressPercent: 0,
+    remainingMinutes: 0,
     showReportModal: false,
-    
+    nextType: '',
+
     // Screen width for WXS gesture module
     screenWidth: 375,
-    
+
     // Starred state
     isStarred: false,
     starredItems: {},
   },
 
   onLoad(options) {
-    this.startTime = Date.now(); // Session Timer
+    this.startTime = Date.now();
+    this.elapsedOffset = 0;
     this.fatigueWarned = false;
-    
-    // Get screen width for WXS gesture module
+    this.abortTracked = false;
+
     const sysInfo = wx.getSystemInfoSync();
     this.setData({ screenWidth: sysInfo.windowWidth });
-    
-    const { courseKey, unitId } = options;
+
+    const { courseKey, unitId, resume, nextType, entry, limit } = options || {};
     if (courseKey) {
+      const decodedCourseKey = decodeURIComponent(courseKey);
+      this.entry = entry || '';
       this.setData({
-        courseKey: decodeURIComponent(courseKey),
+        courseKey: decodedCourseKey,
         unitId: unitId ? parseInt(unitId, 10) : null,
+        nextType: nextType || '',
+        limit: limit ? parseInt(limit, 10) : null,
       });
+
+      if (resume === '1' && this.tryResumeSession(decodedCourseKey)) {
+        return;
+      }
+
       this.loadSession();
     } else {
-      this.setData({ loading: false });
+      this.setData({ loading: false, error: true });
       wx.showToast({
         title: '缺少课程参数',
         icon: 'none',
@@ -56,13 +73,53 @@ Page({
     }
   },
 
+  tryResumeSession(courseKey) {
+    const session = getResumeSession();
+    if (!session || session.type !== 'flashcard' || session.courseKey !== courseKey) {
+      return false;
+    }
+
+    const cards = session.cards || [];
+    if (!Array.isArray(cards) || cards.length === 0) {
+      return false;
+    }
+
+    this._cards = cards;
+    const currentIndex = Math.min(session.currentIndex || 0, cards.length - 1);
+    const currentCard = cards[currentIndex];
+
+    this.elapsedOffset = session.elapsedSeconds || 0;
+
+    this.setData({
+      sessionId: session.sessionId || '',
+      cardsLength: session.cardsLength || cards.length,
+      currentIndex,
+      currentCard,
+      starredItems: session.starredItems || {},
+      isStarred: (session.starredItems || {})[currentCard.contentId] || false,
+      isFlipped: false,
+      completed: false,
+      loading: false,
+      error: false,
+      empty: false,
+      progressPercent: 0,
+    });
+
+    this.updateProgress(currentIndex);
+    track('session_start', { type: 'flashcard', resume: true, entry: 'resume' });
+    return true;
+  },
+
   async loadSession() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, error: false, empty: false });
 
     try {
       const options = {};
       if (this.data.unitId) {
         options.unitId = this.data.unitId;
+      }
+      if (this.data.limit) {
+        options.limit = this.data.limit;
       }
 
       const res = await startSession(this.data.courseKey, options);
@@ -70,9 +127,11 @@ Page({
 
       if (!cards || cards.length === 0) {
         this._cards = [];
+        clearResumeSession();
         this.setData({
           loading: false,
           cardsLength: 0,
+          empty: true,
         });
         return;
       }
@@ -88,7 +147,6 @@ Page({
         logger.error('Failed to load starred items:', err);
       }
 
-      // 存入实例字段，避免大数组 setData
       this._cards = cards;
       const firstCard = cards[0];
 
@@ -107,13 +165,13 @@ Page({
         swipeOpacityForgot: 0,
         swipeOpacityKnew: 0,
       });
+
+      this.updateProgress(0);
+      this.saveSnapshot();
+      track('session_start', { type: 'flashcard', resume: false, entry: this.entry || 'direct' });
     } catch (err) {
       logger.error('Failed to startSession:', err);
-      this.setData({ loading: false });
-      wx.showToast({
-        title: '加载失败',
-        icon: 'none',
-      });
+      this.setData({ loading: false, error: true });
     }
   },
 
@@ -213,13 +271,29 @@ Page({
             haptic.trigger('celebration');
             soundManager.play('celebration');
             
-            // 计算统计数据
-            const durationSeconds = Math.floor((Date.now() - this.startTime) / 1000);
+            const durationSeconds = this.getElapsedSeconds();
             const starredCount = Object.keys(this.data.starredItems).length;
-            
-            // 跳转到结算页面
+
+            clearResumeSession();
+            setLastSessionType('flashcard');
+            track('session_complete', {
+              type: 'flashcard',
+              count: cards.length,
+              durationSeconds
+            });
+
+            const params = [
+              `mode=flashcard`,
+              `count=${cards.length}`,
+              `duration=${durationSeconds}`,
+              `starred=${starredCount}`,
+              `courseKey=${encodeURIComponent(this.data.courseKey)}`
+            ];
+            if (this.data.nextType) {
+              params.push(`nextType=${this.data.nextType}`);
+            }
             wx.redirectTo({
-                url: `/subpackages/review/pages/session-complete/index?count=${cards.length}&duration=${durationSeconds}&starred=${starredCount}&courseKey=${encodeURIComponent(this.data.courseKey)}`
+                url: `/subpackages/review/pages/session-complete/index?${params.join('&')}`
             });
         } else {
             const nextCard = cards[nextIndex];
@@ -231,7 +305,8 @@ Page({
                 isFlipped: false,
                 progressPercent: Math.round((nextIndex / this.data.cardsLength) * 100)
             });
-            
+            this.updateProgress(nextIndex);
+            this.saveSnapshot();
 
         }
       } catch (err) {
@@ -294,6 +369,7 @@ Page({
   },
 
   goBack() {
+    this.trackAbort('back');
     const pages = getCurrentPages();
     if (pages.length > 1) {
       wx.navigateBack();
@@ -309,6 +385,12 @@ Page({
     this.setData({ showReportModal: true });
   },
 
+  onFeedback() {
+    wx.navigateTo({
+      url: '/pages/customer-service/index',
+    });
+  },
+
   closeReportModal() {
     this.setData({ showReportModal: false });
   },
@@ -317,7 +399,51 @@ Page({
     // 反馈提交成功后的回调
   },
 
+  onHide() {
+    this.trackAbort('hide');
+  },
+
+  updateProgress(currentIndex) {
+    const total = this.data.cardsLength || 0;
+    const remaining = Math.max(0, total - currentIndex);
+    const remainingMinutes = Math.ceil((remaining * 8) / 60);
+    this.setData({
+      progressPercent: total > 0 ? Math.round((currentIndex / total) * 100) : 0,
+      remainingMinutes,
+    });
+  },
+
+  saveSnapshot() {
+    if (!this.data.sessionId || this.data.completed) return;
+    saveResumeSession({
+      type: 'flashcard',
+      courseKey: this.data.courseKey,
+      unitId: this.data.unitId,
+      sessionId: this.data.sessionId,
+      cards: this._cards,
+      cardsLength: this.data.cardsLength,
+      currentIndex: this.data.currentIndex,
+      starredItems: this.data.starredItems,
+      elapsedSeconds: this.getElapsedSeconds(),
+    });
+  },
+
+  getElapsedSeconds() {
+    return this.elapsedOffset + Math.floor((Date.now() - this.startTime) / 1000);
+  },
+
+  trackAbort(reason) {
+    if (this.abortTracked || this.data.completed || !this.data.sessionId) return;
+    this.abortTracked = true;
+    this.saveSnapshot();
+    track('session_abort', {
+      type: 'flashcard',
+      reason,
+    });
+  },
+
   onUnload() {
+    this.trackAbort('close');
     // 释放音效实例，避免长期资源占用
     soundManager.destroyAll();
   },

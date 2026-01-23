@@ -51,6 +51,11 @@ export const TodayQueueQuerySchema = Type.Object({
   courseKey: Type.String({ minLength: 1, maxLength: 100 }),
 });
 
+// GET /api/study/dashboard
+export const StudyDashboardQuerySchema = Type.Object({
+  courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+});
+
 // POST /api/study/start
 export const StartSessionBodySchema = Type.Object({
   courseKey: Type.String({ minLength: 1, maxLength: 100 }),
@@ -146,6 +151,35 @@ export const CardStateUpdateSchema = Type.Object({
   newBoxLevel: Type.Integer(),
   nextDueAt: Type.String({ format: "date-time" }),
   todayShownCount: Type.Integer(),
+});
+
+export const StudyDashboardCourseSchema = Type.Object({
+  courseKey: Type.String(),
+  title: Type.String(),
+  progress: Type.Number({ minimum: 0, maximum: 1 }),
+});
+
+export const StudyDashboardHeatmapSchema = Type.Object({
+  date: Type.String({ format: "date" }),
+  count: Type.Integer({ minimum: 0 }),
+  level: Type.Integer({ minimum: 0, maximum: 3 }),
+});
+
+export const ResumeSessionSchema = Type.Object({
+  type: Type.Union([Type.Literal("flashcard"), Type.Literal("quiz")]),
+  sessionId: Type.String(),
+  updatedAt: Type.String({ format: "date-time" }),
+});
+
+export const StudyDashboardResponseSchema = Type.Object({
+  dueCardCount: Type.Integer({ minimum: 0 }),
+  dueQuizCount: Type.Integer({ minimum: 0 }),
+  wrongCount: Type.Integer({ minimum: 0 }),
+  etaMinutes: Type.Integer({ minimum: 0 }),
+  streakDays: Type.Integer({ minimum: 0 }),
+  activeHeatmap: Type.Array(StudyDashboardHeatmapSchema),
+  currentCourse: Type.Union([StudyDashboardCourseSchema, Type.Null()]),
+  resumeSession: Type.Union([ResumeSessionSchema, Type.Null()]),
 });
 
 // ============================================
@@ -361,6 +395,45 @@ export const StarredItemsResponseSchema = Type.Object({
 });
 
 // ============================================
+// 复习提醒 Schema
+// ============================================
+
+export const ReminderSubscribeBodySchema = Type.Object({
+  templateId: Type.String({ minLength: 1, maxLength: 100 }),
+  result: Type.Union([Type.Literal("accept"), Type.Literal("reject")]),
+  timezone: Type.Optional(Type.String({ maxLength: 64 })),
+});
+
+export const ReminderSubscribeResponseSchema = Type.Object({
+  status: Type.Union([
+    Type.Literal("ACTIVE"),
+    Type.Literal("REJECT"),
+    Type.Literal("BAN"),
+    Type.Literal("SENT"),
+    Type.Literal("FAILED"),
+  ]),
+  nextSendAt: Type.Union([Type.String({ format: "date-time" }), Type.Null()]),
+});
+
+export const ReminderStatusQuerySchema = Type.Object({
+  templateId: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+});
+
+export const ReminderStatusResponseSchema = Type.Object({
+  status: Type.Union([
+    Type.Literal("ACTIVE"),
+    Type.Literal("REJECT"),
+    Type.Literal("BAN"),
+    Type.Literal("SENT"),
+    Type.Literal("FAILED"),
+    Type.Literal("UNKNOWN"),
+  ]),
+  templateId: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
+  lastSentAt: Type.Union([Type.String({ format: "date-time" }), Type.Null()]),
+  nextSendAt: Type.Union([Type.String({ format: "date-time" }), Type.Null()]),
+});
+
+// ============================================
 // 导出类型
 // ============================================
 
@@ -370,6 +443,7 @@ export type EnrollCourseParams = Static<typeof EnrollCourseParamsSchema>;
 export type EnrollCourseBody = Static<typeof EnrollCourseBodySchema>;
 export type UpdateExamDateBody = Static<typeof UpdateExamDateBodySchema>;
 export type TodayQueueQuery = Static<typeof TodayQueueQuerySchema>;
+export type StudyDashboardQuery = Static<typeof StudyDashboardQuerySchema>;
 export type StartSessionBody = Static<typeof StartSessionBodySchema>;
 export type CardAnswerParams = Static<typeof CardAnswerParamsSchema>;
 export type CardAnswerBody = Static<typeof CardAnswerBodySchema>;
@@ -388,6 +462,8 @@ export type CreateFeedbackBody = Static<typeof CreateFeedbackBodySchema>;
 export type GetFeedbacksQuery = Static<typeof GetFeedbacksQuerySchema>;
 export type StarItemBody = Static<typeof StarItemBodySchema>;
 export type StarredItemsQuery = Static<typeof StarredItemsQuerySchema>;
+export type ReminderSubscribeBody = Static<typeof ReminderSubscribeBodySchema>;
+export type ReminderStatusQuery = Static<typeof ReminderStatusQuerySchema>;
 
 // ============================================
 // Streak 与周榜 Schema (Phase 5)

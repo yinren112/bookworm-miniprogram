@@ -1,22 +1,36 @@
 <!-- subpackages/review/pages/quiz/index.wxml -->
 <!-- 刷题闯关页 -->
 <view class="container">
+  <state-view
+    wx:if="{{loading || error || empty}}"
+    status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}"
+    loadingText="正在加载题库..."
+    emptyText="题库空空，老师还没出题呢"
+    errorText="加载失败，请重试"
+    actionText="返回课程"
+    bind:action="goBack"
+    bind:retry="loadQuiz"
+    bind:feedback="onFeedback"
+  />
   <!-- 进度条 -->
-  <view class="progress-section" wx:if="{{!loading && !completed && questionsLength > 0}}">
+  <view class="progress-section" wx:if="{{!loading && !error && !empty && questionsLength > 0}}">
     <view class="progress-bar">
       <view class="progress-fill" style="width: {{progressPercent}}%"></view>
     </view>
     <view class="progress-info">
       <text class="progress-text">{{currentIndex + 1}} / {{questionsLength}}</text>
       <text class="accuracy-text" wx:if="{{answeredCount > 0}}">
-        正确率 {{Math.round(correctCount / answeredCount * 100)}}%
+        正确率 {{accuracyPercent}}%
+      </text>
+      <text class="eta-text" wx:if="{{remainingMinutes > 0}}">
+        剩余约 {{remainingMinutes}} 分钟
       </text>
     </view>
   </view>
   <!-- 题目区域 -->
-  <view class="question-card clay-card" wx:if="{{!loading && !completed && currentQuestion}}">
+  <view class="question-card clay-card" wx:if="{{!loading && !error && !empty && currentQuestion}}">
     <!-- 题目类型标签 -->
-    <view class="question-type-tag {{currentQuestion.questionType.toLowerCase()}}">
+    <view class="question-type-tag {{questionTypeClass}}">
       <text>{{questionTypeLabels[currentQuestion.questionType]}}</text>
     </view>
     <!-- Star Button -->
@@ -76,46 +90,10 @@
     </view>
   </view>
   <!-- 下一题按钮 -->
-  <view class="action-section" wx:if="{{showResult && !completed}}">
+  <view class="action-section" wx:if="{{showResult && !loading && !error && !empty}}">
     <button class="next-btn clay-btn-primary" bindtap="nextQuestion">
       {{currentIndex < questionsLength - 1 ? '下一题' : '查看结果'}}
     </button>
-  </view>
-  <!-- 加载状态 -->
-  <view class="loading-state" wx:if="{{loading}}">
-    <text class="loading-text">正在加载题库...</text>
-  </view>
-  <!-- 完成状态 -->
-  <view class="complete-state" wx:if="{{!loading && completed}}">
-    <image class="complete-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
-    <text class="complete-title">
-      {{correctCount === questionsLength ? '全对！你是学霸！' : (correctCount >= questionsLength * 0.6 ? '不错哦，及格了！' : '还需努力，再来一轮？')}}
-    </text>
-    <view class="stats-card clay-card">
-      <view class="stat-row">
-        <text class="stat-label">答对</text>
-        <text class="stat-value correct">{{correctCount}}</text>
-      </view>
-      <view class="stat-row">
-        <text class="stat-label">答错</text>
-        <text class="stat-value wrong">{{questionsLength - correctCount}}</text>
-      </view>
-      <view class="stat-row">
-        <text class="stat-label">正确率</text>
-        <text class="stat-value">{{Math.round(correctCount / questionsLength * 100)}}%</text>
-      </view>
-    </view>
-    <view class="complete-actions">
-      <button class="retry-btn" bindtap="retryQuiz" wx:if="{{correctCount < questionsLength}}">
-        错题再练
-      </button>
-      <button class="back-btn clay-btn-primary" bindtap="goBack">返回课程</button>
-    </view>
-  </view>
-  <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{!loading && !completed && questionsLength === 0}}">
-    <text class="empty-text">题库空空，老师还没出题呢</text>
-    <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
   <!-- 纠错弹窗 -->
   <report-issue visible="{{showReportModal}}" courseKey="{{courseKey}}" questionId="{{currentQuestion.id}}" bind:close="closeReportModal" bind:success="onReportSuccess" />

@@ -5,6 +5,7 @@ import { withAdvisoryLock } from "./utils/dbLock";
 import { cancelExpiredOrders } from "./services/orderService";
 import { metrics } from "./plugins/metrics";
 import { processRefundQueue } from "./jobs/refundProcessor";
+import { dispatchStudyReminders } from "./jobs/sendStudyReminders";
 import { resetWeeklyPoints } from "./services/study/streakService";
 import config from "./config";
 import prisma from "./db";
@@ -146,6 +147,35 @@ export function startCronJobs(fastify: FastifyInstance): void {
     jobPromise.finally(() => runningJobs.delete(jobPromise));
   });
   scheduledTasks.push(weeklyResetTask);
+
+  // Schedule study reminder dispatch (default 09:00 Asia/Shanghai)
+  const reminderTask = cron.schedule(
+    config.CRON_STUDY_REMINDER,
+    async () => {
+      if (isShuttingDown) return;
+      const jobPromise = withAdvisoryLock(
+        prisma,
+        "job:send_study_reminders",
+        async () => {
+          fastify.log.info("Running scheduled job: SendStudyReminders");
+          try {
+            const result = await dispatchStudyReminders();
+            fastify.log.info(
+              `SendStudyReminders job finished: ${result.sent} sent, ${result.skipped} skipped, ${result.failed} failed`,
+            );
+          } catch (error) {
+            fastify.log.error(error, 'CRITICAL: The "SendStudyReminders" job failed');
+          }
+        },
+      );
+      runningJobs.add(jobPromise);
+      jobPromise.finally(() => runningJobs.delete(jobPromise));
+    },
+    {
+      timezone: "Asia/Shanghai",
+    },
+  );
+  scheduledTasks.push(reminderTask);
 
   fastify.log.info(`Started ${scheduledTasks.length} cron jobs`);
 }

@@ -90,6 +90,7 @@ model User {
   wrongItems        UserWrongItem[]
   studyStreak       UserStudyStreak?
   studyFeedbacks    StudyFeedback[]
+  reminderSubscriptions StudyReminderSubscription[]
   starredItems      UserStarredItem[]
 
   @@index([phone_number])
@@ -396,6 +397,14 @@ enum StudyFeedbackStatus {
   REJECTED
 }
 
+enum StudyReminderStatus {
+  ACTIVE
+  REJECT
+  BAN
+  SENT
+  FAILED
+}
+
 enum CourseStatus {
   DRAFT
   PUBLISHED
@@ -625,6 +634,43 @@ model UserStudyStreak {
 
   @@index([weeklyPoints]) // 周榜排序
   @@map("user_study_streak")
+}
+
+model StudyReminderSubscription {
+  id              Int                 @id @default(autoincrement())
+  userId          Int                 @map("user_id")
+  templateId      String              @map("template_id") @db.VarChar(100)
+  status          StudyReminderStatus @default(REJECT)
+  consentAt       DateTime?           @map("consent_at") @db.Timestamptz(6)
+  nextSendAt      DateTime?           @map("next_send_at") @db.Timestamptz(6)
+  sentAt          DateTime?           @map("sent_at") @db.Timestamptz(6)
+  lastError       String?             @map("last_error")
+  lastSentAt      DateTime?           @map("last_sent_at") @db.Timestamptz(6)
+  lastPayloadHash String?             @map("last_payload_hash") @db.VarChar(64)
+  timezone        String              @default("Asia/Shanghai") @db.VarChar(64)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sendLogs StudyReminderSendLog[]
+
+  @@unique([userId, templateId])
+  @@index([status, nextSendAt])
+  @@map("study_reminder_subscription")
+}
+
+model StudyReminderSendLog {
+  id             Int      @id @default(autoincrement())
+  subscriptionId Int      @map("subscription_id")
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+  resultCode     String?  @map("result_code") @db.VarChar(50)
+  resultMsg      String?  @map("result_msg") @db.VarChar(255)
+  payloadHash    String?  @map("payload_hash") @db.VarChar(64)
+
+  subscription StudyReminderSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, sentAt])
+  @@map("study_reminder_send_log")
 }
 
 model UserStarredItem {

@@ -73,6 +73,8 @@ Page({
    */
   async onScanCode() {
     if (this.data.isScanning) return;
+    const hasPermission = await this.ensureCameraPermission();
+    if (!hasPermission) return;
     this.setData({ isScanning: true });
     await this.performScan();
     this.setData({ isScanning: false });
@@ -153,9 +155,41 @@ Page({
         ui.showError(errorMsg);
       }
     } catch (scanError) {
-      // 用户取消扫码，自然退出连续模式
-      // 不做任何操作
+      if (scanError && String(scanError.errMsg || '').includes('auth')) {
+        this.showCameraPermissionTip();
+      }
     }
+  },
+
+  ensureCameraPermission() {
+    return new Promise((resolve) => {
+      wx.getSetting({
+        success: (res) => {
+          const granted = res.authSetting && res.authSetting['scope.camera'];
+          if (granted === false) {
+            this.showCameraPermissionTip();
+            resolve(false);
+            return;
+          }
+          resolve(true);
+        },
+        fail: () => resolve(true)
+      });
+    });
+  },
+
+  showCameraPermissionTip() {
+    wx.showModal({
+      title: '需要相机权限',
+      content: '请在系统设置中打开相机权限后再扫码。',
+      confirmText: '去设置',
+      cancelText: '取消',
+      success: (res) => {
+        if (res.confirm) {
+          wx.openSetting({});
+        }
+      }
+    });
   },
 
   /**

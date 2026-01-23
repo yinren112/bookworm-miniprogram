@@ -116,3 +116,18 @@ export {
   type DailyActivity,
   type ActivityHistory,
 } from "./activityService";
+
+// 复习首页聚合数据
+export {
+  getStudyDashboard,
+  type StudyDashboard,
+  type StudyDashboardCourse,
+  type ResumeSessionSnapshot,
+} from "./dashboardService";
+
+// 复习提醒订阅与发送
+export {
+  upsertStudyReminderSubscription,
+  getStudyReminderStatus,
+  sendStudyReminders,
+} from "./reminderService";

@@ -1,0 +1,22 @@
+<!-- subpackages/review/pages/activity-history/index.wxml -->
+<view class="page">
+  <state-view
+    wx:if="{{loading || error || empty}}"
+    status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}"
+    loadingText="正在加载学习记录..."
+    emptyText="暂无学习记录"
+    errorText="记录加载失败"
+    actionText="返回首页"
+    bind:action="goHome"
+    bind:retry="onRetry"
+    bind:feedback="onFeedback"
+  />
+
+  <scroll-view wx:if="{{!loading && !error && !empty}}" scroll-y="true" class="history-list" scroll-into-view="{{scrollTargetId}}">
+    <view class="history-item {{selectedDate === item.date ? 'active' : ''}}" id="day-{{item.date}}" wx:for="{{days}}" wx:key="date">
+      <view class="history-date">{{item.date}}</view>
+      <view class="history-count">学习 {{item.count}} 次</view>
+      <view class="history-level level-{{item.level}}"></view>
+    </view>
+  </scroll-view>
+</view>

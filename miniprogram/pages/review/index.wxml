@@ -1,113 +1,104 @@
 <!-- pages/review/index.wxml -->
 <!-- 复习首页 -->
 <view class="container">
-  <!-- 头部问候 -->
   <view class="header-section">
     <text class="greeting-text">你好，同学</text>
-    <text class="greeting-sub">每天进步一点点，你比昨天更强了</text>
+    <text class="greeting-sub">今天也要稳稳推进复习节奏</text>
   </view>
-  <!-- 今日任务 Hero Card -->
-  <view class="hero-card clay-card">
-    <view class="hero-header">
-      <view class="date-badge">
-        <text class="date-text">{{todayDate}}</text>
-      </view>
-    </view>
-    <view class="hero-content" wx:if="{{!loading && todaySummary}}">
-      <view class="progress-ring-container">
-        <!-- 简单的圆形进度可视化，这里用CSS实现 -->
-        <view class="progress-circle">
-          <text class="progress-number">{{todaySummary.dueCards || 0}}</text>
-          <text class="progress-label">今日待攻克</text>
-          <view class="estimate-badge" wx:if="{{todaySummary.dueCards > 0 && todaySummary.estimatedMinutes}}">
-            <text>约 {{todaySummary.estimatedMinutes}} 分钟</text>
-          </view>
+
+  <state-view
+    wx:if="{{loading || error}}"
+    status="{{loading ? 'loading' : 'error'}}"
+    loadingText="正在加载复习看板..."
+    errorText="网络波动，稍后再试"
+    bind:retry="onRetry"
+    bind:feedback="onFeedback"
+    skeletonType="grid"
+    skeletonCount="{{4}}"
+  />
+
+  <view wx:if="{{!loading && !error}}">
+    <view class="dashboard-card clay-card">
+      <view class="dashboard-header">
+        <view class="date-badge">
+          <text class="date-text">{{todayDate}}</text>
+        </view>
+        <view class="streak-chip">
+          <image class="streak-icon" src="/images/icons/review/flame.svg" mode="aspectFit" />
+          <text>{{dashboard.streakDays || 0}} 天</text>
         </view>
       </view>
-      <view class="hero-stats">
-        <view class="hero-stat-item">
-          <text class="h-stat-num">{{todaySummary.newCards || 0}}</text>
-          <text class="h-stat-label">新卡片</text>
+      <view class="metric-grid">
+        <view class="metric-item">
+          <text class="metric-value">{{dashboard.dueCardCount || 0}}</text>
+          <text class="metric-label">到期卡片</text>
         </view>
-        <view class="h-divider"></view>
-        <view class="hero-stat-item">
-          <text class="h-stat-num">{{todaySummary.reviewedToday || 0}}</text>
-          <text class="h-stat-label">已完成</text>
+        <view class="metric-item">
+          <text class="metric-value">{{dashboard.dueQuizCount || 0}}</text>
+          <text class="metric-label">待测验</text>
+        </view>
+        <view class="metric-item">
+          <text class="metric-value">{{dashboard.wrongCount || 0}}</text>
+          <text class="metric-label">错题数</text>
+        </view>
+        <view class="metric-item">
+          <text class="metric-value">{{dashboard.etaMinutes || 0}}</text>
+          <text class="metric-label">预计分钟</text>
         </view>
       </view>
-    </view>
-    <view class="hero-actions" wx:if="{{!loading && currentCourse}}">
-      <button class="hero-btn primary" bindtap="startReview">
-        <text>开启今日背卡</text>
-        <image class="btn-icon" src="/images/icons/review/book.svg" mode="aspectFit" />
+      <button class="cta-btn {{highlightStart ? 'highlight' : ''}}" bindtap="startPrimaryCta">
+        {{primaryCtaText}}
       </button>
-      <button class="hero-btn secondary" bindtap="startQuiz">
-        <text>来挑战刷题</text>
-        <image class="btn-icon" src="/images/icons/review/quiz.svg" mode="aspectFit" />
+      <button class="cta-btn ghost" wx:if="{{resumeSession}}" bindtap="continueSession">
+        继续上次复习
+      </button>
+      <button class="cta-btn subtle" wx:if="{{dashboard.wrongCount > 0}}" bindtap="startWrongQuiz">
+        错题强化
       </button>
     </view>
-    <view class="loading-state" wx:if="{{loading}}">
-      <text class="loading-text">正在加载学习数据...</text>
-    </view>
-  </view>
-  <!-- 连续学习 -->
-  <!-- Streak Heatmap Section -->
-  <view class="streak-section clay-card-sm" wx:if="{{!loading}}" bindtap="navigateToLeaderboard">
-    <view class="streak-header">
-      <view class="streak-title-group">
-        <image class="streak-flame-icon" src="/images/icons/review/flame.svg" mode="aspectFit" />
-        <text class="streak-days">{{streakInfo.currentStreak || 0}}</text>
-        <text class="streak-label">天连续学习</text>
+
+    <view class="course-section" wx:if="{{currentCourse}}">
+      <view class="section-title">当前学习课程</view>
+      <view class="course-card clay-card-sm" bindtap="navigateToCourse" data-course-key="{{currentCourse.courseKey}}">
+        <view class="course-summary">
+          <text class="course-name">{{currentCourse.title}}</text>
+          <text class="course-progress">已完成 {{currentCourse.progressPercent}}%</text>
+        </view>
+        <view class="course-action">
+          <text>继续学习</text>
+        </view>
       </view>
-      <text class="streak-sub">连续打卡中，保持火力！</text>
     </view>
-    <view class="heatmap-grid" wx:if="{{heatmapData.length > 0}}">
-      <block wx:for="{{heatmapData}}" wx:key="index">
-        <view class="heatmap-cell level-{{item.level}}"></view>
-      </block>
-    </view>
-  </view>
-  <!-- 课程列表 -->
-  <view class="courses-section">
-    <text class="section-heading">我的课程</text>
-    <block wx:if="{{!loading && courses.length > 0}}">
-      <view class="course-list">
-        <view class="course-card clay-card-sm" wx:for="{{courses}}" wx:key="id" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
-          <view class="course-icon-placeholder">{{item.title[0]}}</view>
-          <view class="course-details">
+
+    <view class="empty-wrap" wx:if="{{!currentCourse}}">
+      <state-view
+        status="empty"
+        emptyText="还没有加入课程，先从推荐课程开始"
+        actionText="浏览推荐课程"
+        bind:action="goToFirstRecommended"
+      />
+      <view class="recommend-list" wx:if="{{recommendedCourses.length > 0}}">
+        <view class="section-title">推荐课程</view>
+        <view class="course-card clay-card-sm" wx:for="{{recommendedCourses}}" wx:key="id" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
+          <view class="course-summary">
             <text class="course-name">{{item.title}}</text>
-            <view class="course-tags">
-              <text class="mini-tag">{{item.totalCards || 0}} 卡片</text>
-            </view>
+            <text class="course-progress">{{item.totalCards || 0}} 卡片</text>
           </view>
-          <view class="course-enter-btn">
-            <text>进入</text>
+          <view class="course-action">
+            <text>去学习</text>
           </view>
         </view>
       </view>
-    </block>
-    <!-- Empty State -->
-    <block wx:if="{{!loading && courses.length === 0}}">
-      <view class="empty-state">
-        <text class="empty-text">课程库空空如也，来探索第一门课吧</text>
-        <block wx:if="{{recommendedCourses.length > 0}}">
-          <view class="recommend-divider">
-            <text>为您推荐</text>
-          </view>
-          <view class="course-list">
-            <block wx:for="{{recommendedCourses}}" wx:key="id">
-              <view class="course-card clay-card-sm" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
-                <view class="course-icon-placeholder">{{item.title[0]}}</view>
-                <view class="course-details">
-                  <text class="course-name">{{item.title}}</text>
-                  <text class="mini-tag">热门推荐</text>
-                </view>
-                <view class="course-enter-btn">去学习</view>
-              </view>
-            </block>
-          </view>
+    </view>
+
+    <view class="heatmap-section" wx:if="{{heatmapData.length > 0}}">
+      <view class="section-title">过去 35 天</view>
+      <view class="heatmap-grid">
+        <block wx:for="{{heatmapData}}" wx:key="date">
+          <view class="heatmap-cell level-{{item.level}}" data-date="{{item.date}}" bindtap="onHeatmapTap"></view>
         </block>
       </view>
-    </block>
+      <text class="heatmap-hint">点击任意一天查看记录</text>
+    </view>
   </view>
 </view>

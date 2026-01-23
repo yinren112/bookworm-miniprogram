@@ -26,6 +26,18 @@
     </view>
     <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
   </view>
+  <view class="menu-card card reminder-card">
+    <view class="menu-item reminder-item">
+      <view class="menu-content">
+        <text class="menu-text">复习提醒设置</text>
+        <text class="menu-sub">{{reminderStatusText}}</text>
+        <text class="menu-sub" wx:if="{{nextSendAtText}}">下次提醒 {{nextSendAtText}}</text>
+      </view>
+      <button class="reminder-btn" bindtap="onReminderSubscribe" loading="{{reminderLoading}}">
+        {{reminderStatus === 'ACCEPT' ? '重新授权' : '开启提醒'}}
+      </button>
+    </view>
+  </view>
   <!-- Staff Operations Section - Only visible for STAFF role -->
   <view wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
     <view class="section-title">

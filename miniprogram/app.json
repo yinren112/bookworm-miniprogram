@@ -35,13 +35,14 @@
         "pages/quiz/index",
         "pages/cheatsheet/index",
         "pages/leaderboard/index",
-        "pages/session-complete/index"
+        "pages/session-complete/index",
+        "pages/activity-history/index"
       ]
     }
   ],
   "preloadRule": {
     "pages/review/index": {
-      "network": "wifi",
+      "network": "all",
       "packages": ["review"]
     }
   },

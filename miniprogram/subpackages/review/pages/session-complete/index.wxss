@@ -70,6 +70,22 @@
   text-align: center;
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.stat-item {
+  background: rgba(44, 95, 45, 0.06);
+  border-radius: 18rpx;
+  padding: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
 .stat-row {
   display: flex;
   align-items: center;
@@ -138,12 +154,6 @@
   color: #FF9800;
 }
 
-.streak-label {
-  font-size: 24rpx;
-  color: #8FA396;
-  margin-top: 4rpx;
-}
-
 .streak-best {
   font-size: 24rpx;
   color: #B8C4BC;
@@ -158,7 +168,7 @@
   max-width: 600rpx;
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: 18rpx;
   animation: fadeInUp 0.6s ease-out 0.3s both;
 }
 
@@ -197,11 +207,32 @@
   background: #F5F7F5;
 }
 
-.btn-hint {
+.action-btn.ghost {
+  background: #fff7ed;
+  color: #b45309;
+  border: none;
+}
+
+.subscribe-tip {
   font-size: 22rpx;
-  font-weight: 400;
-  opacity: 0.8;
-  margin-top: 4rpx;
+  color: #8FA396;
+  text-align: center;
+}
+
+.shortcut-actions {
+  width: 100%;
+  max-width: 600rpx;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+.shortcut-btn {
+  background: #fff7ed;
+  color: #b45309;
+  border-radius: 999rpx;
+  padding: 10rpx 28rpx;
+  font-size: 24rpx;
 }
 
 /* Clay Card */

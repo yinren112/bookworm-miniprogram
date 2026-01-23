@@ -44,6 +44,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
 }
 
 .progress-text {
@@ -55,6 +57,11 @@
   font-size: 26rpx;
   color: var(--color-primary, #2c5f2d);
   font-weight: 600;
+}
+
+.eta-text {
+  font-size: 24rpx;
+  color: #7a8f83;
 }
 
 /* 题目卡片 */

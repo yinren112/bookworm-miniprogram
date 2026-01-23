@@ -2,6 +2,7 @@
   "navigationBarTitleText": "卡片复习",
   "usingComponents": {
     "report-issue": "../../components/report-issue/index",
-    "mp-html": "/components/mp-html/index"
+    "mp-html": "/components/mp-html/index",
+    "state-view": "/components/state-view/state-view"
   }
 }

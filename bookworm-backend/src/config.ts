@@ -58,6 +58,7 @@ const schema = Type.Object({
   CRON_INVENTORY_METRICS: Type.String({ default: "*/5 * * * *" }),
   CRON_WECHAT_CERT_REFRESH: Type.String({ default: "0 */10 * * *" }),
   CRON_REFUND_PROCESSOR: Type.String({ default: "*/10 * * * *" }),
+  CRON_STUDY_REMINDER: Type.String({ default: "0 9 * * *" }),
   // Weekly reset: Monday 00:00 Beijing time (UTC+8) = Sunday 16:00 UTC
   CRON_WEEKLY_POINTS_RESET: Type.String({ default: "0 16 * * 0" }),
 

@@ -40,6 +40,10 @@ import {
   getUserRank,
   // Phase 5.5: Activity History (Heatmap)
   getActivityHistory,
+  // Phase 5.6: Dashboard & Reminders
+  getStudyDashboard,
+  upsertStudyReminderSubscription,
+  getStudyReminderStatus,
   // Phase 6: Course Import
   importCoursePackage,
   listCourseVersions,
@@ -60,6 +64,9 @@ import {
   UpdateExamDateBody,
   TodayQueueQuerySchema,
   TodayQueueQuery,
+  StudyDashboardQuerySchema,
+  StudyDashboardQuery,
+  StudyDashboardResponseSchema,
   StartSessionBodySchema,
   StartSessionBody,
   CardAnswerParamsSchema,
@@ -90,6 +97,12 @@ import {
   StarItemBody,
   StarredItemsQuerySchema,
   StarredItemsQuery,
+  ReminderSubscribeBodySchema,
+  ReminderSubscribeBody,
+  ReminderSubscribeResponseSchema,
+  ReminderStatusQuerySchema,
+  ReminderStatusQuery,
+  ReminderStatusResponseSchema,
   // Phase 5 schemas
   LeaderboardQuerySchema,
   LeaderboardQuery,
@@ -355,6 +368,40 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const summary = await getTodayQueueSummary(prisma, userId, course.id);
 
       reply.send({ summary });
+    },
+  );
+
+  // GET /api/study/dashboard - 获取复习首页聚合数据
+  fastify.get<{ Querystring: StudyDashboardQuery }>(
+    "/api/study/dashboard",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        querystring: StudyDashboardQuerySchema,
+        response: {
+          200: StudyDashboardResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { courseKey } = request.query;
+
+      const dashboard = await getStudyDashboard(prisma, userId, courseKey);
+
+      if (courseKey && !dashboard.currentCourse) {
+        throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
+      }
+
+      reply.send({
+        ...dashboard,
+        resumeSession: dashboard.resumeSession
+          ? {
+              ...dashboard.resumeSession,
+              updatedAt: new Date(dashboard.resumeSession.updatedAt).toISOString(),
+            }
+          : null,
+      });
     },
   );
 
@@ -846,6 +893,70 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
           questionId: item.questionId,
         })),
         total: result.total,
+      });
+    },
+  );
+
+  // ============================================
+  // 复习提醒订阅端点
+  // ============================================
+
+  // POST /api/study/reminders/subscribe - 订阅或拒绝提醒
+  fastify.post<{ Body: ReminderSubscribeBody }>(
+    "/api/study/reminders/subscribe",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        body: ReminderSubscribeBodySchema,
+        response: {
+          200: ReminderSubscribeResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { templateId, result, timezone } = request.body;
+
+      const subscription = await upsertStudyReminderSubscription(
+        prisma,
+        userId,
+        templateId,
+        result,
+        timezone,
+      );
+
+      reply.send({
+        status: subscription.status,
+        nextSendAt: subscription.nextSendAt
+          ? subscription.nextSendAt.toISOString()
+          : null,
+      });
+    },
+  );
+
+  // GET /api/study/reminders/status - 获取提醒订阅状态
+  fastify.get<{ Querystring: ReminderStatusQuery }>(
+    "/api/study/reminders/status",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        querystring: ReminderStatusQuerySchema,
+        response: {
+          200: ReminderStatusResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { templateId } = request.query;
+
+      const status = await getStudyReminderStatus(prisma, userId, templateId);
+
+      reply.send({
+        status: status.status,
+        templateId: status.templateId,
+        lastSentAt: status.lastSentAt ? status.lastSentAt.toISOString() : null,
+        nextSendAt: status.nextSendAt ? status.nextSendAt.toISOString() : null,
       });
     },
   );

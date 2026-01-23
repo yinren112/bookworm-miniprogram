@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "复习中心",
+  "navigationBarTitleText": "学习记录",
   "usingComponents": {
     "state-view": "/components/state-view/state-view"
   }

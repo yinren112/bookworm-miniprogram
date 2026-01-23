@@ -1,0 +1,22 @@
+<!-- components/state-view/state-view.wxml -->
+<view class="state-view" wx:if="{{status === 'loading'}}">
+  <skeleton type="{{skeletonType}}" count="{{skeletonCount}}" />
+  <text class="state-text" wx:if="{{loadingText}}">{{loadingText}}</text>
+</view>
+
+<view class="state-view" wx:elif="{{status === 'empty'}}">
+  <text class="state-title">暂无内容</text>
+  <text class="state-text">{{emptyText}}</text>
+  <button class="state-btn" wx:if="{{actionText}}" bindtap="onAction">
+    {{actionText}}
+  </button>
+</view>
+
+<view class="state-view" wx:elif="{{status === 'error'}}">
+  <text class="state-title">出现问题</text>
+  <text class="state-text">{{errorText}}</text>
+  <view class="state-actions">
+    <button class="state-btn" wx:if="{{showRetry}}" bindtap="onRetry">重试</button>
+    <button class="state-btn ghost" wx:if="{{showFeedback}}" bindtap="onFeedback">反馈</button>
+  </view>
+</view>

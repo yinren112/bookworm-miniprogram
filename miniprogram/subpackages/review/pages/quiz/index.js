@@ -2,11 +2,15 @@
 // 刷题闯关页
 
 const { startQuiz, submitQuizAnswer, starItem, unstarItem, getStarredItems } = require("../../utils/study-api");
+const { getResumeSession, saveResumeSession, clearResumeSession, setLastSessionType } = require("../../utils/study-session");
 const logger = require("../../../../utils/logger");
+const { track } = require("../../../../utils/track");
 
 Page({
   data: {
     loading: true,
+    error: false,
+    empty: false,
     submitting: false, // 防重复提交
     courseKey: "",
     unitId: null,
@@ -24,11 +28,12 @@ Page({
     optionStates: [], // 每个选项的渲染状态 { isCorrect, isWrong, isSelected }
     answeredCount: 0,
     correctCount: 0,
-    completed: false,
     progressPercent: 0,
+    remainingMinutes: 0,
     startTime: 0,
     isStarred: false, // Local Star State
     starredItems: {}, // Local cache
+    nextType: "",
     // 常量
     questionTypeLabels: {
       SINGLE_CHOICE: "单选题",
@@ -38,22 +43,33 @@ Page({
     },
     optionLabels: ["A", "B", "C", "D", "E", "F"],
     showReportModal: false,
+    questionTypeClass: "",
+    accuracyPercent: 0,
   },
 
   onLoad(options) {
-    this.sessionStartTime = Date.now(); // Global session timer
+    this.sessionStartTime = Date.now();
+    this.elapsedOffset = 0;
     this.fatigueWarned = false;
-    
-    const { courseKey, unitId, wrongItemsOnly } = options;
+    this.abortTracked = false;
+
+    const { courseKey, unitId, wrongItemsOnly, resume, nextType } = options || {};
     if (courseKey) {
+      const decodedCourseKey = decodeURIComponent(courseKey);
       this.setData({
-        courseKey: decodeURIComponent(courseKey),
+        courseKey: decodedCourseKey,
         unitId: unitId ? parseInt(unitId, 10) : null,
         wrongItemsOnly: wrongItemsOnly === "true",
+        nextType: nextType || "",
       });
+
+      if (resume === "1" && this.tryResumeSession(decodedCourseKey)) {
+        return;
+      }
+
       this.loadQuiz();
     } else {
-      this.setData({ loading: false });
+      this.setData({ loading: false, error: true });
       wx.showToast({
         title: "缺少课程参数",
         icon: "none",
@@ -61,8 +77,56 @@ Page({
     }
   },
 
+  tryResumeSession(courseKey) {
+    const session = getResumeSession();
+    if (!session || session.type !== "quiz" || session.courseKey !== courseKey) {
+      return false;
+    }
+    const questions = session.questions || [];
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return false;
+    }
+
+    this._questions = questions;
+    const currentIndex = Math.min(session.currentIndex || 0, questions.length - 1);
+    const currentQuestion = questions[currentIndex];
+    this.elapsedOffset = session.elapsedSeconds || 0;
+    const accuracyPercent = calcAccuracy(
+      session.correctCount || 0,
+      session.answeredCount || 0,
+    );
+
+    this.setData({
+      sessionId: session.sessionId || "",
+      questionsLength: session.questionsLength || questions.length,
+      currentIndex,
+      currentQuestion,
+      starredItems: session.starredItems || {},
+      isStarred: (session.starredItems || {})[currentQuestion.id] || false,
+      selectedAnswers: [],
+      fillAnswer: "",
+      showResult: false,
+      answeredCount: session.answeredCount || 0,
+      correctCount: session.correctCount || 0,
+      loading: false,
+      error: false,
+      empty: false,
+      progressPercent: 0,
+      startTime: Date.now(),
+      correctIndices: [],
+      correctAnswerText: "",
+      optionStates: buildOptionStates(currentQuestion?.options || [], [], []),
+      questionTypeClass: getQuestionTypeClass(currentQuestion),
+      accuracyPercent,
+    });
+
+    this.updateProgress(currentIndex);
+    track("session_start", { type: "quiz", resume: true, entry: "resume" });
+    return true;
+  },
+
   async loadQuiz() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, error: false, empty: false });
 
     try {
       const options = {};
@@ -74,9 +138,11 @@ Page({
 
       if (!questions || questions.length === 0) {
         this._questions = [];
+        clearResumeSession();
         this.setData({
           loading: false,
           questionsLength: 0,
+          empty: true,
         });
         return;
       }
@@ -92,7 +158,6 @@ Page({
         logger.error("Failed to load starred items:", err);
       }
 
-      // 存入实例字段，避免大数组 setData
       this._questions = questions;
 
       this.setData({
@@ -107,21 +172,22 @@ Page({
         showResult: false,
         answeredCount: 0,
         correctCount: 0,
-        completed: false,
         loading: false,
         progressPercent: 0,
-        startTime: Date.now(), // Question timer
+        startTime: Date.now(),
         correctIndices: [],
         correctAnswerText: "",
         optionStates: buildOptionStates(questions[0]?.options || [], [], []),
+        questionTypeClass: getQuestionTypeClass(questions[0]),
+        accuracyPercent: 0,
       });
+
+      this.updateProgress(0);
+      this.saveSnapshot();
+      track("session_start", { type: "quiz", resume: false, entry: "direct" });
     } catch (err) {
       logger.error("Failed to start quiz:", err);
-      this.setData({ loading: false });
-      wx.showToast({
-        title: "加载失败",
-        icon: "none",
-      });
+      this.setData({ loading: false, error: true });
     }
   },
 
@@ -274,6 +340,8 @@ Page({
 
       const newCorrectCount =
         this.data.correctCount + (result.isCorrect ? 1 : 0);
+      const answeredCount = this.data.answeredCount + 1;
+      const accuracyPercent = calcAccuracy(newCorrectCount, answeredCount);
       const optionStates = buildOptionStates(
         currentQuestion.options || [],
         correctIndices,
@@ -286,8 +354,9 @@ Page({
         correctIndices,
         correctAnswerText,
         optionStates,
-        answeredCount: this.data.answeredCount + 1,
+        answeredCount,
         correctCount: newCorrectCount,
+        accuracyPercent,
       });
 
       // 触觉反馈
@@ -309,16 +378,33 @@ Page({
     const nextIndex = currentIndex + 1;
 
     if (nextIndex >= questions.length) {
-      // 完成所有题目
-      this.setData({
-        completed: true,
-        progressPercent: 100,
+      const durationSeconds = this.getElapsedSeconds();
+      const wrongCount = Math.max(0, questions.length - this.data.correctCount);
+
+      clearResumeSession();
+      setLastSessionType("quiz");
+      track("session_complete", {
+        type: "quiz",
+        count: questions.length,
+        durationSeconds,
+        correctCount: this.data.correctCount,
       });
-      
-      // Completion Haptic
-       wx.vibrateShort({ type: 'heavy' });
-       setTimeout(() => wx.vibrateShort({ type: 'medium' }), 150);
-       
+
+      const params = [
+        `mode=quiz`,
+        `count=${questions.length}`,
+        `duration=${durationSeconds}`,
+        `correct=${this.data.correctCount}`,
+        `wrong=${wrongCount}`,
+        `courseKey=${encodeURIComponent(this.data.courseKey)}`
+      ];
+      if (this.data.nextType) {
+        params.push(`nextType=${this.data.nextType}`);
+      }
+
+      wx.redirectTo({
+        url: `/subpackages/review/pages/session-complete/index?${params.join("&")}`,
+      });
       return;
     }
 
@@ -326,7 +412,7 @@ Page({
     this.setData({
       currentIndex: nextIndex,
       currentQuestion: nextQ,
-      isStarred: this.data.starredItems[nextQ.id] || false, 
+      isStarred: this.data.starredItems[nextQ.id] || false,
       selectedAnswers: [],
       fillAnswer: "",
       showResult: false,
@@ -336,7 +422,11 @@ Page({
       optionStates: buildOptionStates(nextQ?.options || [], [], []),
       progressPercent: Math.round((nextIndex / this.data.questionsLength) * 100),
       startTime: Date.now(),
+      questionTypeClass: getQuestionTypeClass(nextQ),
     });
+
+    this.updateProgress(nextIndex);
+    this.saveSnapshot();
   },
 
   retryQuiz() {
@@ -349,6 +439,7 @@ Page({
   },
 
   goBack() {
+    this.trackAbort("back");
     const pages = getCurrentPages();
     if (pages.length > 1) {
       wx.navigateBack();
@@ -372,6 +463,62 @@ Page({
     // 反馈提交成功后的回调
   },
 
+  onHide() {
+    this.trackAbort("hide");
+  },
+
+  onFeedback() {
+    wx.navigateTo({
+      url: "/pages/customer-service/index",
+    });
+  },
+
+  updateProgress(currentIndex) {
+    const total = this.data.questionsLength || 0;
+    const remaining = Math.max(0, total - currentIndex);
+    const remainingMinutes = Math.ceil((remaining * 30) / 60);
+    this.setData({
+      progressPercent: total > 0 ? Math.round((currentIndex / total) * 100) : 0,
+      remainingMinutes,
+    });
+  },
+
+  saveSnapshot() {
+    if (!this.data.sessionId) return;
+    saveResumeSession({
+      type: "quiz",
+      courseKey: this.data.courseKey,
+      unitId: this.data.unitId,
+      sessionId: this.data.sessionId,
+      questions: this._questions,
+      questionsLength: this.data.questionsLength,
+      currentIndex: this.data.currentIndex,
+      starredItems: this.data.starredItems,
+      answeredCount: this.data.answeredCount,
+      correctCount: this.data.correctCount,
+      wrongItemsOnly: this.data.wrongItemsOnly,
+      elapsedSeconds: this.getElapsedSeconds(),
+    });
+  },
+
+  getElapsedSeconds() {
+    return this.elapsedOffset + Math.floor((Date.now() - this.sessionStartTime) / 1000);
+  },
+
+  trackAbort(reason) {
+    if (this.abortTracked || !this.data.sessionId) return;
+    this.abortTracked = true;
+    this.saveSnapshot();
+    track("session_abort", {
+      type: "quiz",
+      reason,
+    });
+  },
+
+  onUnload() {
+    this.trackAbort("close");
+  },
+
   onShareAppMessage() {
     return {
       title: "一起来刷题吧",
@@ -381,11 +528,6 @@ Page({
 });
 
 function getCorrectIndices(question, correctAnswer) {
-  // ... (Helper functions preserved, truncated for brevity in thought but included in Output?)
-  // Yes, I must include helper functions.
-  // I will check if I need to copy them or if I can omit them if they are unchanged?
-  // write_to_file Replaces the file. I MUST include them.
-  // I will copy them from the previous view_file.
   if (
     !question ||
     !question.options ||
@@ -529,4 +671,15 @@ function buildQuestionStarredMap(items) {
     }
     return acc;
   }, {});
+}
+
+function getQuestionTypeClass(question) {
+  return question && question.questionType
+    ? String(question.questionType).toLowerCase()
+    : "";
+}
+
+function calcAccuracy(correctCount, answeredCount) {
+  if (!answeredCount) return 0;
+  return Math.round((correctCount / answeredCount) * 100);
 }

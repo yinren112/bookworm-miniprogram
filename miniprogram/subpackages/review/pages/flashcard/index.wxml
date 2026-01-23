@@ -2,15 +2,29 @@
 <!-- 卡片复习页 -->
 <wxs src="../../utils/swipe-gesture.wxs" module="gesture" />
 <view class="container">
+  <state-view
+    wx:if="{{loading || error || empty}}"
+    status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}"
+    loadingText="正在加载知识卡片..."
+    emptyText="今天的卡片都复习完了，休息一下吧"
+    errorText="加载失败，请重试"
+    actionText="返回首页"
+    bind:action="goBack"
+    bind:retry="loadSession"
+    bind:feedback="onFeedback"
+  />
   <!-- 进度条 -->
-  <view class="progress-bar">
-    <view class="progress-fill" style="width: {{progressPercent}}%"></view>
-  </view>
-  <view class="progress-text">
-    <text>{{currentIndex + 1}} / {{cardsLength}}</text>
+  <view class="progress-header" wx:if="{{!loading && !error && !empty}}">
+    <view class="progress-bar">
+      <view class="progress-fill" style="width: {{progressPercent}}%"></view>
+    </view>
+    <view class="progress-text">
+      <text>{{currentIndex + 1}} / {{cardsLength}}</text>
+      <text class="progress-eta" wx:if="{{remainingMinutes > 0}}">剩余约 {{remainingMinutes}} 分钟</text>
+    </view>
   </view>
   <!-- 卡片区域 -->
-  <view class="card-wrapper" wx:if="{{!loading && currentCard}}">
+  <view class="card-wrapper" wx:if="{{!loading && !error && !empty && currentCard}}">
     <!-- Star Button (Pinned to wrapper) -->
     <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
       <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
@@ -51,7 +65,7 @@
   </view>
   <!-- 反馈按钮 -->
   <!-- 反馈按钮 (Bottom Golden Zone) -->
-  <view class="feedback-zone" wx:if="{{!loading && currentCard && isFlipped}}">
+  <view class="feedback-zone" wx:if="{{!loading && !error && !empty && currentCard && isFlipped}}">
     <view class="feedback-buttons">
       <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
         <image class="btn-icon" src="/images/icons/review/forgot.svg" mode="aspectFit" />
@@ -72,33 +86,14 @@
     </view>
   </view>
   <!-- 翻转提示 -->
-  <view class="flip-hint" wx:if="{{!loading && currentCard && !isFlipped}}">
+  <view class="flip-hint" wx:if="{{!loading && !error && !empty && currentCard && !isFlipped}}">
     <text>点击卡片查看答案</text>
   </view>
   <!-- 纠错按钮 -->
-  <view class="report-btn-wrapper" wx:if="{{!loading && currentCard}}">
+  <view class="report-btn-wrapper" wx:if="{{!loading && !error && !empty && currentCard}}">
     <view class="report-btn" bindtap="openReportModal">
       <text>发现问题？帮我们改进</text>
     </view>
-  </view>
-  <!-- 加载状态 -->
-  <view class="loading-state" wx:if="{{loading}}">
-    <text class="loading-text">正在加载知识卡片...</text>
-  </view>
-  <!-- 完成状态 -->
-  <view class="complete-state" wx:if="{{!loading && completed}}">
-    <image class="complete-icon" src="/images/icons/review/celebration.svg" mode="aspectFit" />
-    <text class="complete-title">太棒了!</text>
-    <text class="complete-desc">这一轮你完成了！</text>
-    <view class="complete-stats">
-      <text>攻克了 {{cardsLength}} 张卡片</text>
-    </view>
-    <button class="back-btn" bindtap="goBack">返回课程</button>
-  </view>
-  <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{!loading && !completed && cardsLength === 0}}">
-    <text class="empty-text">今天的卡片都复习完了，休息一下吧</text>
-    <button class="back-btn" bindtap="goBack">返回课程</button>
   </view>
   <!-- 纠错弹窗 -->
   <report-issue visible="{{showReportModal}}" courseKey="{{courseKey}}" cardId="{{currentCard.id}}" bind:close="closeReportModal" bind:success="onReportSuccess" />

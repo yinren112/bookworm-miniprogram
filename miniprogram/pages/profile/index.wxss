@@ -119,6 +119,33 @@
   color: var(--clay-text-main);
 }
 
+.menu-sub {
+  font-size: 22rpx;
+  color: var(--clay-text-light);
+  margin-top: 6rpx;
+}
+
+.reminder-card .menu-item::after {
+  display: none;
+}
+
+.reminder-item {
+  align-items: flex-start;
+}
+
+.reminder-btn {
+  background: #2c5f2d;
+  color: #ffffff;
+  font-size: 24rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  border: none;
+}
+
+.reminder-btn[disabled] {
+  opacity: 0.6;
+}
+
 /* Arrow Icon */
 .menu-arrow {
   width: 32rpx;

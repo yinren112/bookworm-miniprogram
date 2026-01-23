@@ -1,0 +1,55 @@
+/* subpackages/review/pages/activity-history/index.wxss */
+.page {
+  min-height: 100vh;
+  background: #f3fbf6;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.history-list {
+  max-height: 100vh;
+}
+
+.history-item {
+  background: #ffffff;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  margin-bottom: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8rpx 16rpx rgba(44, 95, 45, 0.06);
+}
+
+.history-item.active {
+  border: 2rpx solid #2c5f2d;
+}
+
+.history-date {
+  font-size: 26rpx;
+  color: #2c3e35;
+}
+
+.history-count {
+  font-size: 24rpx;
+  color: #7a8f83;
+}
+
+.history-level {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 6rpx;
+  background: #e8f5e9;
+}
+
+.history-level.level-1 {
+  background: #b7e4c7;
+}
+
+.history-level.level-2 {
+  background: #74c69d;
+}
+
+.history-level.level-3 {
+  background: #40916c;
+}
