@@ -5,18 +5,7 @@
     <text class="greeting-text">你好，同学</text>
     <text class="greeting-sub">今天也要稳稳推进复习节奏</text>
   </view>
-
-  <state-view
-    wx:if="{{loading || error}}"
-    status="{{loading ? 'loading' : 'error'}}"
-    loadingText="正在加载复习看板..."
-    errorText="网络波动，稍后再试"
-    bind:retry="onRetry"
-    bind:feedback="onFeedback"
-    skeletonType="grid"
-    skeletonCount="{{4}}"
-  />
-
+  <state-view wx:if="{{loading || error}}" status="{{loading ? 'loading' : 'error'}}" loadingText="正在加载复习看板..." errorText="网络波动，稍后再试" bind:retry="onRetry" bind:feedback="onFeedback" skeletonType="grid" skeletonCount="{{4}}" />
   <view wx:if="{{!loading && !error}}">
     <view class="dashboard-card clay-card">
       <view class="dashboard-header">
@@ -56,7 +45,6 @@
         错题强化
       </button>
     </view>
-
     <view class="course-section" wx:if="{{currentCourse}}">
       <view class="section-title">当前学习课程</view>
       <view class="course-card clay-card-sm" bindtap="navigateToCourse" data-course-key="{{currentCourse.courseKey}}">
@@ -69,14 +57,8 @@
         </view>
       </view>
     </view>
-
     <view class="empty-wrap" wx:if="{{!currentCourse}}">
-      <state-view
-        status="empty"
-        emptyText="还没有加入课程，先从推荐课程开始"
-        actionText="浏览推荐课程"
-        bind:action="goToFirstRecommended"
-      />
+      <state-view status="empty" emptyText="还没有加入课程，先从推荐课程开始" actionText="浏览推荐课程" bind:action="goToFirstRecommended" />
       <view class="recommend-list" wx:if="{{recommendedCourses.length > 0}}">
         <view class="section-title">推荐课程</view>
         <view class="course-card clay-card-sm" wx:for="{{recommendedCourses}}" wx:key="id" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
@@ -90,7 +72,6 @@
         </view>
       </view>
     </view>
-
     <view class="heatmap-section" wx:if="{{heatmapData.length > 0}}">
       <view class="section-title">过去 35 天</view>
       <view class="heatmap-grid">
