@@ -5,7 +5,9 @@ import { Prisma, PrismaClient, FeedbackRating } from "@prisma/client";
 import {
   cardSelectPublic,
   cardCourseIdView,
+  cardStateWithCardInclude,
   cardStateScheduleView,
+  enrollmentSelectPublic,
 } from "../../db/views";
 import { recordActivity } from "./streakService";
 import { getBeijingTodayStart, getBeijingDateStart } from "../../utils/timezone";
@@ -248,12 +250,7 @@ export async function startCardSession(
         { todayShownCount: { lt: MAX_DAILY_ATTEMPTS } },
       ],
     },
-    // eslint-disable-next-line local-rules/no-prisma-raw-select -- nested card select
-    select: {
-      cardId: true,
-      boxLevel: true,
-      card: { select: cardSelectPublic },
-    },
+    include: cardStateWithCardInclude,
     orderBy: { nextDueAt: "asc" },
     take: limit,
   });
@@ -336,10 +333,9 @@ export async function submitCardFeedback(
       throw new Error("CARD_NOT_FOUND");
     }
 
-    // eslint-disable-next-line local-rules/no-prisma-raw-select -- simple single-field select
     const enrollment = await tx.userCourseEnrollment.findUnique({
       where: { userId_courseId: { userId, courseId: card.courseId } },
-      select: { examDate: true },
+      select: enrollmentSelectPublic,
     });
 
     const examDate = enrollment?.examDate ?? null;

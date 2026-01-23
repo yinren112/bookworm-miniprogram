@@ -37,7 +37,8 @@ const OrderListQuerySchema = Type.Object({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const presentOrderAmount = (order: any) => {
-  const { web_staff_id: _webStaffId, ...rest } = order;
+  const rest = { ...order };
+  delete rest.web_staff_id;
   return {
     ...rest,
     total_amount: formatCentsToYuanString(order.total_amount),

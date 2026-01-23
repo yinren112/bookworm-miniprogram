@@ -2,16 +2,17 @@
 import { Prisma, PrismaClient, CourseStatus } from "@prisma/client";
 import {
   courseSelectPublic,
-  unitSelectPublic,
+  unitWithCountsView,
   courseIdStatusView,
-  enrollmentLastStudiedView,
+  enrollmentCourseProgressView,
   enrollmentSelectPublic,
+  enrollmentWithCourseView,
 } from "../../db/views";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
 // 重新导出供其他模块使用
-export { courseSelectPublic, unitSelectPublic };
+export { courseSelectPublic };
 
 // ============================================
 // 类型定义
@@ -65,21 +66,21 @@ export async function getCourseList(
 ): Promise<CourseListItem[]> {
   const { publishedOnly = true, userId } = options;
 
-  /* eslint-disable local-rules/no-prisma-raw-select -- complex query with dynamic enrollment select */
   const courses = await dbCtx.studyCourse.findMany({
     where: publishedOnly ? { status: CourseStatus.PUBLISHED } : undefined,
-    select: {
-      ...courseSelectPublic,
-      enrollments: userId
-        ? {
-            where: { userId },
-            select: enrollmentLastStudiedView,
-          }
-        : false,
-    },
+    select: courseSelectPublic,
     orderBy: { updatedAt: "desc" },
   });
-  /* eslint-enable local-rules/no-prisma-raw-select */
+  const enrollments = userId
+    ? await dbCtx.userCourseEnrollment.findMany({
+        where: { userId },
+        select: enrollmentCourseProgressView,
+      })
+    : [];
+
+  const enrollmentByCourseId = new Map(
+    enrollments.map((enrollment) => [enrollment.courseId, enrollment.lastStudiedAt]),
+  );
 
   return courses.map((course) => ({
     id: course.id,
@@ -89,8 +90,8 @@ export async function getCourseList(
     totalCards: course.totalCards,
     totalQuestions: course.totalQuestions,
     status: course.status,
-    enrolled: userId ? course.enrollments.length > 0 : undefined,
-    lastStudiedAt: userId ? course.enrollments[0]?.lastStudiedAt : undefined,
+    enrolled: userId ? enrollmentByCourseId.has(course.id) : undefined,
+    lastStudiedAt: userId ? enrollmentByCourseId.get(course.id) ?? null : undefined,
   }));
 }
 
@@ -104,40 +105,29 @@ export async function getCourseByKey(
   options: { userId?: number; publishedOnly?: boolean; latestVersion?: boolean } = {},
 ): Promise<CourseDetail | null> {
   const { userId, publishedOnly = true, latestVersion = true } = options;
-  /* eslint-disable local-rules/no-prisma-raw-select -- complex nested query with _count */
   const course = await dbCtx.studyCourse.findFirst({
     where: {
       courseKey,
       ...(publishedOnly ? { status: CourseStatus.PUBLISHED } : {}),
     },
-    select: {
-      ...courseSelectPublic,
-      units: {
-        select: {
-          ...unitSelectPublic,
-          _count: {
-            select: {
-              cards: true,
-              questions: true,
-            },
-          },
-        },
-        orderBy: { orderIndex: "asc" },
-      },
-      enrollments: userId
-        ? {
-            where: { userId },
-            select: enrollmentSelectPublic,
-          }
-        : false,
-    },
+    select: courseSelectPublic,
     orderBy: latestVersion ? { contentVersion: "desc" } : undefined,
   });
-  /* eslint-enable local-rules/no-prisma-raw-select */
 
   if (!course) {
     return null;
   }
+  const units = await dbCtx.studyUnit.findMany({
+    where: { courseId: course.id },
+    select: unitWithCountsView,
+    orderBy: { orderIndex: "asc" },
+  });
+  const enrollment = userId
+    ? await dbCtx.userCourseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId: course.id } },
+        select: enrollmentSelectPublic,
+      })
+    : null;
 
   return {
     id: course.id,
@@ -147,7 +137,7 @@ export async function getCourseByKey(
     contentVersion: course.contentVersion,
     totalCards: course.totalCards,
     totalQuestions: course.totalQuestions,
-    units: course.units.map((unit) => ({
+    units: units.map((unit) => ({
       id: unit.id,
       unitKey: unit.unitKey,
       title: unit.title,
@@ -155,12 +145,12 @@ export async function getCourseByKey(
       cardCount: unit._count.cards,
       questionCount: unit._count.questions,
     })),
-    enrollment: userId && course.enrollments.length > 0
+    enrollment: enrollment
       ? {
-          enrolledAt: course.enrollments[0].enrolledAt,
-          lastStudiedAt: course.enrollments[0].lastStudiedAt,
-          completedCards: course.enrollments[0].completedCards,
-          examDate: course.enrollments[0].examDate,
+          enrolledAt: enrollment.enrolledAt,
+          lastStudiedAt: enrollment.lastStudiedAt,
+          completedCards: enrollment.completedCards,
+          examDate: enrollment.examDate,
         }
       : null,
   };
@@ -219,11 +209,10 @@ export async function updateEnrollmentExamDate(
   courseId: number,
   examDate: Date | null,
 ): Promise<Date | null> {
-  // eslint-disable-next-line local-rules/no-prisma-raw-select -- simple single-field select
   const enrollment = await dbCtx.userCourseEnrollment.update({
     where: { userId_courseId: { userId, courseId } },
     data: { examDate },
-    select: { examDate: true },
+    select: enrollmentSelectPublic,
   });
 
   return enrollment.examDate;
@@ -259,18 +248,11 @@ export async function getUserEnrolledCourses(
   dbCtx: DbCtx,
   userId: number,
 ): Promise<CourseListItem[]> {
-  /* eslint-disable local-rules/no-prisma-raw-select -- nested include with course select */
   const enrollments = await dbCtx.userCourseEnrollment.findMany({
     where: { userId },
-    select: {
-      lastStudiedAt: true,
-      course: {
-        select: courseSelectPublic,
-      },
-    },
+    select: enrollmentWithCourseView,
     orderBy: { lastStudiedAt: { sort: "desc", nulls: "last" } },
   });
-  /* eslint-enable local-rules/no-prisma-raw-select */
 
   return enrollments.map((enrollment) => ({
     id: enrollment.course.id,

@@ -99,6 +99,19 @@ export const unitBasicView = {
   unitKey: true,
 } as const satisfies Prisma.StudyUnitSelect;
 
+export const unitWithCountsView = {
+  id: true,
+  unitKey: true,
+  title: true,
+  orderIndex: true,
+  _count: {
+    select: {
+      cards: true,
+      questions: true,
+    },
+  },
+} as const satisfies Prisma.StudyUnitSelect;
+
 // ============================================
 // StudyCard 视图选择器
 // ============================================
@@ -248,6 +261,18 @@ export const enrollmentSelectPublic = {
 
 export const enrollmentCourseIdView = {
   courseId: true,
+} as const satisfies Prisma.UserCourseEnrollmentSelect;
+
+export const enrollmentCourseProgressView = {
+  courseId: true,
+  lastStudiedAt: true,
+} as const satisfies Prisma.UserCourseEnrollmentSelect;
+
+export const enrollmentWithCourseView = {
+  lastStudiedAt: true,
+  course: {
+    select: courseSelectPublic,
+  },
 } as const satisfies Prisma.UserCourseEnrollmentSelect;
 
 // ============================================

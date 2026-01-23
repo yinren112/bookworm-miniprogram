@@ -10,7 +10,6 @@ export {
   getUserEnrolledCourses,
   updateCourseTotals,
   courseSelectPublic,
-  unitSelectPublic,
   type CourseListItem,
   type CourseDetail,
   type UnitListItem,

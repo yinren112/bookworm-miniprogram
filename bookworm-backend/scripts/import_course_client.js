@@ -20,9 +20,9 @@
  *   node import_course_client.js --dry-run ./courses/CS101
  */
 
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
+let fs;
+let path;
+let axios;
 
 // Configuration
 const CONFIG = {
@@ -86,7 +86,7 @@ function parseCardsTsv(content, unitKey) {
         throw new Error(`[Unit: ${unitKey}] TSV missing required columns. Found: ${headers.join(', ')}`);
     }
 
-    return lines.slice(1).map((line, i) => {
+    return lines.slice(1).map((line, _index) => {
         if (!line.trim()) return null;
         const fields = line.split("\t");
         
@@ -100,7 +100,7 @@ function parseCardsTsv(content, unitKey) {
     }).filter(x => x);
 }
 
-function parseQuestionsGift(content, unitKey) {
+function parseQuestionsGift(content, _unitKey) {
     const questions = [];
     // Remove comments
     const cleanContent = content.split(/\r?\n/).filter(l => !l.trim().startsWith("//")).join("\n");
@@ -109,7 +109,7 @@ function parseQuestionsGift(content, unitKey) {
     
     let match;
     while ((match = pattern.exec(cleanContent)) !== null) {
-        const [_, id, stem, ansBlock] = match;
+        const [, id, stem, ansBlock] = match;
         const q = { contentId: id.trim(), stem: stem.trim(), difficulty: 1 };
         const upperAns = ansBlock.trim().toUpperCase();
 
@@ -150,6 +150,12 @@ function parseQuestionsGift(content, unitKey) {
 // ============================================
 
 async function main() {
+    const fsModule = await import("fs");
+    const pathModule = await import("path");
+    const axiosModule = await import("axios");
+    fs = fsModule;
+    path = pathModule;
+    axios = axiosModule.default ?? axiosModule;
     parseArgs();
     
     console.log(`📦 Packaging course from: ${path.resolve(CONFIG.sourceDir)}`);
