@@ -89,6 +89,7 @@ model User {
   questionAttempts  UserQuestionAttempt[]
   wrongItems        UserWrongItem[]
   studyStreak       UserStudyStreak?
+  dailyStudyActivities DailyStudyActivity[]
   studyFeedbacks    StudyFeedback[]
   reminderSubscriptions StudyReminderSubscription[]
   starredItems      UserStarredItem[]
@@ -515,8 +516,10 @@ model StudyCheatSheet {
   courseId  Int      @map("course_id")
   unitId    Int?     @map("unit_id") // 可选：关联到特定章节
   title     String   @db.VarChar(255)
-  assetType String   @db.VarChar(20) // "pdf" | "image"
-  url       String   @db.VarChar(500)
+  assetType String   @db.VarChar(20)
+  url       String?  @db.VarChar(500)
+  content   String?  @db.Text
+  contentFormat String? @map("content_format") @db.VarChar(20)
   version   Int      @default(1)
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -634,6 +637,21 @@ model UserStudyStreak {
 
   @@index([weeklyPoints]) // 周榜排序
   @@map("user_study_streak")
+}
+
+model DailyStudyActivity {
+  id                       Int      @id @default(autoincrement())
+  userId                   Int      @map("user_id")
+  date                     DateTime @db.Date
+  cardDurationSeconds      Int      @default(0) @map("card_duration_seconds")
+  quizDurationSeconds      Int      @default(0) @map("quiz_duration_seconds")
+  cheatsheetDurationSeconds Int     @default(0) @map("cheatsheet_duration_seconds")
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("daily_study_activity")
 }
 
 model StudyReminderSubscription {

@@ -2,30 +2,86 @@
 // 学习活动统计服务 - 热力图数据
 
 import { PrismaClient } from "@prisma/client";
-import { getBeijingTodayStart, toBeijingDate } from "../../utils/timezone";
-import { cardStateActivityView, questionAttemptActivityView } from "../../db/views/studyViews";
+import { dailyStudyActivityHistoryView } from "../../db/views";
+import { getBeijingNow } from "../../utils/timezone";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
 export interface DailyActivity {
   date: string; // YYYY-MM-DD
-  count: number; // 学习次数
+  totalDurationSeconds: number;
+  cardDurationSeconds: number;
+  quizDurationSeconds: number;
+  cheatsheetDurationSeconds: number;
   level: number; // 0-3 热力等级
 }
 
 export interface ActivityHistory {
   days: DailyActivity[];
   totalDays: number;
-  totalCount: number;
+  totalDurationSeconds: number;
+}
+
+export type StudyActivityType = "card" | "quiz" | "cheatsheet";
+
+export async function recordDailyStudyDuration(
+  db: DbCtx,
+  input: {
+    userId: number;
+    activityDate: Date;
+    type: StudyActivityType;
+    totalDurationSeconds: number;
+  },
+): Promise<void> {
+  const cardSeconds = input.type === "card" ? input.totalDurationSeconds : 0;
+  const quizSeconds = input.type === "quiz" ? input.totalDurationSeconds : 0;
+  const cheatsheetSeconds = input.type === "cheatsheet" ? input.totalDurationSeconds : 0;
+
+  await db.$executeRawUnsafe(
+    `
+INSERT INTO "public"."daily_study_activity"
+  ("user_id", "date", "card_duration_seconds", "quiz_duration_seconds", "cheatsheet_duration_seconds", "updated_at")
+VALUES
+  ($1::int4, $2::date, $3::int4, $4::int4, $5::int4, CURRENT_TIMESTAMP)
+ON CONFLICT ("user_id", "date")
+DO UPDATE SET
+  "card_duration_seconds" = GREATEST("daily_study_activity"."card_duration_seconds", EXCLUDED."card_duration_seconds"),
+  "quiz_duration_seconds" = GREATEST("daily_study_activity"."quiz_duration_seconds", EXCLUDED."quiz_duration_seconds"),
+  "cheatsheet_duration_seconds" = GREATEST("daily_study_activity"."cheatsheet_duration_seconds", EXCLUDED."cheatsheet_duration_seconds"),
+  "updated_at" = CURRENT_TIMESTAMP
+    `,
+    input.userId,
+    input.activityDate,
+    cardSeconds,
+    quizSeconds,
+    cheatsheetSeconds,
+  );
+}
+
+export function parseYmdToDateOnlyUtc(ymd: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) {
+    throw new Error("Invalid date format");
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    utc.getUTCFullYear() !== year ||
+    utc.getUTCMonth() !== month - 1 ||
+    utc.getUTCDate() !== day
+  ) {
+    throw new Error("Invalid date value");
+  }
+
+  return utc;
 }
 
 /**
  * 获取用户最近N天的学习活动历史（用于热力图）
- * 
- * 数据来源：
- * 1. UserCardState.lastAnsweredAt - 卡片复习记录
- * 2. UserQuestionAttempt.attemptedAt - 刷题记录
- * 
  * @param db 数据库上下文
  * @param userId 用户ID
  * @param days 天数，默认35天（5周）
@@ -35,91 +91,67 @@ export async function getActivityHistory(
   userId: number,
   days: number = 35
 ): Promise<ActivityHistory> {
-  const todayStart = getBeijingTodayStart();
-  const startDate = new Date(todayStart);
-  startDate.setDate(startDate.getDate() - days + 1);
-  const endDate = new Date(todayStart);
-  endDate.setDate(endDate.getDate() + 1);
-  endDate.setMilliseconds(endDate.getMilliseconds() - 1);
+  const beijingNow = getBeijingNow();
+  const todayDateOnlyUtc = new Date(
+    Date.UTC(beijingNow.getFullYear(), beijingNow.getMonth(), beijingNow.getDate()),
+  );
+  const startDateOnlyUtc = new Date(
+    todayDateOnlyUtc.getTime() - (days - 1) * 24 * 60 * 60 * 1000,
+  );
 
-  // 并行查询卡片和题目的活动数据
-  const [cardActivities, quizActivities] = await Promise.all([
-    // 卡片复习活动
-    db.userCardState.findMany({
-      where: {
-        userId,
-        lastAnsweredAt: {
-          gte: startDate,
-          lte: endDate,
-        },
+  const rows = await db.dailyStudyActivity.findMany({
+    where: {
+      userId,
+      date: {
+        gte: startDateOnlyUtc,
+        lte: todayDateOnlyUtc,
       },
-      select: cardStateActivityView,
-    }),
-    // 刷题活动
-    db.userQuestionAttempt.findMany({
-      where: {
-        userId,
-        attemptedAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      select: questionAttemptActivityView,
-    }),
-  ]);
+    },
+    select: dailyStudyActivityHistoryView,
+  });
 
-  // 按日期聚合
-  const activityMap = new Map<string, number>();
-
-  // 初始化所有日期为0
-  for (let i = 0; i < days; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    const dateStr = formatDateToYMD(date);
-    activityMap.set(dateStr, 0);
-  }
-
-  // 聚合卡片活动
-  for (const { lastAnsweredAt } of cardActivities) {
-    if (lastAnsweredAt) {
-      const dateStr = formatDateToYMD(lastAnsweredAt);
-      activityMap.set(dateStr, (activityMap.get(dateStr) || 0) + 1);
-    }
-  }
-
-  // 聚合刷题活动
-  for (const { attemptedAt } of quizActivities) {
-    const dateStr = formatDateToYMD(attemptedAt);
-    activityMap.set(dateStr, (activityMap.get(dateStr) || 0) + 1);
-  }
-
-  // 计算最大活动量用于归一化
-  const counts = Array.from(activityMap.values());
-  const maxCount = Math.max(...counts, 1);
-
-  // 转换为结果数组
-  const dailyActivities: DailyActivity[] = [];
-  let totalCount = 0;
-  let activeDays = 0;
-
-  for (const [date, count] of activityMap) {
-    totalCount += count;
-    if (count > 0) activeDays++;
-
-    dailyActivities.push({
-      date,
-      count,
-      level: calculateLevel(count, maxCount),
+  const byDate = new Map<string, Omit<DailyActivity, "date" | "level">>();
+  for (const row of rows) {
+    const date = row.date.toISOString().slice(0, 10);
+    byDate.set(date, {
+      totalDurationSeconds:
+        row.cardDurationSeconds + row.quizDurationSeconds + row.cheatsheetDurationSeconds,
+      cardDurationSeconds: row.cardDurationSeconds,
+      quizDurationSeconds: row.quizDurationSeconds,
+      cheatsheetDurationSeconds: row.cheatsheetDurationSeconds,
     });
   }
 
-  // 按日期排序
-  dailyActivities.sort((a, b) => a.date.localeCompare(b.date));
+  const daysOut: DailyActivity[] = [];
+  for (let i = 0; i < days; i++) {
+    const dateOnlyUtc = new Date(startDateOnlyUtc.getTime() + i * 24 * 60 * 60 * 1000);
+    const date = dateOnlyUtc.toISOString().slice(0, 10);
+    const existing = byDate.get(date) || {
+      totalDurationSeconds: 0,
+      cardDurationSeconds: 0,
+      quizDurationSeconds: 0,
+      cheatsheetDurationSeconds: 0,
+    };
+    daysOut.push({ date, ...existing, level: 0 });
+  }
+
+  const maxTotal = Math.max(
+    ...daysOut.map((d) => d.totalDurationSeconds),
+    1,
+  );
+
+  let totalDurationSeconds = 0;
+  let activeDays = 0;
+  for (const day of daysOut) {
+    totalDurationSeconds += day.totalDurationSeconds;
+    if (day.totalDurationSeconds > 0) activeDays++;
+    day.level = calculateLevel(day.totalDurationSeconds, maxTotal);
+  }
 
   return {
-    days: dailyActivities,
+    days: daysOut,
     totalDays: activeDays,
-    totalCount,
+    totalDurationSeconds,
   };
 }
 
@@ -130,21 +162,10 @@ export async function getActivityHistory(
  * 2: 中 (25-50% of max)
  * 3: 高 (50%+ of max)
  */
-function calculateLevel(count: number, maxCount: number): number {
-  if (count === 0) return 0;
-  const ratio = count / maxCount;
+function calculateLevel(totalDurationSeconds: number, maxTotalDurationSeconds: number): number {
+  if (totalDurationSeconds === 0) return 0;
+  const ratio = totalDurationSeconds / maxTotalDurationSeconds;
   if (ratio >= 0.5) return 3;
   if (ratio >= 0.25) return 2;
   return 1;
-}
-
-/**
- * 格式化日期为 YYYY-MM-DD（北京时区）
- */
-function formatDateToYMD(date: Date): string {
-  const beijingTime = toBeijingDate(date);
-  const year = beijingTime.getFullYear();
-  const month = String(beijingTime.getMonth() + 1).padStart(2, "0");
-  const day = String(beijingTime.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

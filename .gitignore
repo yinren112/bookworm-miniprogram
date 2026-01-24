@@ -83,3 +83,6 @@ data/seeds/ISBN.csv
 # Prisma dev database
 /bookworm-backend/prisma/dev.db
 /bookworm-backend/prisma/dev.db-journal
+
+# Course import staging (local only)
+**/待导入课程/

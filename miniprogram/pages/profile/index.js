@@ -26,7 +26,9 @@ Page({
     reminderStatus: 'UNKNOWN',
     reminderStatusText: '未开启',
     nextSendAtText: '',
-    reminderLoading: false
+    reminderLoading: false,
+    devTapCount: 0,
+    devTapLastTs: 0
   },
 
   onShow() {
@@ -204,6 +206,19 @@ Page({
     wx.navigateTo({
       url: '/pages/customer-service/index'
     });
+  },
+
+  onDevConfigTap() {
+    const now = Date.now();
+    const last = this.data.devTapLastTs || 0;
+    const within = now - last < 800;
+    const nextCount = within ? (this.data.devTapCount || 0) + 1 : 1;
+    this.setData({ devTapCount: nextCount, devTapLastTs: now });
+
+    if (nextCount >= 5) {
+      this.setData({ devTapCount: 0, devTapLastTs: 0 });
+      wx.navigateTo({ url: '/pages/dev-settings/index' });
+    }
   },
 
   onShareAppMessage() {

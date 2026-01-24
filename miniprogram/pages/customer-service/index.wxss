@@ -1,159 +1,116 @@
-/* pages/customer-service/index.wxss */
+page {
+  background: var(--color-bg-soft);
+}
 
 .page-container {
+  padding: var(--space-8);
   min-height: 100vh;
-  background-color: var(--clay-bg);
-  padding: var(--space-l);
-}
-
-/* 1. Contact Card (Business Card Style) */
-.contact-card {
-  background: #fff;
-  border-radius: var(--radius-l);
-  padding: 40rpx;
-  margin-bottom: 60rpx;
-  box-shadow: var(--shadow-clay-out);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Card decoration */
-.contact-card::before {
-  content: '';
-  position: absolute;
-  top: -50rpx; right: -50rpx;
-  width: 200rpx; height: 200rpx;
-  background: #E2F0CB;
-  border-radius: 50%;
-  opacity: 0.5;
-  filter: blur(30rpx);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
 }
 
 .card-header {
   display: flex;
   align-items: center;
-  margin-bottom: 40rpx;
-  position: relative;
-  z-index: 1;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .avatar {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 50%;
-  background: #fff;
-  border: 6rpx solid #fff;
-  box-shadow: var(--shadow-clay-out);
-  margin-right: 24rpx;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
+  border: var(--border-thick) solid var(--color-border);
+  background: var(--color-bg-card);
 }
 
 .card-info {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .role-title {
-  font-size: 36rpx;
-  font-weight: 900;
-  color: var(--clay-text-main);
-  margin-bottom: 8rpx;
-  display: block;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
 }
 
 .service-time {
-  font-size: 24rpx;
-  color: var(--clay-text-light);
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
 }
 
 .wechat-row {
   display: flex;
   align-items: center;
-  background: var(--clay-bg);
-  border-radius: var(--radius-m);
-  padding: 16rpx 24rpx;
-  box-shadow: var(--shadow-clay-in); /* 凹陷效果 */
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 .wechat-box {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
 }
 
-.wechat-box .label {
-  font-size: 20rpx;
-  color: var(--clay-text-light);
-  margin-bottom: 4rpx;
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
 }
 
-.wechat-box .value {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: var(--clay-text-main);
-  font-family: monospace;
+.value {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.copy-btn {
-  background: var(--clay-text-main);
-  color: #fff;
-  font-size: 24rpx;
-  font-weight: 700;
-  padding: 12rpx 32rpx;
-  border-radius: 30rpx;
-  box-shadow: 4rpx 4rpx 10rpx rgba(74, 85, 104, 0.3);
-  border: none;
-  line-height: 1.5;
-  margin: 0;
+.copy-action {
+  width: 160rpx;
+  flex: 0 0 auto;
 }
 
-.copy-btn:active {
-  transform: scale(0.95);
-}
-
-
-/* 2. FAQ Section (Chat Style) */
 .faq-section {
-  margin-top: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .section-header {
-  font-size: 32rpx;
-  font-weight: 900;
-  color: var(--clay-text-light);
-  margin-bottom: 32rpx;
-  text-align: center;
-  opacity: 0.5;
-  letter-spacing: 2rpx;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
 }
 
 .faq-group {
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: var(--space-4);
 }
 
 .chat-bubble {
-  max-width: 85%;
-  padding: 24rpx 32rpx;
-  border-radius: 32rpx;
-  font-size: 28rpx;
-  line-height: 1.5;
-  position: relative;
-  box-shadow: 4rpx 4rpx 12rpx rgba(166, 180, 200, 0.15);
+  border-radius: var(--radius-card);
+  border: var(--border-thick) solid var(--color-border);
+  background: var(--color-bg-card);
+  padding: var(--space-6);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-main);
 }
 
-/* Question (Right aligned, darker) */
 .chat-bubble.question {
-  align-self: flex-end;
-  background: var(--clay-text-main);
-  color: #fff;
-  border-bottom-right-radius: 4rpx;
+  border-color: var(--color-juicy-blue);
 }
 
-/* Answer (Left aligned, lighter) */
 .chat-bubble.answer {
-  align-self: flex-start;
-  background: #fff;
-  color: var(--clay-text-main);
-  border-bottom-left-radius: 4rpx;
+  border-color: var(--color-border);
+  color: var(--color-text-light);
 }

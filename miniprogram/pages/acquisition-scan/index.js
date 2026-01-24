@@ -3,6 +3,7 @@ const { checkAcquisition, createAcquisition } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { extractErrorMessage } = require('../../utils/error');
 const logger = require('../../utils/logger');
+const feedback = require('../../utils/ui/feedback');
 const { formatPrice } = ui;
 
 Page({
@@ -114,7 +115,7 @@ Page({
           });
 
           // 震动反馈
-          wx.vibrateShort({ type: 'heavy' });
+          feedback.success();
           
           wx.showToast({
             title: '已添加到白名单',
@@ -130,7 +131,7 @@ Page({
           });
 
           // 震动反馈
-          wx.vibrateLong();
+          feedback.warn();
 
           wx.showToast({
             title: '不在白名单',

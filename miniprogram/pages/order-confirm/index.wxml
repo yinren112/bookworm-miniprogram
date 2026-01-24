@@ -6,7 +6,17 @@
   <view class="bg-blob bg-blob-1"></view>
   <view class="bg-blob bg-blob-2"></view>
 
-  <view wx:if="{{book}}" class="anim-fade-in-up">
+  <loading-state wx:if="{{isLoading}}" variant="page" text="加载中..." />
+
+  <error-state
+    wx:elif="{{error}}"
+    mode="network"
+    title="加载失败"
+    desc="{{error}}"
+    bind:retry="onRetry"
+  />
+
+  <view wx:elif="{{book}}" class="anim-fade-in-up">
     
     <!-- Product Card (Ticket Style) -->
     <view class="ticket-card">
@@ -29,11 +39,11 @@
       <view class="ticket-stub">
         <view class="price-row">
           <text class="label">商品金额</text>
-          <text class="value clay-num">{{filters.formatCurrency(book.selling_price)}}</text>
+          <text class="value">{{filters.formatCurrency(book.selling_price)}}</text>
         </view>
         <view class="price-row">
           <text class="label">运费</text>
-          <text class="value clay-num">¥0.00</text>
+          <text class="value">¥0.00</text>
         </view>
       </view>
     </view>
@@ -49,9 +59,7 @@
   </view>
   
   <!-- Error State -->
-  <view wx:else class="error-message anim-fade-in-up">
-    商品信息加载失败
-  </view>
+  <empty-state wx:else title="商品不可用" desc="请返回重试" actionText="返回" actionType="secondary" showAction bind:action="goBack" />
 
   <!-- Glass Footer -->
   <view class="glass-footer anim-fade-in-up" wx:if="{{book}}">
@@ -59,7 +67,7 @@
       <text class="total-label">实付款</text>
       <view class="total-price-box">
         <text class="currency">¥</text>
-        <text class="amount clay-num">{{filters.formatCurrencyFromCents(book.selling_price).substring(1)}}</text>
+        <text class="amount">{{filters.formatCurrencyFromCents(book.selling_price).substring(1)}}</text>
       </view>
     </view>
     <button class="pay-btn" bindtap="handlePayment" disabled="{{isSubmitting}}">

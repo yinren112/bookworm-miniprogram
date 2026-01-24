@@ -7,6 +7,8 @@ const logger = require('../../../../utils/logger');
 Page({
   data: {
     loading: true,
+    error: false,
+    errorMsg: '',
     items: [],
     myRank: null,
     myStreak: null,
@@ -25,7 +27,7 @@ Page({
   },
 
   async loadLeaderboard() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, error: false, errorMsg: '' });
 
     try {
       const res = await getLeaderboard({ limit: 50 });
@@ -34,14 +36,12 @@ Page({
         myRank: res.myRank,
         myStreak: res.myStreak,
         loading: false,
+        error: false,
+        errorMsg: '',
       });
     } catch (err) {
       logger.error('Failed to load leaderboard:', err);
-      this.setData({ loading: false });
-      wx.showToast({
-        title: '加载失败',
-        icon: 'none',
-      });
+      this.setData({ loading: false, error: true, errorMsg: '加载失败' });
     }
   },
 

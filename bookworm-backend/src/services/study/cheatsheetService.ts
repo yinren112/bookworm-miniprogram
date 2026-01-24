@@ -2,18 +2,20 @@
 // 急救包服务 - 考前资料管理
 
 import { PrismaClient } from "@prisma/client";
-import {
-  cheatsheetWithUnitInclude,
-  cheatsheetDetailInclude,
-} from "../../db/views";
+import { cheatsheetDetailView, cheatsheetSummaryView } from "../../db/views";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
-export interface CheatSheet {
+export function normalizeCheatsheetContent(content: string): string {
+  return content.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+}
+
+export interface CheatSheetSummary {
   id: number;
   title: string;
   assetType: string;
-  url: string;
+  url: string | null;
+  contentFormat: string | null;
   version: number;
   sortOrder: number;
   unit: {
@@ -23,6 +25,17 @@ export interface CheatSheet {
   } | null;
 }
 
+export interface CheatSheetDetail extends CheatSheetSummary {
+  content: string | null;
+  course: {
+    id: number;
+    title: string;
+    courseKey: string;
+  };
+}
+
+export type CheatSheet = CheatSheetSummary;
+
 /**
  * 获取课程的急救包列表
  */
@@ -30,7 +43,7 @@ export async function getCheatSheets(
   db: DbCtx,
   courseId: number,
   unitId?: number,
-): Promise<CheatSheet[]> {
+): Promise<CheatSheetSummary[]> {
   const whereClause = {
     courseId,
     ...(unitId ? { unitId } : {}),
@@ -38,7 +51,7 @@ export async function getCheatSheets(
 
   const sheets = await db.studyCheatSheet.findMany({
     where: whereClause,
-    include: cheatsheetWithUnitInclude,
+    select: cheatsheetSummaryView,
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
 
@@ -47,6 +60,7 @@ export async function getCheatSheets(
     title: s.title,
     assetType: s.assetType,
     url: s.url,
+    contentFormat: s.contentFormat ?? null,
     version: s.version,
     sortOrder: s.sortOrder,
     unit: s.unit,
@@ -59,10 +73,10 @@ export async function getCheatSheets(
 export async function getCheatSheetById(
   db: DbCtx,
   id: number,
-): Promise<CheatSheet | null> {
+): Promise<CheatSheetDetail | null> {
   const sheet = await db.studyCheatSheet.findUnique({
     where: { id },
-    include: cheatsheetDetailInclude,
+    select: cheatsheetDetailView,
   });
 
   if (!sheet) return null;
@@ -72,8 +86,11 @@ export async function getCheatSheetById(
     title: sheet.title,
     assetType: sheet.assetType,
     url: sheet.url,
+    content: sheet.content ? normalizeCheatsheetContent(sheet.content) : null,
+    contentFormat: sheet.contentFormat ?? null,
     version: sheet.version,
     sortOrder: sheet.sortOrder,
     unit: sheet.unit,
+    course: sheet.course,
   };
 }

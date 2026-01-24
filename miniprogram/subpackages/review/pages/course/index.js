@@ -187,8 +187,8 @@ Page({
     }
 
     wx.showActionSheet({
-      itemList: ['📚 背卡模式', '📝 刷题模式'],
-      itemColor: '#2c5f2d',
+      itemList: ['背卡模式', '刷题模式'],
+      itemColor: '#58CC02',
       success: (res) => {
         if (res.tapIndex === 0) {
           // 背卡

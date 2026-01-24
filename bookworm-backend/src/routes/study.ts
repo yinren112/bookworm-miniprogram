@@ -11,6 +11,7 @@ import {
 } from "../db/views";
 import { ApiError } from "../errors";
 import { CourseStatus } from "@prisma/client";
+import { getBeijingNow } from "../utils/timezone";
 import {
   getCourseList,
   getCourseByKey,
@@ -40,6 +41,8 @@ import {
   getUserRank,
   // Phase 5.5: Activity History (Heatmap)
   getActivityHistory,
+  recordDailyStudyDuration,
+  parseYmdToDateOnlyUtc,
   // Phase 5.6: Dashboard & Reminders
   getStudyDashboard,
   upsertStudyReminderSubscription,
@@ -109,6 +112,9 @@ import {
   ActivityHistoryQuerySchema,
   ActivityHistoryQuery,
   ActivityHistoryResponseSchema,
+  ActivityPulseBodySchema,
+  ActivityPulseBody,
+  ActivityPulseResponseSchema,
   // Phase 6 schemas
   ImportCourseBodySchema,
   ImportCourseBody,
@@ -1040,6 +1046,56 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
   // Phase 5.5: 学习活动历史端点（热力图）
   // ============================================
 
+  fastify.post<{ Body: ActivityPulseBody }>(
+    "/api/study/activity/pulse",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        body: ActivityPulseBodySchema,
+        response: {
+          200: ActivityPulseResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.user!.userId;
+      const { type, activityDate, totalDurationSeconds } = request.body;
+
+      let activityDateOnlyUtc: Date;
+      try {
+        activityDateOnlyUtc = parseYmdToDateOnlyUtc(activityDate);
+      } catch {
+        throw new ApiError(400, "activityDate 无效", "INVALID_ACTIVITY_DATE");
+      }
+
+      const beijingNow = getBeijingNow();
+      const todayDateOnlyUtc = new Date(
+        Date.UTC(beijingNow.getFullYear(), beijingNow.getMonth(), beijingNow.getDate()),
+      );
+
+      const maxBackfillDays = 7;
+      const minDateOnlyUtc = new Date(
+        todayDateOnlyUtc.getTime() - (maxBackfillDays - 1) * 24 * 60 * 60 * 1000,
+      );
+
+      if (activityDateOnlyUtc.getTime() > todayDateOnlyUtc.getTime()) {
+        throw new ApiError(400, "activityDate 不能是未来日期", "ACTIVITY_DATE_IN_FUTURE");
+      }
+      if (activityDateOnlyUtc.getTime() < minDateOnlyUtc.getTime()) {
+        throw new ApiError(400, "activityDate 超出允许回填范围", "ACTIVITY_DATE_TOO_OLD");
+      }
+
+      await recordDailyStudyDuration(prisma, {
+        userId,
+        activityDate: activityDateOnlyUtc,
+        type,
+        totalDurationSeconds,
+      });
+
+      reply.send({ ok: true });
+    },
+  );
+
   // GET /api/study/activity-history - 获取学习活动历史（热力图数据）
   fastify.get<{ Querystring: ActivityHistoryQuery }>(
     "/api/study/activity-history",
@@ -1061,7 +1117,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       reply.send({
         days: history.days,
         totalDays: history.totalDays,
-        totalCount: history.totalCount,
+        totalDurationSeconds: history.totalDurationSeconds,
       });
     },
   );
@@ -1126,7 +1182,9 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         cheatsheets: cheatsheets?.map((cs) => ({
           title: cs.title,
           assetType: cs.assetType,
-          url: cs.url,
+          url: "url" in cs ? cs.url : undefined,
+          content: "content" in cs ? cs.content : undefined,
+          contentFormat: "contentFormat" in cs && cs.contentFormat ? cs.contentFormat : undefined,
           unitKey: cs.unitKey,
           version: cs.version,
         })) || [],

@@ -1,0 +1,10 @@
+<view class="er">
+  <view class="er__icon er__icon--{{mode}}">
+    <text class="er__iconText">{{iconText}}</text>
+  </view>
+  <text class="er__title">{{title || resolvedTitle}}</text>
+  <text class="er__desc" wx:if="{{desc || resolvedDesc}}">{{desc || resolvedDesc}}</text>
+  <view class="er__actions" wx:if="{{showRetry}}">
+    <juicy-button type="outline" size="sm" bind:tap="onRetry">{{retryText}}</juicy-button>
+  </view>
+</view>

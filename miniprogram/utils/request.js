@@ -72,9 +72,21 @@ function performRequest(options, attempt = 0) {
       headers.Authorization = `Bearer ${token}`;
     }
 
+    const finalUrl = `${config.apiBaseUrl}${url}`;
+    if (!/^https?:\/\//i.test(finalUrl) || /[：／]/.test(finalUrl) || /[`"'“”‘’]/.test(finalUrl) || /\s/.test(finalUrl)) {
+      reject({
+        message: '请求地址非法，请检查 DEV_API_BASE_URL 是否包含全角冒号/反引号/空格',
+        errorCode: 'INVALID_URL',
+        requestId,
+        url: finalUrl,
+        errMsg: 'net::ERR_INVALID_URL',
+      });
+      return;
+    }
+
     // eslint-disable-next-line no-restricted-syntax -- utils/request.js 是唯一允许直接调用 wx.request 的文件
     wx.request({
-      url: `${config.apiBaseUrl}${url}`,
+      url: finalUrl,
       method,
       data,
       timeout,
@@ -128,6 +140,8 @@ function performRequest(options, attempt = 0) {
           message: '网络请求失败',
           errorCode: 'NETWORK_ERROR',
           requestId,
+          url: finalUrl,
+          errMsg: error && error.errMsg ? error.errMsg : '',
           detail: error,
         });
       },

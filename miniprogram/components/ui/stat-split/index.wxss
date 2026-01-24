@@ -1,0 +1,38 @@
+.ss {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 var(--space-4);
+}
+
+.ss__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ss__value {
+  font-size: 64rpx;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+  letter-spacing: -2rpx;
+}
+
+.ss__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+}
+
+.ss__divider {
+  width: var(--border-thick);
+  height: 64rpx;
+  background: var(--color-border);
+  border-radius: var(--border-thick);
+}
+
+.ss__value--green { color: var(--color-juicy-green); }
+.ss__value--blue { color: var(--color-juicy-blue); }
+.ss__value--yellow { color: var(--color-juicy-yellow-shade); }
+.ss__value--red { color: var(--color-juicy-red); }

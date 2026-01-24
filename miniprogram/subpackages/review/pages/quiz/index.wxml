@@ -1,99 +1,114 @@
 <!-- subpackages/review/pages/quiz/index.wxml -->
 <!-- 刷题闯关页 -->
-<view class="container">
-  <state-view
-    wx:if="{{loading || error || empty}}"
-    status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}"
-    loadingText="正在加载题库..."
-    emptyText="题库空空，老师还没出题呢"
-    errorText="加载失败，请重试"
-    actionText="返回课程"
-    bind:action="goBack"
-    bind:retry="loadQuiz"
-    bind:feedback="onFeedback"
-  />
-  <!-- 进度条 -->
-  <view class="progress-section" wx:if="{{!loading && !error && !empty && questionsLength > 0}}">
-    <view class="progress-bar">
-      <view class="progress-fill" style="width: {{progressPercent}}%"></view>
-    </view>
-    <view class="progress-info">
-      <text class="progress-text">{{currentIndex + 1}} / {{questionsLength}}</text>
-      <text class="accuracy-text" wx:if="{{answeredCount > 0}}">
-        正确率 {{accuracyPercent}}%
-      </text>
-      <text class="eta-text" wx:if="{{remainingMinutes > 0}}">
-        剩余约 {{remainingMinutes}} 分钟
-      </text>
+<view class="container" bindtouchstart="onUserInteraction" bindtouchmove="onUserInteraction">
+  <loading-state wx:if="{{loading}}" variant="page" text="正在加载题库..." />
+  <view wx:elif="{{error}}" class="quiz-boundary">
+    <error-state title="加载失败" desc="请重试" bind:retry="loadQuiz" />
+    <view class="quiz-boundary__extra">
+      <juicy-button type="secondary" size="sm" bind:tap="onFeedback">反馈</juicy-button>
     </view>
   </view>
-  <!-- 题目区域 -->
-  <view class="question-card clay-card" wx:if="{{!loading && !error && !empty && currentQuestion}}">
-    <!-- 题目类型标签 -->
-    <view class="question-type-tag {{questionTypeClass}}">
-      <text>{{questionTypeLabels[currentQuestion.questionType]}}</text>
+  <empty-state
+    wx:elif="{{empty}}"
+    title="暂无题目"
+    desc="题库空空"
+    actionText="返回课程"
+    actionType="secondary"
+    showAction
+    bind:action="goBack"
+  />
+
+  <view class="progress-section" wx:if="{{!loading && !error && !empty && questionsLength > 0}}">
+    <progress-chunky percent="{{progressPercent}}" color="green" label="进度" showLabel />
+    <view class="progress-meta">
+      <pill-tag variant="neutral" size="sm">{{currentIndex + 1}} / {{questionsLength}}</pill-tag>
+      <pill-tag variant="neutral" size="sm" wx:if="{{answeredCount > 0}}">正确率 {{accuracyPercent}}%</pill-tag>
+      <pill-tag variant="neutral" size="sm" wx:if="{{remainingMinutes > 0}}">剩余约 {{remainingMinutes}} 分钟</pill-tag>
     </view>
-    <!-- Star Button -->
-    <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
-      <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
+  </view>
+  <card-flat wx:if="{{!loading && !error && !empty && currentQuestion}}">
+    <view class="question-head">
+      <view class="question-type">
+        <pill-tag variant="neutral" size="sm">{{questionTypeLabels[currentQuestion.questionType]}}</pill-tag>
+      </view>
+      <view class="star-hit {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
+        <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
+      </view>
     </view>
-    <!-- 题干 -->
+
     <view class="question-stem">
       <mp-html content="{{currentQuestion.stem}}" markdown="{{true}}" />
     </view>
-    <!-- 选项区域 -->
+
     <view class="options-section" wx:if="{{currentQuestion.questionType !== 'FILL_BLANK'}}">
-      <view class="option-item {{optionStates[index].isSelected ? 'selected' : ''}} {{showResult && optionStates[index].isCorrect ? 'correct' : ''}} {{showResult && optionStates[index].isWrong ? 'wrong' : ''}}" wx:for="{{currentQuestion.options}}" wx:key="index" bindtap="selectOption" data-index="{{index}}">
-        <view class="option-marker">{{optionLabels[index]}}</view>
-        <view class="option-content">
-          <mp-html content="{{item}}" markdown="{{true}}" />
+      <card-flat
+        wx:for="{{currentQuestion.options}}"
+        wx:key="index"
+        clickable
+        custom-class="option-item {{optionStates[index].isSelected ? 'is-selected' : ''}} {{showResult && optionStates[index].isCorrect ? 'is-correct' : ''}} {{showResult && optionStates[index].isWrong ? 'is-wrong' : ''}}"
+        data-index="{{index}}"
+        bind:tap="selectOption"
+      >
+        <view class="option-inner">
+          <view class="option-marker">{{optionLabels[index]}}</view>
+          <view class="option-content"><mp-html content="{{item}}" markdown="{{true}}" /></view>
+          <view class="option-state" wx:if="{{showResult && optionStates[index].isCorrect}}">✓</view>
+          <view class="option-state" wx:elif="{{showResult && optionStates[index].isWrong}}">✗</view>
         </view>
-        <view class="option-icon" wx:if="{{showResult && optionStates[index].isCorrect}}">✓</view>
-        <view class="option-icon wrong" wx:if="{{showResult && optionStates[index].isWrong}}">
-          ✗
-        </view>
-      </view>
-      <button class="submit-multi-btn" bindtap="submitMultiChoice" wx:if="{{currentQuestion.questionType === 'MULTI_CHOICE' && !showResult && selectedAnswers.length > 0}}">
+      </card-flat>
+
+      <juicy-button
+        wx:if="{{currentQuestion.questionType === 'MULTI_CHOICE' && !showResult && selectedAnswers.length > 0}}"
+        type="primary"
+        size="sm"
+        full
+        hapticEnabled="{{false}}"
+        bind:tap="submitMultiChoice"
+      >
         提交
-      </button>
+      </juicy-button>
     </view>
-    <!-- 填空题输入 -->
+
     <view class="fill-blank-section" wx:if="{{currentQuestion.questionType === 'FILL_BLANK'}}">
-      <input class="fill-input {{showResult ? (lastResult.isCorrect ? 'correct' : 'wrong') : ''}}" placeholder="请输入答案" value="{{fillAnswer}}" bindinput="onFillInput" disabled="{{showResult}}" />
-      <button class="submit-fill-btn" bindtap="submitFillAnswer" wx:if="{{!showResult && fillAnswer}}">
+      <input
+        class="fill-input {{showResult ? (lastResult.isCorrect ? 'is-correct' : 'is-wrong') : ''}}"
+        placeholder="请输入答案"
+        value="{{fillAnswer}}"
+        bindinput="onFillInput"
+        disabled="{{showResult}}"
+      />
+      <juicy-button
+        wx:if="{{!showResult && fillAnswer}}"
+        type="primary"
+        size="sm"
+        full
+        hapticEnabled="{{false}}"
+        bind:tap="submitFillAnswer"
+      >
         提交
-      </button>
+      </juicy-button>
     </view>
-    <!-- 结果反馈 -->
+
     <view class="result-section" wx:if="{{showResult}}">
-      <view class="result-badge {{lastResult.isCorrect ? 'correct' : 'wrong'}}">
-        <text>{{lastResult.isCorrect ? '答对了！' : '差一点，下次一定'}}</text>
+      <text class="result-title {{lastResult.isCorrect ? 'is-correct' : 'is-wrong'}}">{{lastResult.isCorrect ? '答对了' : '答错了'}}</text>
+      <view wx:if="{{lastResult.explanation}}">
+        <text class="explanation-label">解析</text>
+        <mp-html content="{{lastResult.explanation}}" markdown="{{true}}" />
       </view>
-      <view class="explanation" wx:if="{{lastResult.explanation}}">
-        <text class="explanation-label">解析：</text>
-        <view class="explanation-text">
-          <mp-html content="{{lastResult.explanation}}" markdown="{{true}}" />
-        </view>
-      </view>
-      <view class="correct-answer" wx:if="{{!lastResult.isCorrect}}">
-        <text class="answer-label">正确答案：</text>
-        <view class="answer-text">
-          <mp-html content="{{correctAnswerText}}" markdown="{{true}}" />
-        </view>
+      <view wx:if="{{!lastResult.isCorrect}}">
+        <text class="answer-label">正确答案</text>
+        <mp-html content="{{correctAnswerText}}" markdown="{{true}}" />
       </view>
     </view>
-    <!-- 纠错按钮 -->
+
     <view class="report-btn-wrapper">
-      <view class="report-btn" bindtap="openReportModal">
-        <text>发现问题？帮我们改进</text>
-      </view>
+      <view class="report-btn" bindtap="openReportModal"><text>发现问题？帮我们改进</text></view>
     </view>
-  </view>
-  <!-- 下一题按钮 -->
+  </card-flat>
   <view class="action-section" wx:if="{{showResult && !loading && !error && !empty}}">
-    <button class="next-btn clay-btn-primary" bindtap="nextQuestion">
+    <juicy-button type="primary" full hapticEnabled="{{false}}" bind:tap="nextQuestion">
       {{currentIndex < questionsLength - 1 ? '下一题' : '查看结果'}}
-    </button>
+    </juicy-button>
   </view>
   <!-- 纠错弹窗 -->
   <report-issue visible="{{showReportModal}}" courseKey="{{courseKey}}" questionId="{{currentQuestion.id}}" bind:close="closeReportModal" bind:success="onReportSuccess" />

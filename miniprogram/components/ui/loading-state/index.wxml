@@ -1,0 +1,16 @@
+<view class="ls ls--{{variant}}">
+  <view wx:if="{{variant === 'inline'}}" class="ls__inline">
+    <view class="ls__block ls__block--chip"></view>
+    <view class="ls__block ls__block--chip"></view>
+    <view class="ls__block ls__block--chip"></view>
+  </view>
+
+  <view wx:else class="ls__page">
+    <view class="ls__block ls__block--title"></view>
+    <view class="ls__block ls__block--line"></view>
+    <view class="ls__block ls__block--line"></view>
+    <view class="ls__block ls__block--line ls__block--short"></view>
+  </view>
+
+  <text wx:if="{{text}}" class="ls__text">{{text}}</text>
+</view>

@@ -2,7 +2,7 @@
 <wxs module="filters" src="../../utils/filters.wxs"></wxs>
 <view class="container detail-page">
   <!-- Skeleton -->
-  <skeleton wx:if="{{isLoading}}" type="detail" />
+  <loading-state wx:if="{{isLoading}}" variant="page" text="加载中..." />
 
   <!-- Real Content -->
   <view wx:if="{{!isLoading && bookDetail}}" class="content-wrapper">
@@ -50,16 +50,24 @@
   </view>
 
   <!-- Empty State -->
-  <view wx:if="{{!isLoading && !bookDetail && !error}}" class="error-container">
-    <image class="empty-img" src="/images/empty-shelf.png" mode="widthFix" />
-    <text>书籍信息不存在</text>
-  </view>
+  <empty-state
+    wx:if="{{!isLoading && notFound}}"
+    title="书籍信息不存在"
+    desc="返回书市继续看看"
+    actionText="去书市"
+    actionType="primary"
+    showAction
+    bind:action="goMarket"
+  />
 
   <!-- Error State -->
-  <view wx:if="{{!isLoading && error}}" class="error-container">
-    <image class="empty-img" src="/images/empty-search.png" mode="widthFix" />
-    <text>{{error}}</text>
-  </view>
+  <error-state
+    wx:elif="{{!isLoading && error}}"
+    mode="network"
+    title="加载失败"
+    desc="{{error}}"
+    bind:retry="onRetry"
+  />
 
   <!-- Floating Action Bar (Clay Glass) -->
   <view class="footer-bar" wx:if="{{bookDetail}}">

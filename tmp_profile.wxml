@@ -1,0 +1,78 @@
+<!-- pages/profile/index.wxml -->
+<view class="container profile-container">
+  <!-- Header Section (User Card) -->
+  <view class="header">
+    <view class="avatar-wrapper">
+      <image class="user-avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+      <!-- 寰俊澶村儚缁勪欢 (OpenData) 宸插簾寮冿紝寤鸿浣跨敤 button open-type="chooseAvatar" 鎴栬€呯洿鎺ユ樉绀洪粯璁ゅご鍍忓紩瀵肩敤鎴峰畬鍠?-->
+      <!-- 杩欓噷鎴戜滑鍏堢敤绮捐嚧鐨勯粯璁ゅご鍍?-->
+    </view>
+    <text class="username">{{userInfo.nickName || '寰俊鐢ㄦ埛'}}</text>
+
+    <!-- Phone Number Authorization Button -->
+    <button
+      wx:if="{{!isReviewMode && !hasPhoneNumber}}"
+      class="auth-phone-button"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+    >
+      鎺堟潈鎵嬫満鍙凤紙鍏宠仈鍗栦功璁板綍锛?    </button>
+  </view>
+
+  <!-- Review System Entry -->
+  <view class="review-entry-card card" bindtap="goToReview">
+    <view class="review-entry-content">
+      <view class="review-icon-wrapper">
+        <text class="review-icon">馃摎</text>
+      </view>
+      <view class="review-text-wrapper">
+        <text class="review-title">澶嶄範鍔╂墜</text>
+        <text class="review-desc">鑳屽崟璇嶃€佸埛棰樸€佹煡璧勬枡</text>
+      </view>
+    </view>
+    <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+  </view>
+
+  <!-- Staff Operations Section - Only visible for STAFF role -->
+  <view wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
+    <view class="section-title">
+      <text class="title-text">鍛樺伐鎿嶄綔</text>
+      <view class="staff-badge">STAFF</view>
+    </view>
+    <navigator url="/pages/acquisition-scan/index" class="menu-item" hover-class="item-hover">
+      <view class="menu-content">
+        <text class="icon-text">馃摲</text>
+        <text class="menu-text">鎸夋湰鏀惰喘</text>
+      </view>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </navigator>
+  </view>
+
+  <view class="menu-card card">
+    <view class="menu-item" bindtap="copyWechatId" hover-class="item-hover">
+      <text class="menu-text">鑱旂郴瀹㈡湇</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+    <button class="menu-item share-button" open-type="share" hover-class="item-hover">
+      <text class="menu-text">鍒嗕韩缁欏ソ鍙?/text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </button>
+    <view class="menu-item" bindtap="showTerms" hover-class="item-hover">
+      <text class="menu-text">鐢ㄦ埛鏈嶅姟鍗忚</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+    <view class="menu-item" bindtap="showPrivacy" hover-class="item-hover">
+      <text class="menu-text">闅愮鏀跨瓥</text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+    <view class="menu-item" bindtap="goToCustomerService" hover-class="item-hover">
+      <text class="menu-text">鑱旂郴瀹㈡湇涓庡府鍔?/text>
+      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </view>
+  </view>
+
+  <view class="support-info">
+    <text>瀹㈡湇寰俊: {{serviceInfo.wechatId}} (鐐瑰嚮澶嶅埗)</text>
+    <text>鏈嶅姟鏃堕棿: {{serviceInfo.time}}</text>
+  </view>
+</view>

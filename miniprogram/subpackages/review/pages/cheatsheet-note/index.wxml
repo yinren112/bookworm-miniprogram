@@ -1,0 +1,34 @@
+<view class="container" bindtouchstart="onUserInteraction" bindtouchmove="onUserInteraction">
+  <loading-state wx:if="{{loading}}" variant="page" text="正在加载..." />
+  <error-state wx:elif="{{error}}" title="加载失败" desc="{{errorMsg || '请重试'}}" bind:retry="loadDetail" />
+
+  <empty-state
+    wx:elif="{{!loading && !error && !content}}"
+    title="暂无内容"
+    desc="急救包内容为空"
+    actionText="返回"
+    actionType="secondary"
+    showAction
+    bind:action="goBack"
+  />
+
+  <view wx:else class="content">
+    <view class="header">
+      <text class="title">{{title}}</text>
+      <view class="meta">
+        <pill-tag variant="neutral" size="sm" wx:if="{{unitTitle}}">{{unitTitle}}</pill-tag>
+        <pill-tag variant="neutral" size="sm" wx:if="{{version}}">v{{version}}</pill-tag>
+      </view>
+    </view>
+
+    <card-flat>
+      <view class="note-body">
+        <mp-html content="{{content}}" markdown="{{contentFormat === 'markdown'}}" />
+      </view>
+    </card-flat>
+
+    <view class="actions">
+      <juicy-button type="secondary" full bind:tap="goBack">返回</juicy-button>
+    </view>
+  </view>
+</view>

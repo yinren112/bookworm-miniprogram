@@ -3,6 +3,12 @@
   "usingComponents": {
     "report-issue": "../../components/report-issue/index",
     "mp-html": "/components/mp-html/index",
-    "state-view": "/components/state-view/state-view"
+    "empty-state": "/components/ui/empty-state/index",
+    "juicy-button": "/components/ui/juicy-button/index",
+    "card-flat": "/components/ui/card-flat/index",
+    "progress-chunky": "/components/ui/progress-chunky/index",
+    "pill-tag": "/components/ui/pill-tag/index",
+    "loading-state": "/components/ui/loading-state/index",
+    "error-state": "/components/ui/error-state/index"
   }
 }

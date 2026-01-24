@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## 项目结构与模块组织
-- `miniprogram/`：微信小程序前端；`pages/`当前承载复习主页(`pages/review`)与个人中心(`pages/profile`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载刷题/背卡/结算等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
+- `miniprogram/`：微信小程序前端；`pages/`承载复习主页(`pages/review`)、个人中心(`pages/profile`)、开发设置(`pages/dev-settings`)、WebView(`pages/webview`)与客服(`pages/customer-service`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
 - `miniprogram/components/mp-html/`：第三方富文本组件，保持原样，不做规则性格式化或 ESLint 改造。
 - `bookworm-backend/`：Fastify + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
 - 根目录脚本`test_metrics.sh`与`update_user_metrics.js`用于观测性验证，改动前须先与运维同步。
@@ -10,7 +10,7 @@
 - 安装依赖：`cd bookworm-backend && npm install`。
 - 开发环境：`npm run dev`启动热重载；正式部署使用`npm run build`后接`npm run start`。
 - 测试流程：`npm test`运行单元覆盖，`npm run test:integration`串行执行数据库集成，必要时用`npm run db:migrate:test:reset`重置测试库。
-- 小程序开发需在微信开发者工具导入`miniprogram/`，通过 Preview 与 Upload 验证。
+- 小程序开发需在微信开发者工具导入`miniprogram/`，通过 Preview 与 Upload 验证；`pages/dev-settings` 用于设置本地调试 `DEV_API_BASE_URL`。
 
 ## 代码风格与命名约定
 - 全局采用两空格缩进与 UTF-8 编码；JavaScript/TypeScript 遵循 ESLint 规则，对`_ignored`等前缀允许未使用变量，对`any`仅警告。
@@ -295,7 +295,8 @@
 **页面结构:**
 - `pages/review/` - 复习首页（主包，TabBar）
 - `pages/profile/` - 个人中心（TabBar，复习模式隐藏交易入口）
-- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/周榜）
+- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图）
+- `pages/dev-settings/` - 开发环境 API 地址配置（本地调试用）
 - `pages/customer-service/` - Customer support (WeChat ID copy)
 - `pages/webview/` - Generic WebView for dynamic content loading
 - `pages/review-entry/` - Legacy redirect page (not registered in review-only TabBar)
@@ -314,6 +315,7 @@
 **核心工具模块:**
 - `utils/token.js`: Manages user token and ID in local storage. Zero dependencies.
 - `utils/api.js`: Handles all API requests, depends on `config.js`, `token.js`, `auth-guard.js`
+- `utils/request.js`: 底层请求客户端（重试、Request-ID），唯一允许直接调用 `wx.request`
 - `utils/auth-guard.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
 - `utils/ui.js`: UI helpers (showError, showSuccess, formatPrice)
 - `utils/error.js`: Error message extraction
@@ -321,12 +323,16 @@
 - `utils/constants.js`: Business constants (ORDER_STATUS enums)
 - `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
 - `utils/study-api.js`: 复习系统 API 封装
+- `utils/study-session.js`: 复习流程状态管理
+- `utils/url.js`: 归一化 DEV_API_BASE_URL 与链接
+- `utils/track.js`: 轻量埋点追踪
+- `utils/haptic.js`/`utils/sound-manager.js`/`utils/confetti.js`/`utils/theme.js`: 交互与主题辅助
 
 **WXS 模块** (for WXML rendering):
 - `formatter.wxs`: Time formatting (formatTime, formatOrderTime)
 - `filters.wxs`: Price formatting (formatPrice, formatCurrency, formatCurrencyFromCents)
 
-**⚠️ 依赖注意**: `api.js` requires `auth-guard.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.performRequest → 401 handling → auth.ensureLoggedIn → auth.login → wx.request).
+**⚠️ 依赖注意**: `api.js` requires `auth-guard.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.request → 401 handling → auth.ensureLoggedIn → auth.login → request.request → wx.request).
 
 ## 数据库 Schema
 
@@ -423,7 +429,7 @@ npx prisma migrate dev
 dotenv -e .env.test -- npx prisma migrate reset --force
 ```
 
-小程序需在微信开发者工具导入 `miniprogram/`，并在 `miniprogram/config.js` 设置后端 `apiBaseUrl`。
+小程序需在微信开发者工具导入 `miniprogram/`，`miniprogram/config.js` 会按环境选择 API 地址，本地设备可通过 `pages/dev-settings` 配置 `DEV_API_BASE_URL`。
 
 ## 环境配置
 
@@ -647,6 +653,7 @@ docker-compose -f docker-compose.staging.yml up -d
 
 - 任何库存/订单写操作必须运行在事务中，并接受传入的 `Prisma.TransactionClient`。
 - 401 自动重登仅通过 `api.setLoginProvider(auth.ensureLoggedIn)` 注入，禁止在模块顶层互相 `require`。
+- 小程序网络请求必须走 `miniprogram/utils/request.js`，不要直接调用 `wx.request`。
 - 提交前需确保 `npm test` 与（涉及数据库改动时）`npm run test:integration` 均通过。
 - 修改监控或计量逻辑时提供 `test_metrics.sh` 输出。
 

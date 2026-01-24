@@ -1,6 +1,8 @@
 {
   "navigationBarTitleText": "详情",
   "usingComponents": {
-    "skeleton": "../../components/skeleton/skeleton"
+    "card-flat": "/components/ui/card-flat/index",
+    "loading-state": "/components/ui/loading-state/index",
+    "error-state": "/components/ui/error-state/index"
   }
 }

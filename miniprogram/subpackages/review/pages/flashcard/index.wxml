@@ -1,57 +1,66 @@
 <!-- subpackages/review/pages/flashcard/index.wxml -->
 <!-- 卡片复习页 -->
 <wxs src="../../utils/swipe-gesture.wxs" module="gesture" />
-<view class="container">
-  <state-view wx:if="{{loading || error || empty}}" status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}" loadingText="正在加载知识卡片..." emptyText="今天的卡片都复习完了，休息一下吧" errorText="加载失败，请重试" actionText="返回首页" bind:action="goBack" bind:retry="loadSession" bind:feedback="onFeedback" />
-  <!-- 进度条 -->
-  <view class="progress-header" wx:if="{{!loading && !error && !empty}}">
-    <view class="progress-bar">
-      <view class="progress-fill" style="width: {{progressPercent}}%"></view>
+<view class="container" bindtouchstart="onUserInteraction" bindtouchmove="onUserInteraction">
+  <loading-state wx:if="{{loading}}" variant="page" text="正在加载知识卡片..." />
+  <view wx:elif="{{error}}" class="flash-boundary">
+    <error-state title="加载失败" desc="请重试" bind:retry="loadSession" />
+    <view class="flash-boundary__extra">
+      <juicy-button type="secondary" size="sm" bind:tap="onFeedback">反馈</juicy-button>
     </view>
-    <view class="progress-text">
-      <text>{{currentIndex + 1}} / {{cardsLength}}</text>
-      <text class="progress-eta" wx:if="{{remainingMinutes > 0}}">剩余约 {{remainingMinutes}} 分钟</text>
+  </view>
+  <empty-state
+    wx:elif="{{empty}}"
+    title="今日已完成"
+    desc="今天的卡片都复习完了"
+    actionText="返回首页"
+    actionType="secondary"
+    showAction
+    bind:action="goBack"
+  />
+
+  <view class="progress-header" wx:if="{{!loading && !error && !empty}}">
+    <progress-chunky percent="{{progressPercent}}" color="green" label="进度" showLabel />
+    <view class="progress-meta">
+      <pill-tag variant="neutral" size="sm">{{currentIndex + 1}} / {{cardsLength}}</pill-tag>
+      <pill-tag variant="neutral" size="sm" wx:if="{{remainingMinutes > 0}}">剩余约 {{remainingMinutes}} 分钟</pill-tag>
     </view>
   </view>
   <!-- 卡片区域 -->
   <view class="card-wrapper" wx:if="{{!loading && !error && !empty && currentCard}}">
-    <!-- Star Button (Pinned to wrapper) -->
     <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
-      <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
+      <view class="star-hit {{isStarred ? 'starred' : ''}}">
+        <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
+      </view>
     </view>
-    <!-- Card Container with WXS Swipe Gestures -->
-    <view class="card-container {{isFlipped ? 'flipped' : ''}}" bindtap="flipCard">
-      <view id="swipe-card" class="card-swipe" data-screen-width="{{screenWidth}}" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
-        <!-- 正面 -->
-        <view class="card card-front clay-card">
-          <view class="card-label">Q</view>
-          <view class="card-content">
-            <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
-          </view>
-          <view class="card-hint">
-            <text>轻触翻牌</text>
-          </view>
+    <view id="swipe-card" class="card-container" data-screen-width="{{screenWidth}}" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
+      <view class="card-stack {{isFlipped ? 'is-flipped' : ''}}">
+        <view class="face-front" bindtap="flipCard">
+          <card-flat>
+            <view class="card-face">
+              <view class="card-label">Q</view>
+              <view class="card-content">
+                <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
+              </view>
+              <view class="card-hint"><text>轻触翻牌</text></view>
+            </view>
+          </card-flat>
         </view>
-        <!-- 背面 -->
-        <view class="card card-back clay-card">
-          <view class="card-label">A</view>
-          <view class="card-content">
-            <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
-          </view>
+        <view class="face-back" bindtap="flipCard">
+          <card-flat>
+            <view class="card-face">
+              <view class="card-label">A</view>
+              <view class="card-content">
+                <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
+              </view>
+            </view>
+          </card-flat>
         </view>
-        <!-- 4档 Swipe Indicators -->
-        <view id="indicator-left-light" class="swipe-indicator fuzzy-overlay">
-          <text>有点模糊</text>
-        </view>
-        <view id="indicator-left-heavy" class="swipe-indicator forgot-overlay">
-          <text>想不起来</text>
-        </view>
-        <view id="indicator-right-light" class="swipe-indicator knew-overlay">
-          <text>记住了</text>
-        </view>
-        <view id="indicator-right-heavy" class="swipe-indicator perfect-overlay">
-          <text>完全掌握</text>
-        </view>
+
+        <view id="indicator-left-light" class="swipe-indicator fuzzy-overlay"><text>有点模糊</text></view>
+        <view id="indicator-left-heavy" class="swipe-indicator forgot-overlay"><text>想不起来</text></view>
+        <view id="indicator-right-light" class="swipe-indicator knew-overlay"><text>记住了</text></view>
+        <view id="indicator-right-heavy" class="swipe-indicator perfect-overlay"><text>完全掌握</text></view>
       </view>
     </view>
   </view>
@@ -59,22 +68,30 @@
   <!-- 反馈按钮 (Bottom Golden Zone) -->
   <view class="feedback-zone" wx:if="{{!loading && !error && !empty && currentCard && isFlipped}}">
     <view class="feedback-buttons">
-      <button class="feedback-btn forgot" bindtap="submitFeedback" data-rating="FORGOT">
-        <image class="btn-icon" src="/images/icons/review/forgot.svg" mode="aspectFit" />
-        <text class="btn-label">想不起来</text>
-      </button>
-      <button class="feedback-btn fuzzy" bindtap="submitFeedback" data-rating="FUZZY">
-        <image class="btn-icon" src="/images/icons/review/fuzzy.svg" mode="aspectFit" />
-        <text class="btn-label">有点模糊</text>
-      </button>
-      <button class="feedback-btn knew" bindtap="submitFeedback" data-rating="KNEW">
-        <image class="btn-icon" src="/images/icons/review/knew.svg" mode="aspectFit" />
-        <text class="btn-label">记住了</text>
-      </button>
-      <button class="feedback-btn perfect" bindtap="submitFeedback" data-rating="PERFECT">
-        <image class="btn-icon" src="/images/icons/review/perfect.svg" mode="aspectFit" />
-        <text class="btn-label">完全掌握</text>
-      </button>
+      <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" data-rating="FORGOT" bind:tap="submitFeedback">
+        <view class="feedback-btn-content">
+          <image class="btn-icon" src="/images/icons/review/forgot.svg" mode="aspectFit" />
+          <text>想不起来</text>
+        </view>
+      </juicy-button>
+      <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" data-rating="FUZZY" bind:tap="submitFeedback">
+        <view class="feedback-btn-content">
+          <image class="btn-icon" src="/images/icons/review/fuzzy.svg" mode="aspectFit" />
+          <text>有点模糊</text>
+        </view>
+      </juicy-button>
+      <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" data-rating="KNEW" bind:tap="submitFeedback">
+        <view class="feedback-btn-content">
+          <image class="btn-icon" src="/images/icons/review/knew.svg" mode="aspectFit" />
+          <text>记住了</text>
+        </view>
+      </juicy-button>
+      <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" data-rating="PERFECT" bind:tap="submitFeedback">
+        <view class="feedback-btn-content">
+          <image class="btn-icon" src="/images/icons/review/perfect.svg" mode="aspectFit" />
+          <text>完全掌握</text>
+        </view>
+      </juicy-button>
     </view>
   </view>
   <!-- 翻转提示 -->

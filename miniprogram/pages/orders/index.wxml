@@ -5,17 +5,27 @@
 <view class="container order-page">
   
   <!-- Loading State -->
-  <skeleton wx:if="{{state.status === 'loading'}}" type="list" count="3" />
+  <loading-state wx:if="{{state.status === 'loading'}}" variant="page" text="加载中..." />
   
   <!-- Error State -->
-  <view wx:if="{{state.status === 'error'}}" class="error-message">{{state.error}}</view>
+  <error-state
+    wx:if="{{state.status === 'error'}}"
+    mode="network"
+    title="加载失败"
+    desc="{{state.error}}"
+    bind:retry="onRetry"
+  />
   
   <!-- Empty State -->
-  <view wx:if="{{state.status === 'success' && state.data.length === 0}}" class="empty-state">
-    <image class="empty-img" src="/images/empty-orders.png" mode="widthFix" />
-    <text class="empty-text">你还没有任何订单</text>
-    <navigator url="/pages/market/index" open-type="switchTab" class="go-market-btn">去逛逛</navigator>
-  </view>
+  <empty-state
+    wx:if="{{state.status === 'success' && state.data.length === 0}}"
+    title="暂无订单"
+    desc="你还没有任何订单"
+    actionText="去逛逛"
+    actionType="primary"
+    showAction
+    bind:action="goMarket"
+  />
 
   <!-- Order List -->
   <view class="order-list" wx:if="{{state.status === 'success' && state.data.length > 0}}">

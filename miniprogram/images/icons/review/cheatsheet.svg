@@ -1,7 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-  <polyline points="14 2 14 8 20 8"/>
-  <line x1="8" y1="13" x2="16" y2="13"/>
-  <line x1="8" y1="17" x2="14" y2="17"/>
-  <circle cx="16" cy="17" r="2" fill="currentColor" fill-opacity="0.15"/>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 8H40L54 22V52C54 54.2091 52.2091 56 50 56H12C9.79086 56 8 54.2091 8 52V12C8 9.79086 9.79086 8 12 8Z" fill="#FFFFFF" stroke="#FFC800" stroke-width="4"/>
+  <path d="M40 8V22H54" stroke="#FFC800" stroke-width="4" stroke-linejoin="round"/>
+  
+  <path d="M20 32H42" stroke="#FFC800" stroke-width="4" stroke-linecap="round"/>
+  <path d="M20 42H36" stroke="#FFC800" stroke-width="4" stroke-linecap="round"/>
+  
+  <circle cx="44" cy="44" r="8" fill="#FFC800"/>
+  <path d="M44 40V48" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M40 44H48" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
 </svg>

@@ -323,6 +323,19 @@ const validateProductionConfig = () => {
 };
 
 const setupApplication = async () => {
+  const reqStartKey = Symbol.for("reqStartNs");
+  fastify.addHook("onRequest", async (request) => {
+    (request as unknown as Record<symbol, bigint>)[reqStartKey] = process.hrtime.bigint();
+    const remoteAddress = request.ip || request.socket.remoteAddress || "";
+    fastify.log.info({ method: request.method, url: request.url, remoteAddress }, "onRequest");
+  });
+
+  fastify.addHook("onResponse", async (request, reply) => {
+    const start = (request as unknown as Record<symbol, bigint>)[reqStartKey];
+    const durationMs = start ? Number(process.hrtime.bigint() - start) / 1e6 : null;
+    fastify.log.info({ statusCode: reply.statusCode, durationMs }, "onResponse");
+  });
+
   // Register CORS plugin
   // 微信小程序不受浏览器CORS限制，但Web管理后台需要
   if (config.CORS_ORIGIN) {

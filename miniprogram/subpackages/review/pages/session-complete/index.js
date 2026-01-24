@@ -5,6 +5,8 @@ const { getStreakInfo, getDashboard, subscribeStudyReminder, getStudyReminderSta
 const { STUDY_REMINDER_TEMPLATE_ID } = require('../../../../utils/constants');
 const { track } = require('../../../../utils/track');
 const logger = require('../../../../utils/logger');
+const Confetti = require('../../../../utils/confetti');
+const soundManager = require('../../../../utils/sound-manager');
 
 Page({
   data: {
@@ -55,6 +57,52 @@ Page({
 
     this.loadStats();
     this.loadReminderStatus();
+  },
+
+  onReady() {
+    this.initConfetti();
+  },
+
+  onUnload() {
+    if (this.confetti) {
+      this.confetti.clear();
+    }
+  },
+
+  initConfetti() {
+    const query = wx.createSelectorQuery().in(this);
+    query.select('#confetti')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        if (!res[0] || !res[0].node) return;
+        
+        const canvas = res[0].node;
+        const width = res[0].width;
+        const height = res[0].height;
+        
+        // Handle High DPI
+        const dpr = wx.getSystemInfoSync().pixelRatio;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        
+        // Pass logical size for calculations
+        canvas.width = width; 
+        canvas.height = height;
+
+        this.confetti = new Confetti(canvas, ctx);
+        
+        // Trigger burst
+        setTimeout(() => {
+          this.confetti.burst(80);
+          // 播放音效 (如果文件存在)
+          // 用户提示: "我后面再加上音效mp3文件"
+          // 代码已就绪，只要文件放进去就会响
+          soundManager.play('celebration');
+        }, 300);
+      });
   },
 
   async loadStats() {

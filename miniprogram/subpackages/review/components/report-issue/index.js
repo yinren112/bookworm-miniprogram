@@ -3,6 +3,7 @@
 
 const { submitFeedback } = require('../../utils/study-api');
 const logger = require('../../../../utils/logger');
+const feedback = require('../../../../utils/ui/feedback');
 
 Component({
   properties: {
@@ -46,7 +47,7 @@ Component({
     // 选择原因
     selectReason(e) {
       const { value } = e.currentTarget.dataset;
-      wx.vibrateShort({ type: 'light' });
+      feedback.tap('light');
       this.setData({ selectedReason: value });
     },
 
@@ -105,7 +106,7 @@ Component({
 
         await submitFeedback(feedbackData);
 
-        wx.vibrateShort({ type: 'medium' });
+        feedback.success();
         wx.showToast({
           title: '反馈已提交',
           icon: 'success',
@@ -132,7 +133,7 @@ Component({
     // 关闭弹窗
     handleClose() {
       if (this.data.submitting) return;
-      wx.vibrateShort({ type: 'light' });
+      feedback.tap('light');
       this.setData({
         selectedReason: null,
         message: '',

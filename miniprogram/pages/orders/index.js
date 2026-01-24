@@ -1,4 +1,4 @@
-﻿// pages/orders/index.js
+// pages/orders/index.js
 const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
 const tokenUtil = require('../../utils/token');
@@ -18,6 +18,12 @@ Page({
   },
   onShow() {
     this.fetchUserOrders();
+  },
+  onRetry() {
+    this.fetchUserOrders();
+  },
+  goMarket() {
+    wx.switchTab({ url: '/pages/market/index' });
   },
   navigateToDetail(event) {
     const orderId = event.currentTarget.dataset.orderId;

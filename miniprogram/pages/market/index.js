@@ -116,6 +116,15 @@ Page({
     }
   },
 
+  onRetry() {
+    this.fetchAvailableBooks({ forceRefresh: true });
+  },
+
+  onClearSearch() {
+    this.setData({ searchTerm: '', searchPerformed: false });
+    this.fetchAvailableBooks({ forceRefresh: true });
+  },
+
   // NEW: Handle input change
   handleInput(e) {
     this.setData({

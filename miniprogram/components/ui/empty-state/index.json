@@ -1,0 +1,7 @@
+{
+  "component": true,
+  "usingComponents": {
+    "juicy-button": "/components/ui/juicy-button/index",
+    "card-flat": "/components/ui/card-flat/index"
+  }
+}

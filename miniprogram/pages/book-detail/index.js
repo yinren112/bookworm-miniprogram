@@ -10,6 +10,7 @@ Page({
   data: {
     bookDetail: null,
     isLoading: true,
+    notFound: false,
     error: null,
     isSubmitting: false,
   },
@@ -43,9 +44,9 @@ Page({
 
   async fetchBookDetails(id, { preserveData = false } = {}) {
     if (!preserveData) {
-      this.setData({ isLoading: true, error: null });
+      this.setData({ isLoading: true, error: null, notFound: false });
     } else {
-      this.setData({ error: null });
+      this.setData({ error: null, notFound: false });
     }
     try {
       const data = await request({
@@ -53,19 +54,28 @@ Page({
         method: 'GET'
       });
       if (!data) {
-        this.setData({ error: '书籍信息不存在' });
+        this.setData({ bookDetail: null, notFound: true, error: null });
       } else {
         applyCoverProxy(data);
-        this.setData({ bookDetail: data });
+        this.setData({ bookDetail: data, notFound: false, error: null });
       }
     } catch (error) {
       logger.error('API request failed', error);
       const errorMsg = extractErrorMessage(error, '加载失败');
-      this.setData({ error: errorMsg });
+      this.setData({ error: errorMsg, notFound: false });
       ui.showError(errorMsg);
     } finally {
       this.setData({ isLoading: false });
     }
+  },
+
+  onRetry() {
+    if (!this.currentId) return;
+    this.fetchBookDetails(this.currentId);
+  },
+
+  goMarket() {
+    wx.switchTab({ url: '/pages/market/index' });
   },
 
   async handleBuyNow() {

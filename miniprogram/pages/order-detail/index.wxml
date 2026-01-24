@@ -7,14 +7,17 @@
   <view class="bg-blob bg-blob-2"></view>
 
   <!-- Loading State -->
-  <skeleton wx:if="{{isLoading}}" type="list" count="3" />
+  <loading-state wx:if="{{isLoading}}" variant="page" text="加载中..." />
 
   <!-- Error State -->
-  <view wx:elif="{{error}}" class="error-container anim-fade-in-up">
-    <view class="error-icon">⚠️</view>
-    <view class="error-text">{{error}}</view>
-    <button class="retry-btn" bind:tap="onRefresh">刷新重试</button>
-  </view>
+  <error-state
+    wx:elif="{{error}}"
+    mode="network"
+    title="加载失败"
+    desc="{{error}}"
+    retryText="刷新重试"
+    bind:retry="onRefresh"
+  />
 
   <!-- Order Detail Content -->
   <view wx:else class="order-detail anim-fade-in-up">
@@ -46,7 +49,7 @@
       
       <view class="code-section">
         <text class="code-label">取货码</text>
-        <text class="pickup-code clay-num">{{order.pickup_code}}</text>
+        <text class="pickup-code">{{order.pickup_code}}</text>
         <button class="copy-btn" bind:tap="copyPickupCode" data-code="{{order.pickup_code}}">复制</button>
       </view>
 
@@ -86,11 +89,11 @@
             <text class="book-title">{{item.inventoryItem.bookSku.bookMaster.title}}</text>
             <text class="book-author">{{item.inventoryItem.bookSku.bookMaster.author || '作者未知'}}</text>
             <view class="tags-row">
-              <view class="clay-tag">{{filters.getConditionText(item.inventoryItem.condition)}}</view>
-              <view class="clay-tag version" wx:if="{{item.inventoryItem.bookSku.edition}}">{{item.inventoryItem.bookSku.edition}}</view>
+              <view class="tag">{{filters.getConditionText(item.inventoryItem.condition)}}</view>
+              <view class="tag version" wx:if="{{item.inventoryItem.bookSku.edition}}">{{item.inventoryItem.bookSku.edition}}</view>
             </view>
           </view>
-          <text class="book-price clay-num">{{filters.formatCurrency(item.price)}}</text>
+          <text class="book-price">{{filters.formatCurrency(item.price)}}</text>
         </view>
       </view>
     </view>
@@ -99,22 +102,22 @@
     <view class="meta-card">
       <view class="meta-row">
         <text class="label">订单编号</text>
-        <text class="value copyable clay-num" bindtap="copyOrderId" data-id="{{order.id}}">{{order.id}}</text>
+        <text class="value copyable" bindtap="copyOrderId" data-id="{{order.id}}">{{order.id}}</text>
       </view>
       <view class="meta-row">
         <text class="label">下单时间</text>
-        <text class="value clay-num">{{formatDate(order.createdAt)}}</text>
+        <text class="value">{{formatDate(order.createdAt)}}</text>
       </view>
       <view wx:if="{{order.paid_at}}" class="meta-row">
         <text class="label">支付时间</text>
-        <text class="value clay-num">{{formatDate(order.paid_at)}}</text>
+        <text class="value">{{formatDate(order.paid_at)}}</text>
       </view>
       
       <view class="meta-divider"></view>
       
       <view class="meta-row total">
         <text class="label">实付金额</text>
-        <text class="value total-price clay-num">{{filters.formatCurrency(order.total_amount)}}</text>
+        <text class="value total-price">{{filters.formatCurrency(order.total_amount)}}</text>
       </view>
     </view>
 

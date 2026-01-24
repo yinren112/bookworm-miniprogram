@@ -161,7 +161,7 @@ export const StudyDashboardCourseSchema = Type.Object({
 
 export const StudyDashboardHeatmapSchema = Type.Object({
   date: Type.String({ format: "date" }),
-  count: Type.Integer({ minimum: 0 }),
+  totalDurationSeconds: Type.Integer({ minimum: 0 }),
   level: Type.Integer({ minimum: 0, maximum: 3 }),
 });
 
@@ -505,14 +505,27 @@ export const ActivityHistoryQuerySchema = Type.Object({
 
 export const DailyActivitySchema = Type.Object({
   date: Type.String({ format: "date" }),
-  count: Type.Integer({ minimum: 0 }),
+  totalDurationSeconds: Type.Integer({ minimum: 0 }),
+  cardDurationSeconds: Type.Integer({ minimum: 0 }),
+  quizDurationSeconds: Type.Integer({ minimum: 0 }),
+  cheatsheetDurationSeconds: Type.Integer({ minimum: 0 }),
   level: Type.Integer({ minimum: 0, maximum: 3 }),
 });
 
 export const ActivityHistoryResponseSchema = Type.Object({
   days: Type.Array(DailyActivitySchema),
   totalDays: Type.Integer({ minimum: 0 }),
-  totalCount: Type.Integer({ minimum: 0 }),
+  totalDurationSeconds: Type.Integer({ minimum: 0 }),
+});
+
+export const ActivityPulseBodySchema = Type.Object({
+  type: Type.Union([Type.Literal("card"), Type.Literal("quiz"), Type.Literal("cheatsheet")]),
+  activityDate: Type.String({ format: "date" }),
+  totalDurationSeconds: Type.Integer({ minimum: 0, maximum: 86400 }),
+});
+
+export const ActivityPulseResponseSchema = Type.Object({
+  ok: Type.Boolean(),
 });
 
 // Phase 5 types
@@ -520,6 +533,7 @@ export type LeaderboardQuery = Static<typeof LeaderboardQuerySchema>;
 export type StreakInfoResponse = Static<typeof StreakInfoResponseSchema>;
 export type LeaderboardResponse = Static<typeof LeaderboardResponseSchema>;
 export type ActivityHistoryQuery = Static<typeof ActivityHistoryQuerySchema>;
+export type ActivityPulseBody = Static<typeof ActivityPulseBodySchema>;
 
 // ============================================
 // 课程包导入 Schema (Phase 6)
@@ -542,6 +556,23 @@ export const UnitDefinitionSchema = Type.Object({
 });
 
 // POST /api/study/admin/import
+const CheatSheetPdfImageSchema = Type.Object({
+  title: Type.String({ minLength: 1, maxLength: 255 }),
+  assetType: Type.Union([Type.Literal("pdf"), Type.Literal("image")]),
+  url: Type.String({ minLength: 1, maxLength: 500 }),
+  unitKey: Type.Optional(Type.String({ maxLength: 100 })),
+  version: Type.Optional(Type.Integer({ minimum: 1 })),
+});
+
+const CheatSheetNoteSchema = Type.Object({
+  title: Type.String({ minLength: 1, maxLength: 255 }),
+  assetType: Type.Literal("note"),
+  content: Type.String({ minLength: 1 }),
+  contentFormat: Type.Optional(Type.Literal("markdown")),
+  unitKey: Type.Optional(Type.String({ maxLength: 100 })),
+  version: Type.Optional(Type.Integer({ minimum: 1 })),
+});
+
 export const ImportCourseBodySchema = Type.Object({
   manifest: CourseManifestSchema,
   units: Type.Array(UnitDefinitionSchema, { minItems: 1 }),
@@ -567,13 +598,7 @@ export const ImportCourseBodySchema = Type.Object({
       difficulty: Type.Optional(Type.Integer({ minimum: 1, maximum: 5 })),
     }))
   )),
-  cheatsheets: Type.Optional(Type.Array(Type.Object({
-    title: Type.String({ minLength: 1, maxLength: 255 }),
-    assetType: Type.Union([Type.Literal("pdf"), Type.Literal("image")]),
-    url: Type.String({ minLength: 1, maxLength: 500 }),
-    unitKey: Type.Optional(Type.String({ maxLength: 100 })),
-    version: Type.Optional(Type.Integer({ minimum: 1 })),
-  }))),
+  cheatsheets: Type.Optional(Type.Array(Type.Union([CheatSheetPdfImageSchema, CheatSheetNoteSchema]))),
   options: Type.Optional(Type.Object({
     dryRun: Type.Optional(Type.Boolean({ default: false })),
     overwriteContent: Type.Optional(Type.Boolean({ default: false })),

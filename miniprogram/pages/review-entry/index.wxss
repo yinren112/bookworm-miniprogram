@@ -4,10 +4,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F0F9F4;
+  background: var(--color-bg-soft);
 }
 
 .loading-text {
   font-size: 28rpx;
-  color: #8FA396;
+  color: var(--color-text-light);
 }

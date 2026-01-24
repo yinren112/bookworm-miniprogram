@@ -1,39 +1,27 @@
-# Task Plan: One-time Subscription Template Integration
+# 课程导入：待导入课程文件夹的课程包
 
-## Goal
-Implement one-time subscription message for study reminders, replacing the daily reminder model. Ensure exact template key mapping, correct frontend integration, and robust backend handling (idempotency, consumption state).
+## 目标
+- 将 `待导入课程/` 目录中的课程按教程导入到系统（后端数据库/复习模块可用）。
+- 导入过程可复现：明确入口脚本/命令、输入文件、以及验证方式。
 
-## Key Information
-- **Template ID**: `kNHUGMC5tapQG7aTC2zalWgnW0iFuBjbwp06xDOXRjk`
-- **Type**: One-time subscription (Requires "Consume" logic)
-- **Constraint**: Strict template key mapping (No guessing)
-- **Confirmed Keys**:
-    - 复习内容 = `thing2` (CONTENT)
-    - 复习数量 = `number1` (COUNT)
-    - 开始学习时间 = `time5` (START_TIME)
-    - 备注 = `thing4` (REMARK)
+## 范围
+- 仅处理 `待导入课程/` 内的课程数据导入（以 `manifest.json` 清单为准）。
+- 不做与导入无关的功能开发与页面优化。
 
-## Phases
+## 阶段
+| 阶段 | 状态 | 产出 |
+|---|---|---|
+| 1. 读取教程与数据结构勘察 | complete | 找到教程 md、课程清单、输入格式与导入入口 |
+| 2. 执行导入 | complete | 所有课程均导入成功，过程可重复 |
+| 3. 验证与回归 | complete | 通过接口/数据库/前端任一方式确认可用 |
 
-### Phase 1: Preparation & Discovery (Completed)
-- [x] Identify Template Keys (User Provided)
-- [x] Create/Update mapping table file
-- [x] Verify Schema requirements (Added `SENT`, `FAILED`, `sentAt`, `lastError`)
-- [x] Schema Migration
+## 关键假设
+- 导入教程 md 与课程数据都位于 `待导入课程/` 同一目录下。
+- 后端已可运行（本地 `bookworm-backend` 开发服务器可用）。
 
-### Phase 2: Frontend Implementation (Completed)
-- [x] Update `STUDY_REMINDER_TEMPLATE_ID` in `miniprogram/utils/constants.js`
-- [x] Verify subscription entry points
-- [x] Update UI copy ("Daily" -> "Next") in `session-complete` and `profile`.
+## 风险与回滚
+- 风险：重复导入导致唯一约束/数据污染。回滚策略优先走“按课程键/slug删除”或“清空导入批次”。
 
-### Phase 3: Backend Core Implementation (Completed)
-- [x] Update `studyReminderTemplate.ts` with Real Keys
-- [x] Verify `reminderService.ts` dynamic data construction.
-
-### Phase 4: Testing & Verification (Completed)
-- [x] Lint Check (`npm run lint`). Status: Pass
-- [x] Unit Tests (`npm test`). Status: Pass
-- [x] Integration Tests (`npm run test:integration`). Status: Pass (28 test files passed)
-
-### Phase 5: Documentation & Handoff (Completed)
-- [x] Generate Final Report
+## Errors Encountered
+| Error | Attempt | Resolution |
+|---|---:|---|

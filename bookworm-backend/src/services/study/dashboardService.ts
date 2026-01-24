@@ -27,7 +27,7 @@ export interface StudyDashboard {
   wrongCount: number;
   etaMinutes: number;
   streakDays: number;
-  activeHeatmap: Array<{ date: string; count: number; level: number }>;
+  activeHeatmap: Array<{ date: string; totalDurationSeconds: number; level: number }>;
   currentCourse: StudyDashboardCourse | null;
   resumeSession: ResumeSessionSnapshot | null;
 }
@@ -55,7 +55,7 @@ export async function getStudyDashboard(
       streakDays: streakInfo.currentStreak,
       activeHeatmap: activityHistory.days.map((day) => ({
         date: day.date,
-        count: day.count,
+        totalDurationSeconds: day.totalDurationSeconds,
         level: day.level,
       })),
       currentCourse: null,
@@ -82,7 +82,7 @@ export async function getStudyDashboard(
     streakDays: streakInfo.currentStreak,
     activeHeatmap: activityHistory.days.map((day) => ({
       date: day.date,
-      count: day.count,
+      totalDurationSeconds: day.totalDurationSeconds,
       level: day.level,
     })),
     currentCourse: {

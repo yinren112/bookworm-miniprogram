@@ -1,0 +1,37 @@
+<view class="es-root">
+  <card-flat wx:if="{{useCard}}" padding="{{cardPadding}}" custom-class="es-card">
+    <view class="es es--inCard">
+      <view class="es__icon es__icon--{{status}}">
+        <text class="es__iconText">{{iconText}}</text>
+      </view>
+      <text class="es__title">{{title}}</text>
+      <text class="es__subtitle" wx:if="{{desc || subtitle}}">{{desc || subtitle}}</text>
+      <view class="es__actions" wx:if="{{(showAction && (actionText || primaryText)) || secondaryText}}">
+        <juicy-button
+          wx:if="{{showAction && (actionText || primaryText)}}"
+          type="{{actionType || primaryType}}"
+          size="sm"
+          bind:tap="{{actionText ? 'onAction' : 'onPrimary'}}"
+        >{{actionText || primaryText}}</juicy-button>
+        <juicy-button wx:if="{{secondaryText}}" type="{{secondaryType}}" size="sm" bind:tap="onSecondary">{{secondaryText}}</juicy-button>
+      </view>
+    </view>
+  </card-flat>
+
+  <view wx:else class="es">
+    <view class="es__icon es__icon--{{status}}">
+      <text class="es__iconText">{{iconText}}</text>
+    </view>
+    <text class="es__title">{{title}}</text>
+    <text class="es__subtitle" wx:if="{{desc || subtitle}}">{{desc || subtitle}}</text>
+    <view class="es__actions" wx:if="{{(showAction && (actionText || primaryText)) || secondaryText}}">
+      <juicy-button
+        wx:if="{{showAction && (actionText || primaryText)}}"
+        type="{{actionType || primaryType}}"
+        size="sm"
+        bind:tap="{{actionText ? 'onAction' : 'onPrimary'}}"
+      >{{actionText || primaryText}}</juicy-button>
+      <juicy-button wx:if="{{secondaryText}}" type="{{secondaryType}}" size="sm" bind:tap="onSecondary">{{secondaryText}}</juicy-button>
+    </view>
+  </view>
+</view>

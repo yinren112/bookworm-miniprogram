@@ -113,8 +113,11 @@ export {
 // 学习活动服务（热力图）
 export {
   getActivityHistory,
+  recordDailyStudyDuration,
+  parseYmdToDateOnlyUtc,
   type DailyActivity,
   type ActivityHistory,
+  type StudyActivityType,
 } from "./activityService";
 
 // 复习首页聚合数据

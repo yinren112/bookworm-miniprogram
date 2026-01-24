@@ -3,8 +3,10 @@
 
 const { startQuiz, submitQuizAnswer, starItem, unstarItem, getStarredItems } = require("../../utils/study-api");
 const { getResumeSession, saveResumeSession, clearResumeSession, setLastSessionType } = require("../../utils/study-session");
+const studyTimer = require("../../utils/study-timer");
 const logger = require("../../../../utils/logger");
 const { track } = require("../../../../utils/track");
+const feedback = require("../../../../utils/ui/feedback");
 
 Page({
   data: {
@@ -75,6 +77,15 @@ Page({
         icon: "none",
       });
     }
+  },
+
+  onShow() {
+    studyTimer.start("quiz");
+    studyTimer.onInteraction();
+  },
+
+  onUserInteraction() {
+    studyTimer.onInteraction();
   },
 
   tryResumeSession(courseKey) {
@@ -198,7 +209,7 @@ Page({
      const newVal = !isStarred;
      const qId = currentQuestion.id;
 
-     wx.vibrateShort({ type: 'light' });
+     feedback.tap('light');
      this.setData({ isStarred: newVal });
 
      const updatePromise = newVal
@@ -241,7 +252,7 @@ Page({
 
     const { index } = e.currentTarget.dataset;
     const { currentQuestion } = this.data;
-    wx.vibrateShort({ type: "light" });
+    feedback.tap("light");
 
     if (currentQuestion.questionType === "MULTI_CHOICE") {
       const selectedAnswers = this.data.selectedAnswers.slice();
@@ -272,7 +283,7 @@ Page({
 
   submitFillAnswer() {
     if (!this.data.fillAnswer) return;
-    wx.vibrateShort({ type: "light" });
+    feedback.tap("light");
     this.submitAnswer(this.data.fillAnswer.trim());
   },
 
@@ -360,7 +371,8 @@ Page({
       });
 
       // 触觉反馈
-      wx.vibrateShort({ type: result.isCorrect ? "light" : "medium" });
+      if (result.isCorrect) feedback.correct();
+      else feedback.wrong();
     } catch (err) {
       logger.error("Failed to submit answer:", err);
       wx.showToast({
@@ -451,7 +463,7 @@ Page({
   },
 
   openReportModal() {
-    wx.vibrateShort({ type: "light" });
+    feedback.tap("light");
     this.setData({ showReportModal: true });
   },
 
@@ -465,6 +477,8 @@ Page({
 
   onHide() {
     this.trackAbort("hide");
+    studyTimer.flush();
+    studyTimer.stop();
   },
 
   onFeedback() {
@@ -517,6 +531,8 @@ Page({
 
   onUnload() {
     this.trackAbort("close");
+    studyTimer.flush();
+    studyTimer.stop();
   },
 
   onShareAppMessage() {

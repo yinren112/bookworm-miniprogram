@@ -1,41 +1,12 @@
 # Findings
 
-## Context
-- We are moving from "Daily Reminder" to "One-time Reminder".
-- Template ID: `kNHUGMC5tapQG7aTC2zalWgnW0iFuBjbwp06xDOXRjk`
-
-## Schema Analysis
-- Current `StudyReminderSubscription` table exists.
-- Current Status Enum: `ACCEPT`, `REJECT`, `BAN`.
-- Need to support: `SENT` (Consumed), `FAILED` (Consumed/Error).
-- User requested `sentAt` field (Already exists as `lastSentAt`? Or strict `sentAt` for the one-time event? User said `sentAt` non-null). `lastSentAt` seems sufficient if we treat it as "the time it was sent".
-- Uniqueness: `@@unique([userId, templateId])`. This implies one row per user per template. For ONE-TIME subscription, usually, a user subscribes *again* for the next one.
-  - If `@@unique` is on `userId, templateId`, how do we handle multiple subscriptions?
-  - WeChat One-time subscription: User taps -> adds 1 to quota.
-  - Does WeChat allow getting the *count*? No. 
-  - Typically, we just check if we have a valid subscription.
-  - If we send one, the quota decreases.
-  - If we treat it as "Store one record per user", and update status to `SENT`, then the user needs to subscribe *again* to reset it to `ACCEPT`.
-  - `upsert` logic in `reminderService.ts` handles re-subscription:
-    ```typescript
-    update: {
-      status, // Sets to ACCEPT
-      consentAt: now,
-      ...
-    }
-    ```
-    This works for re-subscription.
-
-## Template Keys
-- **MISSING**: Exact mapping of keys (thing1, time2, etc.) to content. (Resolved: User provided keys: `thing2, number1, time5, thing4`)
-
-## Debug Log: Missing Course on Dashboard (2026-01-23)
-- **Symptom**: Frontend Dashboard shows no current course/progress. Backend logic was skipping enrollment checks.
-- **Investigation**:
-  - `getStudyDashboard` logs showed `!course` was true.
-  - Direct database query confirmed `StudyCourse` table was empty (0 records).
-  - Cause: Development database likely reset or fresh, lacking seed data.
-- **Resolution**:
-  - Ran `npm run seed` to restore standard courses (including "MA101 高数").
-  - Manually re-enrolled User ID 1 into Course ID 1 using `enroll_user.ts`.
-- **Status**: Fixed. Dashboard should now populate correctly.
+## 课程导入
+- 课程包目录：`待导入课程/`
+- 教程：`待导入课程/复习模块课程导入完整教程.md`
+- 课程清单（以 manifest.json 为准）：
+  - `待导入课程/市场营销/MARKETING001_CONSUMER/`
+  - `待导入课程/风景园林/LANDSCAPE001_PRINCIPLES/`
+- 该目录下仅发现 2 份 `manifest.json`，未发现第 3 门课程包。
+- 导入工具：`bookworm-backend/scripts/import_course_client.js`
+- 导入接口鉴权：`POST /api/study/admin/import` 需要 `STAFF` 角色 JWT
+- 开发环境登录特性：`/api/auth/login` 在非 prod/staging 会固定返回 `mock-openid-dev-fixed-user`（不依赖真实微信）

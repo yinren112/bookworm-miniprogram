@@ -227,7 +227,8 @@ The system follows a strict "books as atomic inventory items" model where each i
 **Page Structure:**
 - `pages/review/` - 复习首页（主包，TabBar）
 - `pages/profile/` - 个人中心（TabBar，复习模式隐藏交易入口）
-- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/周榜/结算）
+- `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图）
+- `pages/dev-settings/` - 开发环境 API 地址配置（本地调试用）
 - `pages/customer-service/` - Customer support (WeChat ID copy)
 - `pages/webview/` - Generic WebView for dynamic content loading
 - `pages/review-entry/` - Legacy redirect page (not registered in review-only TabBar)
@@ -248,6 +249,7 @@ The system follows a strict "books as atomic inventory items" model where each i
 - **Core Utility Modules**:
   - `token.js`: Manages user token and ID in local storage. Zero dependencies.
   - `api.js`: Handles all API requests, depends on `config.js`, `token.js`, `auth-guard.js`
+  - `request.js`: Low-level HTTP client with retries + request IDs; only place to call `wx.request`
   - `auth-guard.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
 
 - **Additional Utility Modules**:
@@ -258,12 +260,16 @@ The system follows a strict "books as atomic inventory items" model where each i
   - `constants.js`: Business constants (ORDER_STATUS enums)
   - `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
   - `study-api.js`: Review system API wrapper
+  - `study-session.js`: Review session state helpers
+  - `url.js`: Normalize DEV_API_BASE_URL and URLs
+  - `track.js`: Lightweight analytics tracking
+  - `haptic.js`/`sound-manager.js`/`confetti.js`/`theme.js`: Interaction and theme helpers
 
 - **WXS Modules** (for WXML rendering):
   - `formatter.wxs`: Time formatting (formatTime, formatOrderTime)
   - `filters.wxs`: Price formatting (formatPrice, formatCurrency, formatCurrencyFromCents)
 
-**⚠️ Dependency Note**: `api.js` requires `auth-guard.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.performRequest → 401 handling → auth.ensureLoggedIn → auth.login → wx.request).
+**⚠️ Dependency Note**: `api.js` requires `auth-guard.js` which creates conditional circular dependency during 401 error handling. Current implementation avoids hard cycles but dependency chain is deep (api.request → 401 handling → auth.ensureLoggedIn → auth.login → request.request → wx.request).
 
 ## Development Commands
 
@@ -305,7 +311,7 @@ npx prisma migrate dev
 
 ### WeChat Mini Program
 - Use WeChat Developer Tools to open the `miniprogram/` directory
-- Configure API endpoint in `miniprogram/config.js`
+- Configure API endpoint in `miniprogram/config.js`; local devices can set `DEV_API_BASE_URL` via `pages/dev-settings`
 - TabBar icons must be PNG format (81x81px); current review-only TabBar uses `images/icons/home.png` and `images/icons/usercenter.png`
 
 ## Database Schema
@@ -550,6 +556,7 @@ WX_APP_SECRET=test-app-secret
 - Dynamic WeChat Pay certificate management with auto-refresh
 - Payment notification webhook with timestamp validation
 - 小程序禁止直接使用 `console.*`，统一用 `miniprogram/utils/logger.js`（提交检查会忽略 `miniprogram/components/mp-html` 与 `miniprogram/node_modules`）。
+- 小程序网络请求必须走 `miniprogram/utils/request.js`，不要直接调用 `wx.request`。
 
 **复习模式（前端）:**
 - `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 保持 `true`
@@ -734,3 +741,10 @@ Host lailinkeji
 ### SOP-预提交忽略第三方 mp-html
 1. 在 `miniprogram/.eslintignore` 中加入 `components/mp-html/**`。
 2. 在 `.husky/pre-commit` 的 console 守卫中排除 `mp-html` 目录。
+
+### SOP-课程导入（给定课程包文件夹）
+1. 以 `manifest.json` 为课程包的唯一判定标准：先扫描目录下所有 `manifest.json`，数量即课程数量；缺 manifest 就等于缺课程。
+2. 导入入口固定使用 `bookworm-backend/scripts/import_course_client.js`；流程固定为 `--dry-run` 校验通过后再 `--force --publish`。
+3. 导入接口是 `STAFF` 权限：JWT payload 必须带 `role=STAFF`，提升角色后必须重新登录才能拿到可用 token。
+4. 验证只做两步：`GET /api/study/courses`（只返回 PUBLISHED）与 `GET /api/study/courses/:courseKey`（核对 units/cards/questions 数量）。
+5. 详细操作手册见：`docs/operations/课程导入SOP（给定课程包文件夹）.md`。

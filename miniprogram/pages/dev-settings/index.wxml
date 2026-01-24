@@ -1,0 +1,31 @@
+<view class="container">
+  <card-flat>
+    <text class="label">开发后端地址</text>
+    <input
+      class="input"
+      value="{{value}}"
+      placeholder="192.168.43.20:8080 或 http(s)://.../api"
+      bindinput="onInput"
+    />
+    <view class="kv">
+      <text class="k">归一化后</text>
+      <text class="v" selectable>{{normalizedValue}}</text>
+    </view>
+    <view class="kv">
+      <text class="k">当前生效 baseUrl</text>
+      <text class="v" selectable>{{effectiveBaseUrl}}</text>
+    </view>
+    <text class="hint">仅 develop 真机调试生效；保存后下次请求生效。</text>
+    <view class="actions">
+      <view class="action">
+        <juicy-button type="secondary" size="sm" full bind:tap="onClear">清除</juicy-button>
+      </view>
+      <view class="action">
+        <juicy-button type="secondary" size="sm" full bind:tap="onCopyEffective">复制生效地址</juicy-button>
+      </view>
+      <view class="action">
+        <juicy-button type="primary" size="sm" full bind:tap="onSave">保存</juicy-button>
+      </view>
+    </view>
+  </card-flat>
+</view>

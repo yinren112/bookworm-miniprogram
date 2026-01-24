@@ -2,6 +2,8 @@
   "navigationBarTitleText": "书市",
   "enablePullDownRefresh": true,
   "usingComponents": {
-    "skeleton": "../../components/skeleton/skeleton"
+    "loading-state": "/components/ui/loading-state/index",
+    "error-state": "/components/ui/error-state/index",
+    "empty-state": "/components/ui/empty-state/index"
   }
 }

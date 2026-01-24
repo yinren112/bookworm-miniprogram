@@ -9,6 +9,12 @@ Page({
     errorMsg: ''
   },
 
+  onRetry() {
+    if (this.currentSlug) {
+      this.loadContent(this.currentSlug);
+    }
+  },
+
   onLoad(options) {
     const { slug } = options;
     this.hasShownOnce = false;

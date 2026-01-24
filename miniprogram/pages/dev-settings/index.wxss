@@ -1,0 +1,67 @@
+page {
+  background: var(--color-bg-soft);
+}
+
+.container {
+  padding: var(--space-8);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.label {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
+  margin-bottom: var(--space-4);
+}
+
+.input {
+  height: 96rpx;
+  border-radius: var(--radius-btn);
+  border: var(--border-thick) solid var(--color-border);
+  padding: 0 var(--space-6);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-bg-card);
+  box-sizing: border-box;
+}
+
+.hint {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+}
+
+.kv {
+  margin-top: var(--space-4);
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+}
+
+.k {
+  flex: 0 0 auto;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+}
+
+.v {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-main);
+  word-break: break-all;
+}
+
+.actions {
+  margin-top: var(--space-6);
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.action {
+  flex: 1 1 200rpx;
+}

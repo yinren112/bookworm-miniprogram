@@ -15,7 +15,7 @@
   <!-- 连续扫码开关 -->
   <view class="scan-mode-switch">
     <text class="switch-label">连续扫码模式</text>
-    <switch checked="{{continuousMode}}" bindchange="onContinuousModeChange" color="#48BB78" />
+    <switch checked="{{continuousMode}}" bindchange="onContinuousModeChange" />
   </view>
 
   <!-- 已扫描书籍列表 -->
@@ -50,11 +50,15 @@
   </view>
 
   <!-- 空状态 -->
-  <view wx:if="{{scannedItems.length === 0}}" class="empty-state">
-    <image class="empty-img" src="/images/empty-shelf.png" mode="widthFix" />
-    <text class="empty-text">还没有扫描任何书籍</text>
-    <text class="empty-hint">点击上方按钮开始扫码</text>
-  </view>
+  <empty-state
+    wx:if="{{scannedItems.length === 0}}"
+    title="还没有扫描任何书籍"
+    desc="点击上方按钮开始扫码"
+    actionText="开始扫码"
+    actionType="primary"
+    showAction
+    bind:action="onScanCode"
+  />
 
   <!-- 结算信息 -->
   <view wx:if="{{summary.count > 0}}" class="summary-section">

@@ -2,29 +2,20 @@
 <view class="container page-container">
   
   <!-- Loading -->
-  <skeleton wx:if="{{isLoading}}" type="article" />
+  <loading-state wx:if="{{isLoading}}" variant="page" text="加载中..." />
 
   <!-- Error -->
   <view wx:elif="{{errorMsg}}" class="error-container">
-    <view class="error-icon">⚠️</view>
-    <text class="error-text">{{errorMsg}}</text>
-    <button class="retry-btn" bindtap="onLoad" data-slug="{{currentSlug}}">重试</button>
+    <error-state title="加载失败" desc="{{errorMsg}}" bind:retry="onRetry" />
   </view>
 
   <!-- Content (Paper Style) -->
-  <view wx:else class="paper-card">
-    <!-- Decorative Holes -->
-    <view class="holes-row">
-      <view class="hole"></view>
-      <view class="hole"></view>
-      <view class="hole"></view>
-    </view>
-    
+  <card-flat wx:else>
     <view class="content-body">
       <view class="doc-title">{{content.title}}</view>
       <view class="doc-divider"></view>
       <rich-text nodes="{{content.body}}" class="rich-content"></rich-text>
     </view>
-  </view>
+  </card-flat>
 
 </view>

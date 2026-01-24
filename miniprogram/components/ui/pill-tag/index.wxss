@@ -1,0 +1,21 @@
+.pt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  padding: 8rpx 20rpx;
+  font-weight: var(--font-weight-heavy);
+  border: var(--border-thick) solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-light);
+  box-sizing: border-box;
+}
+
+.pt--sm { font-size: var(--font-size-xs); padding: 6rpx 16rpx; }
+.pt--md { font-size: var(--font-size-sm); }
+
+.pt--neutral { border-color: var(--color-border); color: var(--color-text-light); }
+.pt--green { border-color: var(--color-juicy-green); color: var(--color-juicy-green); background: var(--color-bg-success); }
+.pt--blue { border-color: var(--color-juicy-blue); color: var(--color-juicy-blue); background: var(--color-bg-info); }
+.pt--yellow { border-color: var(--color-juicy-yellow-shade); color: var(--color-juicy-yellow-shade); background: var(--color-bg-warn); }
+.pt--red { border-color: var(--color-juicy-red); color: var(--color-juicy-red); background: var(--color-bg-danger); }

@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "订单详情"
+  "navigationBarTitleText": "订单详情",
+  "usingComponents": {
+    "loading-state": "/components/ui/loading-state/index",
+    "error-state": "/components/ui/error-state/index"
+  }
 }

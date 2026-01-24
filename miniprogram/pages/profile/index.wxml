@@ -1,20 +1,26 @@
 <!-- pages/profile/index.wxml -->
 <view class="container profile-container">
-  <!-- Header Section (User Card) -->
   <view class="header">
     <view class="avatar-wrapper">
       <image class="user-avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
-      <!-- 微信头像组件 (OpenData) 已废弃，建议使用 button open-type="chooseAvatar" 或者直接显示默认头像引导用户完善 -->
-      <!-- 这里我们先用精致的默认头像 -->
     </view>
     <text class="username">{{userInfo.nickName || '微信用户'}}</text>
-    <!-- Phone Number Authorization Button -->
-    <button wx:if="{{!isReviewMode && !hasPhoneNumber}}" class="auth-phone-button" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber">
-      授权手机号（关联卖书记录）
-    </button>
+    <view style="width: 80%; margin-top: 24rpx;">
+      <juicy-button
+        wx:if="{{!isReviewMode && !hasPhoneNumber}}"
+        type="primary"
+        size="sm"
+        full
+        openType="getPhoneNumber"
+        bind:getphonenumber="onGetPhoneNumber"
+      >
+        授权手机号（关联卖书记录）
+      </juicy-button>
+    </view>
   </view>
-  <!-- Review System Entry -->
-  <view class="review-entry-card card" bindtap="goToReview">
+
+  <view class="profile-content">
+    <card-flat clickable custom-class="review-entry-card" bind:tap="goToReview">
     <view class="review-entry-content">
       <view class="review-icon-wrapper">
         <image class="review-icon" src="/images/icons/review/book.svg" />
@@ -25,24 +31,27 @@
       </view>
     </view>
     <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-  </view>
-  <view class="menu-card card reminder-card">
-    <view class="menu-item reminder-item">
+  </card-flat>
+
+  <card-flat>
+    <view class="reminder-row">
       <view class="menu-content">
         <text class="menu-text">复习提醒设置</text>
         <text class="menu-sub">{{reminderStatusText}}</text>
         <text class="menu-sub" wx:if="{{nextSendAtText}}">下次提醒 {{nextSendAtText}}</text>
       </view>
-      <button class="reminder-btn" bindtap="onReminderSubscribe" loading="{{reminderLoading}}">
-        {{reminderStatus === 'ACCEPT' ? '重新授权' : '开启提醒'}}
-      </button>
+      <view class="reminder-action">
+        <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" bind:tap="onReminderSubscribe" disabled="{{reminderLoading}}">
+          {{reminderStatus === 'ACCEPT' ? '重新授权' : '开启提醒'}}
+        </juicy-button>
+      </view>
     </view>
-  </view>
+  </card-flat>
   <!-- Staff Operations Section - Only visible for STAFF role -->
-  <view wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}" class="staff-section menu-card card">
+  <card-flat wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}">
     <view class="section-title">
       <text class="title-text">员工操作</text>
-      <view class="staff-badge">STAFF</view>
+      <pill-tag variant="neutral" size="sm">STAFF</pill-tag>
     </view>
     <navigator url="/pages/acquisition-scan/index" class="menu-item" hover-class="item-hover">
       <view class="menu-content">
@@ -51,31 +60,35 @@
       </view>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
     </navigator>
-  </view>
-  <view class="menu-card card">
-    <view class="menu-item" bindtap="copyWechatId" hover-class="item-hover">
-      <text class="menu-text">联系客服</text>
-      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+  </card-flat>
+
+  <card-flat>
+    <view class="menu-list">
+      <view class="menu-item" bindtap="copyWechatId" hover-class="item-hover">
+        <text class="menu-text">联系客服</text>
+        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+      </view>
+      <button class="menu-item share-button" open-type="share" hover-class="item-hover">
+        <text class="menu-text">分享给好友</text>
+        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+      </button>
+      <view class="menu-item" bindtap="showTerms" hover-class="item-hover">
+        <text class="menu-text">用户服务协议</text>
+        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+      </view>
+      <view class="menu-item" bindtap="showPrivacy" hover-class="item-hover">
+        <text class="menu-text">隐私政策</text>
+        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+      </view>
+      <view class="menu-item" bindtap="goToCustomerService" hover-class="item-hover">
+        <text class="menu-text">联系客服与帮助</text>
+        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+      </view>
     </view>
-    <button class="menu-item share-button" open-type="share" hover-class="item-hover">
-      <text class="menu-text">分享给好友</text>
-      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-    </button>
-    <view class="menu-item" bindtap="showTerms" hover-class="item-hover">
-      <text class="menu-text">用户服务协议</text>
-      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-    </view>
-    <view class="menu-item" bindtap="showPrivacy" hover-class="item-hover">
-      <text class="menu-text">隐私政策</text>
-      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-    </view>
-    <view class="menu-item" bindtap="goToCustomerService" hover-class="item-hover">
-      <text class="menu-text">联系客服与帮助</text>
-      <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-    </view>
-  </view>
-  <view class="support-info">
+  </card-flat>
+  <view class="support-info" bindtap="onDevConfigTap">
     <text>客服微信: {{serviceInfo.wechatId}} (点击复制)</text>
     <text>服务时间: {{serviceInfo.time}}</text>
   </view>
+</view>
 </view>

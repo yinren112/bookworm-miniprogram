@@ -1,6 +1,13 @@
 {
-  "navigationBarTitleText": "复习中心",
   "usingComponents": {
-    "state-view": "/components/state-view/state-view"
-  }
+    "topbar": "/components/ui/topbar/index",
+    "juicy-button": "/components/ui/juicy-button/index",
+    "card-flat": "/components/ui/card-flat/index",
+    "progress-chunky": "/components/ui/progress-chunky/index",
+    "stat-split": "/components/ui/stat-split/index",
+    "pill-tag": "/components/ui/pill-tag/index",
+    "loading-state": "/components/ui/loading-state/index",
+    "error-state": "/components/ui/error-state/index"
+  },
+  "navigationStyle": "custom"
 }

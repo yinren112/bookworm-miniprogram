@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "Review"
+  "navigationBarTitleText": "Review",
+  "usingComponents": {
+    "loading-state": "/components/ui/loading-state/index"
+  }
 }

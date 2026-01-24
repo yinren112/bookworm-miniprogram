@@ -1,0 +1,9 @@
+<view class="pc">
+  <view class="pc__track">
+    <view class="pc__fill pc__fill--{{color}}" style="width: {{percent}}%;"></view>
+  </view>
+  <view class="pc__meta" wx:if="{{showLabel}}">
+    <text class="pc__label">{{label}}</text>
+    <text class="pc__value">{{displayPercent}}%</text>
+  </view>
+</view>

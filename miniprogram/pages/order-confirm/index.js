@@ -35,7 +35,7 @@ Page({
 
   async fetchBookDetails(id, { preserveData = false } = {}) {
     if (!preserveData) {
-      this.setData({ isLoading: true, error: null });
+      this.setData({ isLoading: true, error: null, book: null });
     } else {
       this.setData({ error: null });
     }
@@ -49,14 +49,28 @@ Page({
       if (data.status === 'in_stock') {
         this.setData({ book: data });
       } else {
-        this.setData({ error: '该书籍已售出或不可用' });
+        this.setData({ book: null, error: '该书籍已售出或不可用' });
       }
     } catch (error) {
       const errorMsg = extractErrorMessage(error, '网络请求失败，无法获取书籍信息');
-      this.setData({ error: errorMsg });
+      this.setData({ book: null, error: errorMsg });
       ui.showError(errorMsg);
     } finally {
       this.setData({ isLoading: false });
+    }
+  },
+
+  onRetry() {
+    if (!this.currentId) return;
+    this.fetchBookDetails(this.currentId);
+  },
+
+  goBack() {
+    const pages = getCurrentPages();
+    if (pages.length > 1) {
+      wx.navigateBack();
+    } else {
+      wx.switchTab({ url: '/pages/market/index' });
     }
   },
   

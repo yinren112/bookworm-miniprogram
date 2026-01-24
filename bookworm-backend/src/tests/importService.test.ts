@@ -386,7 +386,7 @@ card-001\t问题\t答案\t标签\t3`;
         },
       ]);
 
-      expect(() => parseCheatsheets(content)).toThrow('assetType must be "pdf" or "image"');
+      expect(() => parseCheatsheets(content)).toThrow('assetType must be "pdf", "image" or "note"');
     });
 
     it("should throw error for missing url", () => {
@@ -398,6 +398,47 @@ card-001\t问题\t答案\t标签\t3`;
       ]);
 
       expect(() => parseCheatsheets(content)).toThrow("missing or invalid url");
+    });
+
+    it("should parse note cheatsheet with default markdown format", () => {
+      const content = JSON.stringify([
+        {
+          title: "必背考点",
+          assetType: "note",
+          content: "# 标题\n\n- 要点1\n- 要点2\n",
+          unitKey: "limit",
+        },
+      ]);
+
+      const result = parseCheatsheets(content);
+      expect(result).toHaveLength(1);
+      expect(result[0].assetType).toBe("note");
+      expect(result[0].contentFormat).toBe("markdown");
+      expect(result[0].url).toBeUndefined();
+    });
+
+    it("should normalize literal escaped newlines in note content", () => {
+      const content = JSON.stringify([
+        {
+          title: "必背考点",
+          assetType: "note",
+          content: "# 标题\\n\\n- 要点1\\n- 要点2\\n",
+        },
+      ]);
+      const result = parseCheatsheets(content);
+      expect(result[0].content).toContain("\n");
+      expect(result[0].content).not.toContain("\\n");
+    });
+
+    it("should throw error for note without content", () => {
+      const content = JSON.stringify([
+        {
+          title: "必背考点",
+          assetType: "note",
+        },
+      ]);
+
+      expect(() => parseCheatsheets(content)).toThrow("missing or invalid content");
     });
   });
 });

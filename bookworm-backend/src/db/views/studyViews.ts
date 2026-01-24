@@ -221,9 +221,17 @@ export const cheatsheetSelectPublic = {
   title: true,
   assetType: true,
   url: true,
+  contentFormat: true,
   version: true,
   sortOrder: true,
   unitId: true,
+} as const satisfies Prisma.StudyCheatSheetSelect;
+
+export const cheatsheetSummaryView = {
+  ...cheatsheetSelectPublic,
+  unit: {
+    select: unitBasicView,
+  },
 } as const satisfies Prisma.StudyCheatSheetSelect;
 
 /**
@@ -235,6 +243,17 @@ export const cheatsheetCourseView = {
   title: true,
   courseKey: true,
 } as const satisfies Prisma.StudyCourseSelect;
+
+export const cheatsheetDetailView = {
+  ...cheatsheetSelectPublic,
+  content: true,
+  unit: {
+    select: unitBasicView,
+  },
+  course: {
+    select: cheatsheetCourseView,
+  },
+} as const satisfies Prisma.StudyCheatSheetSelect;
 
 // ============================================
 // UserCourseEnrollment 视图选择器
@@ -426,3 +445,10 @@ export const reminderSubscriptionWithUserInclude = {
     select: userIdView,
   },
 } as const satisfies Prisma.StudyReminderSubscriptionInclude;
+
+export const dailyStudyActivityHistoryView = {
+  date: true,
+  cardDurationSeconds: true,
+  quizDurationSeconds: true,
+  cheatsheetDurationSeconds: true,
+} as const satisfies Prisma.DailyStudyActivitySelect;

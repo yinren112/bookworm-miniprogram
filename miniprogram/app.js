@@ -2,6 +2,7 @@
 const privacy = require('./utils/privacy');
 const { track, flushQueue } = require('./utils/track');
 const logger = require('./utils/logger');
+const theme = require('./utils/theme');
 
 App({
   TERMS_COPY: {
@@ -13,11 +14,8 @@ App({
   },
 
   onLaunch() {
-    wx.setBackgroundColor({
-      backgroundColor: '#f8f9fa',
-      backgroundColorTop: '#2c5f2d',
-      backgroundColorBottom: '#f8f9fa'
-    });
+    theme.applyTheme(theme.getSystemTheme());
+    theme.startThemeListener();
     privacy.setupPrivacyAuthorization();
     this.checkTermsAgreement();
     this.initPerformanceTracking();

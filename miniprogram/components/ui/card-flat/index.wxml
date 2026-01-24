@@ -1,0 +1,6 @@
+<view class="card-flat custom-class" hover-class="{{clickable ? 'is-pressed' : ''}}" hover-stay-time="100" bindtap="onTap">
+  <view class="card-face" style="padding: {{padding}};">
+    <slot />
+  </view>
+  <view class="card-lip"></view>
+</view>

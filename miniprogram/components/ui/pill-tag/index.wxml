@@ -1,0 +1,3 @@
+<view class="pt pt--{{variant}} pt--{{size}}">
+  <slot />
+</view>

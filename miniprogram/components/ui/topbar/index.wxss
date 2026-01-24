@@ -1,0 +1,41 @@
+.tb__container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+}
+
+.tb__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tb__left {
+  position: absolute;
+  left: 32rpx;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 20rpx;
+  margin-left: -20rpx;
+}
+
+.tb__chevron {
+  width: 20rpx;
+  height: 20rpx;
+  border-top: 4rpx solid currentColor;
+  border-left: 4rpx solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.tb__title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  max-width: 400rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

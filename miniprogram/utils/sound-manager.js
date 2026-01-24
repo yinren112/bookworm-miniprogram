@@ -8,12 +8,16 @@ const logger = require('./logger');
 
 // 存储键
 const STORAGE_KEY = 'sound_enabled';
+const OBEY_MUTE_SWITCH_KEY = 'sound_obey_mute_switch';
 
 // 默认启用
 let _enabled = true;
+let _obeyMuteSwitch = false;
 
 // 音效实例池（复用策略）
 const _audioPool = {};
+const _canPlayReady = {};
+const _pendingPlay = {};
 
 // 音效路径映射
 const SOUND_PATHS = {
@@ -27,6 +31,15 @@ try {
   const stored = wx.getStorageSync(STORAGE_KEY);
   if (stored !== '') {
     _enabled = stored !== false;
+  }
+} catch (e) {
+  // ignore
+}
+
+try {
+  const stored = wx.getStorageSync(OBEY_MUTE_SWITCH_KEY);
+  if (stored !== '') {
+    _obeyMuteSwitch = stored === true;
   }
 } catch (e) {
   // ignore
@@ -55,7 +68,20 @@ function getAudioInstance(name) {
   try {
     const audio = wx.createInnerAudioContext();
     audio.src = path;
-    audio.obeyMuteSwitch = true;
+    audio.obeyMuteSwitch = _obeyMuteSwitch;
+
+    audio.onCanplay(() => {
+      _canPlayReady[name] = true;
+      if (_pendingPlay[name]) {
+        _pendingPlay[name] = false;
+        try {
+          audio.seek(0);
+          audio.play();
+        } catch (err) {
+          logger.warn('Sound play failed:', name, err);
+        }
+      }
+    });
 
     // 错误处理
     audio.onError((err) => {
@@ -79,6 +105,11 @@ function play(name) {
 
   const audio = getAudioInstance(name);
   if (!audio) return;
+
+  if (!_canPlayReady[name]) {
+    _pendingPlay[name] = true;
+    return;
+  }
 
   try {
     // 重置播放位置
@@ -110,6 +141,27 @@ function setEnabled(val) {
   }
 }
 
+function setObeyMuteSwitch(val) {
+  _obeyMuteSwitch = !!val;
+  try {
+    wx.setStorageSync(OBEY_MUTE_SWITCH_KEY, _obeyMuteSwitch);
+  } catch (e) {
+    // ignore
+  }
+
+  Object.keys(_audioPool).forEach((name) => {
+    try {
+      _audioPool[name].obeyMuteSwitch = _obeyMuteSwitch;
+    } catch (e) {
+      // ignore
+    }
+  });
+}
+
+function getObeyMuteSwitch() {
+  return _obeyMuteSwitch;
+}
+
 /**
  * 销毁所有音效实例（页面卸载时调用）
  */
@@ -123,6 +175,8 @@ function destroyAll() {
   });
   // 清空池
   Object.keys(_audioPool).forEach((k) => delete _audioPool[k]);
+  Object.keys(_canPlayReady).forEach((k) => delete _canPlayReady[k]);
+  Object.keys(_pendingPlay).forEach((k) => delete _pendingPlay[k]);
 }
 
 /**
@@ -138,6 +192,8 @@ module.exports = {
   play,
   isEnabled,
   setEnabled,
+  getObeyMuteSwitch,
+  setObeyMuteSwitch,
   destroyAll,
   preload
 };

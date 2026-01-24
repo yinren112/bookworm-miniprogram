@@ -52,8 +52,10 @@ export interface QuestionDefinition {
 
 export interface CheatSheetDefinition {
   title: string;
-  assetType: "pdf" | "image";
-  url: string;
+  assetType: "pdf" | "image" | "note";
+  url?: string;
+  content?: string;
+  contentFormat?: "markdown";
   unitKey?: string;
   version?: number;
 }
@@ -347,6 +349,10 @@ export function parseQuestionsGift(content: string, unitKey: string): QuestionDe
 // 解析器：急救包配置
 // ============================================
 
+function normalizeEscapedWhitespace(text: string): string {
+  return text.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+}
+
 export function parseCheatsheets(content: string): CheatSheetDefinition[] {
   const data = JSON.parse(content);
 
@@ -358,17 +364,38 @@ export function parseCheatsheets(content: string): CheatSheetDefinition[] {
     if (!item.title || typeof item.title !== "string") {
       throw new Error(`cheatsheets.json[${index}]: missing or invalid title`);
     }
-    if (!item.assetType || !["pdf", "image"].includes(item.assetType)) {
-      throw new Error(`cheatsheets.json[${index}]: assetType must be "pdf" or "image"`);
+    const assetType = String(item.assetType || "").toLowerCase();
+    if (!assetType || !["pdf", "image", "note"].includes(assetType)) {
+      throw new Error(`cheatsheets.json[${index}]: assetType must be "pdf", "image" or "note"`);
     }
-    if (!item.url || typeof item.url !== "string") {
-      throw new Error(`cheatsheets.json[${index}]: missing or invalid url`);
+
+    if (assetType === "pdf" || assetType === "image") {
+      if (!item.url || typeof item.url !== "string") {
+        throw new Error(`cheatsheets.json[${index}]: missing or invalid url`);
+      }
+      return {
+        title: item.title.trim(),
+        assetType: assetType as "pdf" | "image",
+        url: item.url.trim(),
+        unitKey: item.unitKey?.trim(),
+        version: typeof item.version === "number" ? item.version : 1,
+      };
+    }
+
+    if (!item.content || typeof item.content !== "string" || !item.content.trim()) {
+      throw new Error(`cheatsheets.json[${index}]: missing or invalid content`);
+    }
+
+    const contentFormat = item.contentFormat ? String(item.contentFormat).toLowerCase() : "markdown";
+    if (!["markdown"].includes(contentFormat)) {
+      throw new Error(`cheatsheets.json[${index}]: contentFormat must be "markdown"`);
     }
 
     return {
       title: item.title.trim(),
-      assetType: item.assetType as "pdf" | "image",
-      url: item.url.trim(),
+      assetType: "note",
+      content: normalizeEscapedWhitespace(item.content),
+      contentFormat: contentFormat as "markdown",
       unitKey: item.unitKey?.trim(),
       version: typeof item.version === "number" ? item.version : 1,
     };
@@ -740,7 +767,9 @@ export async function importCoursePackage(
           unitId,
           title: cs.title,
           assetType: cs.assetType,
-          url: cs.url,
+          url: cs.url ? cs.url : null,
+          content: cs.content ? normalizeEscapedWhitespace(cs.content) : null,
+          contentFormat: cs.contentFormat ? cs.contentFormat : null,
           version: cs.version || 1,
           sortOrder: result.stats.cheatsheetsCreated,
         },

@@ -2,11 +2,15 @@
 // 急救包页面
 
 const { getCheatSheets } = require("../../../../utils/study-api");
+const studyTimer = require("../../../../utils/study-timer");
 const logger = require("../../../../utils/logger");
+const feedback = require("../../../../utils/ui/feedback");
 
 Page({
   data: {
     loading: true,
+    error: false,
+    errorMsg: '',
     courseKey: "",
     unitId: null,
     cheatSheets: [],
@@ -14,7 +18,7 @@ Page({
     assetTypeIcons: {
       pdf: "📄",
       image: "🖼️",
-      video: "🎬",
+      note: "⚡",
     },
   },
 
@@ -35,8 +39,27 @@ Page({
     }
   },
 
+  onShow() {
+    studyTimer.start("cheatsheet");
+    studyTimer.onInteraction();
+  },
+
+  onHide() {
+    studyTimer.flush();
+    studyTimer.stop();
+  },
+
+  onUnload() {
+    studyTimer.flush();
+    studyTimer.stop();
+  },
+
+  onUserInteraction() {
+    studyTimer.onInteraction();
+  },
+
   async loadCheatSheets() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, error: false, errorMsg: '' });
 
     try {
       const res = await getCheatSheets(
@@ -49,7 +72,7 @@ Page({
         let assetTypeLabel = "资源";
         if (assetTypeNormalized === "pdf") assetTypeLabel = "PDF文档";
         if (assetTypeNormalized === "image") assetTypeLabel = "图片";
-        if (assetTypeNormalized === "video") assetTypeLabel = "视频";
+        if (assetTypeNormalized === "note") assetTypeLabel = "重点速记";
 
         return {
           ...item,
@@ -60,20 +83,36 @@ Page({
       this.setData({
         cheatSheets: items,
         loading: false,
+        error: false,
+        errorMsg: '',
       });
     } catch (err) {
       logger.error("Failed to load cheatsheets:", err);
-      this.setData({ loading: false });
-      wx.showToast({
-        title: "加载失败",
-        icon: "none",
-      });
+      this.setData({ loading: false, error: true, errorMsg: "加载失败" });
     }
   },
 
   previewCheatSheet(e) {
     const { index } = e.currentTarget.dataset;
     const item = this.data.cheatSheets[index];
+
+    feedback.tap("light");
+
+    const assetType = (item.assetTypeNormalized || "").toLowerCase();
+
+    if (assetType === "note") {
+      if (!item || !item.id) {
+        wx.showToast({
+          title: "内容不可用",
+          icon: "none",
+        });
+        return;
+      }
+      wx.navigateTo({
+        url: `/subpackages/review/pages/cheatsheet-note/index?id=${item.id}`,
+      });
+      return;
+    }
 
     if (!item || !item.url) {
       wx.showToast({
@@ -82,10 +121,6 @@ Page({
       });
       return;
     }
-
-    wx.vibrateShort({ type: "light" });
-
-    const assetType = (item.assetTypeNormalized || "").toLowerCase();
 
     if (assetType === "pdf") {
       // PDF 预览 - 使用文档预览
@@ -140,12 +175,6 @@ Page({
           });
         },
       });
-    } else if (assetType === "video") {
-      // 视频暂不支持直接预览，提示用户
-      wx.showToast({
-        title: "请长按保存后观看",
-        icon: "none",
-      });
     }
   },
 
@@ -161,7 +190,7 @@ Page({
       return;
     }
 
-    wx.vibrateShort({ type: "light" });
+    feedback.tap("light");
 
     const assetType = (item.assetTypeNormalized || "").toLowerCase();
 

@@ -1,85 +1,187 @@
-<!-- pages/review/index.wxml -->
-<!-- 复习首页 -->
 <view class="container">
-  <view class="header-section">
-    <text class="greeting-text">你好，同学</text>
-    <text class="greeting-sub">今天也要稳稳推进复习节奏</text>
-  </view>
-  <state-view wx:if="{{loading || error}}" status="{{loading ? 'loading' : 'error'}}" loadingText="正在加载复习看板..." errorText="网络波动，稍后再试" bind:retry="onRetry" bind:feedback="onFeedback" skeletonType="grid" skeletonCount="{{4}}" />
-  <view wx:if="{{!loading && !error}}">
-    <view class="dashboard-card clay-card">
-      <view class="dashboard-header">
-        <view class="date-badge">
-          <text class="date-text">{{todayDate}}</text>
-        </view>
-        <view class="streak-chip">
-          <image class="streak-icon" src="/images/icons/review/flame.svg" mode="aspectFit" />
-          <text>{{dashboard.streakDays || 0}} 天</text>
-        </view>
-      </view>
-      <view class="metric-grid">
-        <view class="metric-item">
-          <text class="metric-value">{{dashboard.dueCardCount || 0}}</text>
-          <text class="metric-label">到期卡片</text>
-        </view>
-        <view class="metric-item">
-          <text class="metric-value">{{dashboard.dueQuizCount || 0}}</text>
-          <text class="metric-label">待测验</text>
-        </view>
-        <view class="metric-item">
-          <text class="metric-value">{{dashboard.wrongCount || 0}}</text>
-          <text class="metric-label">错题数</text>
-        </view>
-        <view class="metric-item">
-          <text class="metric-value">{{dashboard.etaMinutes || 0}}</text>
-          <text class="metric-label">预计分钟</text>
-        </view>
-      </view>
-      <button class="cta-btn {{highlightStart ? 'highlight' : ''}}" bindtap="startPrimaryCta">
-        {{primaryCtaText}}
-      </button>
-      <button class="cta-btn ghost" wx:if="{{resumeSession}}" bindtap="continueSession">
-        继续上次复习
-      </button>
-      <button class="cta-btn subtle" wx:if="{{dashboard.wrongCount > 0}}" bindtap="startWrongQuiz">
-        错题强化
-      </button>
-    </view>
-    <view class="course-section" wx:if="{{currentCourse}}">
-      <view class="section-title">当前学习课程</view>
-      <view class="course-card clay-card-sm" bindtap="navigateToCourse" data-course-key="{{currentCourse.courseKey}}">
-        <view class="course-summary">
-          <text class="course-name">{{currentCourse.title}}</text>
-          <text class="course-progress">已完成 {{currentCourse.progressPercent}}%</text>
-        </view>
-        <view class="course-action">
-          <text>继续学习</text>
-        </view>
-      </view>
-    </view>
-    <view class="empty-wrap" wx:if="{{!currentCourse}}">
-      <state-view status="empty" emptyText="还没有加入课程，先从推荐课程开始" actionText="浏览推荐课程" bind:action="goToFirstRecommended" />
-      <view class="recommend-list" wx:if="{{recommendedCourses.length > 0}}">
-        <view class="section-title">推荐课程</view>
-        <view class="course-card clay-card-sm" wx:for="{{recommendedCourses}}" wx:key="id" bindtap="navigateToCourse" data-course-key="{{item.courseKey}}">
-          <view class="course-summary">
-            <text class="course-name">{{item.title}}</text>
-            <text class="course-progress">{{item.totalCards || 0}} 卡片</text>
+  <topbar title="复习" back="{{false}}" color="var(--color-text-main)" background="var(--color-bg-card)"></topbar>
+  <scroll-view scroll-y class="main-scroll" enable-flex>
+    <loading-state wx:if="{{loading}}" variant="page" text="加载中..." />
+    <error-state wx:elif="{{error}}" mode="network" title="加载失败" desc="请重试" bind:retry="onRetry" />
+    <view wx:else class="content-wrapper">
+      <card-flat>
+        <view
+          class="course-header"
+          bindtap="navigateToCourse"
+          data-course-key="{{currentCourse ? currentCourse.courseKey : ''}}"
+          hover-class="course-header--pressed"
+          hover-stay-time="80"
+        >
+          <view class="course-info">
+            <text class="course-name">{{currentCourse ? currentCourse.title : '选择课程'}}</text>
+            <stat-split
+              leftValue="{{dashboard ? (dashboard.dueCardCount || 0) : 0}}"
+              leftLabel="待复习"
+              leftTone="green"
+              rightValue="{{dashboard ? (dashboard.dueQuizCount || 0) : 0}}"
+              rightLabel="待测验"
+              rightTone="blue"
+            />
           </view>
-          <view class="course-action">
-            <text>去学习</text>
+          <view class="course-right">
+            <view class="course-icon">
+              <image class="course-icon-img" src="/images/icons/review/book.svg" mode="aspectFit"></image>
+            </view>
+            <image class="course-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
           </view>
         </view>
+
+        <view class="progress-section">
+          <progress-chunky
+            percent="{{currentCourse ? currentCourse.progressPercent : 0}}"
+            color="yellow"
+            label="进度"
+            showLabel
+          />
+        </view>
+
+        <view class="action-area">
+          <juicy-button type="primary" full bind:tap="startPrimaryCta">{{primaryCtaText}}</juicy-button>
+          <juicy-button type="outline" full wx:if="{{dashboard && dashboard.wrongCount > 0}}" bind:tap="startWrongReview">
+            错题强化 ({{dashboard.wrongCount}})
+          </juicy-button>
+          <juicy-button type="secondary" full wx:if="{{resumeSession}}" bind:tap="continueSession">继续上次</juicy-button>
+        </view>
+      </card-flat>
+
+      <card-flat wx:if="{{courses && courses.length > 0}}">
+        <view class="section-header">
+          <text class="section-title">课程</text>
+          <view class="section-link" bindtap="openCoursePicker">
+            <text>管理</text>
+            <image class="section-link-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
+          </view>
+        </view>
+
+        <scroll-view scroll-x class="course-chip-scroll" show-scrollbar="{{false}}">
+          <view class="course-chip-row">
+            <block wx:for="{{enrolledCourses}}" wx:key="courseKey">
+              <view
+                class="course-chip {{selectedCourseKey === item.courseKey ? 'active' : ''}}"
+                bindtap="selectEnrolledCourse"
+                data-course-key="{{item.courseKey}}"
+                hover-class="course-chip--pressed"
+                hover-stay-time="80"
+              >
+                <text class="course-chip-title">{{item.title}}</text>
+                <text class="course-chip-sub">{{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
+              </view>
+            </block>
+            <view
+              class="course-chip add"
+              bindtap="openCoursePicker"
+              hover-class="course-chip--pressed"
+              hover-stay-time="80"
+            >
+              <text class="course-chip-title">添加课程</text>
+              <text class="course-chip-sub">浏览全部</text>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view class="discover-block" wx:if="{{discoverCourses && discoverCourses.length > 0}}">
+          <view class="discover-header">
+            <text class="discover-title">发现</text>
+            <text class="discover-sub">点进去注册</text>
+          </view>
+          <block wx:for="{{discoverCourses}}" wx:key="courseKey">
+            <view
+              class="discover-item"
+              bindtap="viewCourseDetail"
+              data-course-key="{{item.courseKey}}"
+              hover-class="discover-item--pressed"
+              hover-stay-time="80"
+            >
+              <view class="discover-left">
+                <text class="discover-item-title">{{item.title}}</text>
+                <text class="discover-item-desc">{{item.description}}</text>
+              </view>
+              <image class="discover-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
+            </view>
+          </block>
+        </view>
+      </card-flat>
+
+      <card-flat wx:if="{{heatmapData && heatmapData.length > 0}}">
+        <view class="section-header">
+          <text class="section-title">学习热力图</text>
+          <pill-tag variant="neutral" size="sm">最近7天</pill-tag>
+        </view>
+        <view class="heatmap-row">
+          <block wx:for="{{heatmapData}}" wx:key="date">
+            <view class="day-column" bindtap="onHeatmapTap" data-date="{{item.date}}">
+              <view class="day-bar level-{{item.level}}"></view>
+              <text class="day-label">{{item.dayLabel}}</text>
+            </view>
+          </block>
+        </view>
+      </card-flat>
+
+      <view class="footer-slogan">
+        <text>KEEP LEARNING, KEEP GROWING.</text>
       </view>
     </view>
-    <view class="heatmap-section" wx:if="{{heatmapData.length > 0}}">
-      <view class="section-title">过去 35 天</view>
-      <view class="heatmap-grid">
-        <block wx:for="{{heatmapData}}" wx:key="date">
-          <view class="heatmap-cell level-{{item.level}}" data-date="{{item.date}}" bindtap="onHeatmapTap"></view>
+  </scroll-view>
+
+  <view class="course-picker-overlay {{showCoursePicker ? 'visible' : ''}}" catchtap="closeCoursePicker">
+    <view class="course-picker-modal" catchtap="noop">
+      <view class="modal-header">
+        <text class="modal-title">选择课程</text>
+        <view class="close-btn" bindtap="closeCoursePicker">
+          <text>✕</text>
+        </view>
+      </view>
+
+      <input
+        class="course-search"
+        placeholder="搜索课程名 / courseKey"
+        placeholder-class="course-search__placeholder"
+        value="{{courseSearch}}"
+        bindinput="onCourseSearchInput"
+        confirm-type="search"
+      />
+
+      <view class="picker-section">
+        <view class="picker-section-header">
+          <text class="picker-section-title">我的课程</text>
+          <view class="picker-clear" wx:if="{{selectedCourseKey}}" bindtap="clearCourseSelection">
+            <text>恢复自动</text>
+          </view>
+        </view>
+        <block wx:for="{{filteredEnrolledCourses}}" wx:key="courseKey">
+          <view
+            class="picker-item {{selectedCourseKey === item.courseKey ? 'selected' : ''}}"
+            bindtap="selectEnrolledCourse"
+            data-course-key="{{item.courseKey}}"
+          >
+            <text class="picker-item-title">{{item.title}}</text>
+            <text class="picker-item-sub">{{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
+          </view>
         </block>
+        <view class="picker-empty" wx:if="{{filteredEnrolledCourses.length === 0}}">
+          <text>还没有注册课程</text>
+        </view>
       </view>
-      <text class="heatmap-hint">点击任意一天查看记录</text>
+
+      <view class="picker-section">
+        <view class="picker-section-header">
+          <text class="picker-section-title">发现课程</text>
+        </view>
+        <block wx:for="{{filteredDiscoverCourses}}" wx:key="courseKey">
+          <view class="picker-item" bindtap="viewCourseDetail" data-course-key="{{item.courseKey}}">
+            <text class="picker-item-title">{{item.title}}</text>
+            <text class="picker-item-sub">{{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
+          </view>
+        </block>
+        <view class="picker-empty" wx:if="{{filteredDiscoverCourses.length === 0}}">
+          <text>没有匹配的课程</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>

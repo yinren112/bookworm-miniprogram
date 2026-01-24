@@ -205,7 +205,12 @@ export async function submitQuizAnswer(
   }
 
   // 判断答案是否正确
-  const isCorrect = checkAnswer(question.questionType, question.answerJson, chosenAnswer);
+  const isCorrect = checkAnswer(
+    question.questionType,
+    question.answerJson,
+    chosenAnswer,
+    question.optionsJson,
+  );
   const correctOptionIndices = extractCorrectOptionIndices(
     question.questionType,
     question.optionsJson,
@@ -472,20 +477,20 @@ function checkAnswer(
   questionType: QuestionType,
   correctAnswer: string,
   chosenAnswer: string,
+  optionsJson?: unknown,
 ): boolean {
-  // 标准化答案格式
   const normalizedCorrect = correctAnswer.trim().toLowerCase();
   const normalizedChosen = chosenAnswer.trim().toLowerCase();
+
+  if (normalizedCorrect === normalizedChosen) return true;
 
   switch (questionType) {
     case "SINGLE_CHOICE":
     case "TRUE_FALSE":
-      // 单选和判断题：直接比较
-      return normalizedCorrect === normalizedChosen;
+      return checkChoiceByIndex(questionType, normalizedCorrect, normalizedChosen, optionsJson);
 
     case "MULTI_CHOICE":
-      // 多选题：支持 JSON 数组或 "|" 分隔，忽略顺序
-      return compareAnswerSets(normalizedCorrect, normalizedChosen);
+      return checkMultiChoiceByIndex(normalizedCorrect, normalizedChosen, optionsJson);
 
     case "FILL_BLANK": {
       // 填空题：支持多个正确答案（用 | 分隔）
@@ -496,6 +501,70 @@ function checkAnswer(
     default:
       return normalizedCorrect === normalizedChosen;
   }
+}
+
+function checkChoiceByIndex(
+  questionType: QuestionType,
+  normalizedCorrect: string,
+  normalizedChosen: string,
+  optionsJson?: unknown,
+): boolean {
+  if (!Array.isArray(optionsJson) || optionsJson.length === 0) return normalizedCorrect === normalizedChosen;
+
+  const normalizedOptions = optionsJson.map((option) => normalizeAnswerToken(String(option)));
+  const correctIndices = extractCorrectOptionIndices(questionType, optionsJson, normalizedCorrect);
+  if (correctIndices.length === 0) return normalizedCorrect === normalizedChosen;
+
+  const chosenIndex = resolveUserChoiceIndex(normalizedChosen, normalizedOptions);
+  if (chosenIndex < 0) return normalizedCorrect === normalizedChosen;
+
+  return correctIndices.includes(chosenIndex);
+}
+
+function checkMultiChoiceByIndex(
+  normalizedCorrect: string,
+  normalizedChosen: string,
+  optionsJson?: unknown,
+): boolean {
+  if (!Array.isArray(optionsJson) || optionsJson.length === 0) return compareAnswerSets(normalizedCorrect, normalizedChosen);
+
+  const normalizedOptions = optionsJson.map((option) => normalizeAnswerToken(String(option)));
+  const correctIndices = extractCorrectOptionIndices("MULTI_CHOICE", optionsJson, normalizedCorrect);
+  if (correctIndices.length === 0) return compareAnswerSets(normalizedCorrect, normalizedChosen);
+
+  const chosenTokens = parseAnswerTokens(normalizedChosen);
+  if (chosenTokens.length === 0) return false;
+
+  const chosenIndices: number[] = [];
+  for (const token of chosenTokens) {
+    const idx = resolveUserChoiceIndex(normalizeAnswerToken(token), normalizedOptions);
+    if (idx < 0) return compareAnswerSets(normalizedCorrect, normalizedChosen);
+    chosenIndices.push(idx);
+  }
+
+  const chosenSet = new Set(chosenIndices);
+  const correctSet = new Set(correctIndices);
+  if (chosenSet.size !== correctSet.size) return false;
+  for (const idx of correctSet) {
+    if (!chosenSet.has(idx)) return false;
+  }
+  return true;
+}
+
+function resolveUserChoiceIndex(normalizedToken: string, normalizedOptions: string[]): number {
+  if (!normalizedToken) return -1;
+  const directIdx = normalizedOptions.findIndex((option) => option === normalizedToken);
+  if (directIdx >= 0) return directIdx;
+
+  const labelIdx = resolveOptionIndexByLabel(normalizedToken, normalizedOptions);
+  if (labelIdx >= 0) return labelIdx;
+
+  if (/^\d+$/.test(normalizedToken)) {
+    const idx = Number(normalizedToken);
+    if (Number.isInteger(idx) && idx >= 0 && idx < normalizedOptions.length) return idx;
+  }
+
+  return -1;
 }
 
 function compareAnswerSets(correctAnswer: string, chosenAnswer: string): boolean {
@@ -530,9 +599,10 @@ function parseAnswerList(answer: string): string[] {
     }
   }
 
-  if (trimmed.includes("|")) {
-    return trimmed
-      .split("|")
+  const normalizedSeparators = trimmed.replace(/，/g, ",");
+  if (normalizedSeparators.includes("|") || normalizedSeparators.includes(",")) {
+    return normalizedSeparators
+      .split(/[|,]/)
       .map((item) => normalizeAnswerToken(item))
       .filter((item) => item.length > 0);
   }
@@ -595,9 +665,10 @@ function parseAnswerTokens(answer: string): string[] {
     }
   }
 
-  if (trimmed.includes("|")) {
-    return trimmed
-      .split("|")
+  const normalizedSeparators = trimmed.replace(/，/g, ",");
+  if (normalizedSeparators.includes("|") || normalizedSeparators.includes(",")) {
+    return normalizedSeparators
+      .split(/[|,]/)
       .map((item) => item.trim())
       .filter(Boolean);
   }
@@ -609,6 +680,11 @@ function resolveOptionIndexByLabel(
   normalizedAnswer: string,
   normalizedOptions: string[],
 ): number {
+  if (/^\d+$/.test(normalizedAnswer)) {
+    const idx = Number(normalizedAnswer);
+    if (Number.isInteger(idx) && idx >= 0 && idx < normalizedOptions.length) return idx;
+  }
+
   if (normalizedAnswer === "true" || normalizedAnswer === "正确" || normalizedAnswer === "对") {
     return normalizedOptions.findIndex(
       (option) => option === "正确" || option === "true",
@@ -640,3 +716,11 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return array;
 }
+
+export const __testing = {
+  checkAnswer,
+  extractCorrectOptionIndices,
+  parseAnswerTokens,
+  resolveOptionIndexByLabel,
+  resolveUserChoiceIndex,
+};

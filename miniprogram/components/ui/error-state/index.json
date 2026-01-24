@@ -1,0 +1,6 @@
+{
+  "component": true,
+  "usingComponents": {
+    "juicy-button": "/components/ui/juicy-button/index"
+  }
+}

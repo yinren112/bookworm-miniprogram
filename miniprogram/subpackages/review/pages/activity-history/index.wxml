@@ -1,22 +1,78 @@
 <!-- subpackages/review/pages/activity-history/index.wxml -->
 <view class="page">
-  <state-view
-    wx:if="{{loading || error || empty}}"
-    status="{{loading ? 'loading' : (error ? 'error' : 'empty')}}"
-    loadingText="正在加载学习记录..."
-    emptyText="暂无学习记录"
-    errorText="记录加载失败"
+  <loading-state wx:if="{{loading}}" variant="page" text="正在加载学习记录..." />
+  <view wx:elif="{{error}}" class="hist-boundary">
+    <error-state title="加载失败" desc="请重试" bind:retry="onRetry" />
+    <view class="hist-boundary__extra">
+      <juicy-button type="secondary" size="sm" bind:tap="onFeedback">反馈</juicy-button>
+    </view>
+  </view>
+  <empty-state
+    wx:elif="{{empty}}"
+    title="暂无记录"
+    desc="先完成一轮练习"
     actionText="返回首页"
+    actionType="secondary"
+    showAction
     bind:action="goHome"
-    bind:retry="onRetry"
-    bind:feedback="onFeedback"
   />
 
-  <scroll-view wx:if="{{!loading && !error && !empty}}" scroll-y="true" class="history-list" scroll-into-view="{{scrollTargetId}}">
-    <view class="history-item {{selectedDate === item.date ? 'active' : ''}}" id="day-{{item.date}}" wx:for="{{days}}" wx:key="date">
-      <view class="history-date">{{item.date}}</view>
-      <view class="history-count">学习 {{item.count}} 次</view>
-      <view class="history-level level-{{item.level}}"></view>
-    </view>
+  <scroll-view wx:else scroll-y class="content" scroll-into-view="{{scrollTargetId}}">
+    <card-flat>
+      <view class="summary">
+        <view class="summary-item">
+          <text class="summary-label">今日</text>
+          <text class="summary-value">{{todayDurationText}}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">累计</text>
+          <text class="summary-value">{{totalDurationText}}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">连续</text>
+          <text class="summary-value">{{streakDays}}天</text>
+        </view>
+      </view>
+    </card-flat>
+
+    <card-flat wx:if="{{chartDays.length > 0}}">
+      <view class="section-header">
+        <text class="section-title">学习趋势</text>
+        <pill-tag variant="neutral" size="sm">最近7天</pill-tag>
+      </view>
+      <view class="chart">
+        <block wx:for="{{chartDays}}" wx:key="date">
+          <view class="chart-col">
+            <view class="chart-bar">
+              <view class="seg seg-card" style="height: {{item.cardHeight}}rpx"></view>
+              <view class="seg seg-quiz" style="height: {{item.quizHeight}}rpx"></view>
+              <view class="seg seg-cheatsheet" style="height: {{item.cheatsheetHeight}}rpx"></view>
+            </view>
+            <text class="chart-label">{{item.dayLabel}}</text>
+          </view>
+        </block>
+      </view>
+      <view class="legend">
+        <view class="legend-item"><view class="legend-dot seg-card"></view><text>卡片</text></view>
+        <view class="legend-item"><view class="legend-dot seg-quiz"></view><text>刷题</text></view>
+        <view class="legend-item"><view class="legend-dot seg-cheatsheet"></view><text>急救包</text></view>
+      </view>
+    </card-flat>
+
+    <card-flat
+      custom-class="history-item {{selectedDate === item.date ? 'is-active' : ''}}"
+      id="day-{{item.date}}"
+      wx:for="{{days}}"
+      wx:key="date"
+    >
+      <view class="history-row">
+        <view class="history-left">
+          <text class="history-date">{{item.date}}</text>
+          <text class="history-total">{{item.totalText}}</text>
+          <text class="history-breakdown" wx:if="{{item.breakdownText}}">{{item.breakdownText}}</text>
+        </view>
+        <pill-tag variant="neutral" size="sm">Lv {{item.level}}</pill-tag>
+      </view>
+    </card-flat>
   </scroll-view>
 </view>

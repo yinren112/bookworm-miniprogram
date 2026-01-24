@@ -1,6 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="currentColor" fill-opacity="0.1"/>
-  <line x1="8" y1="7" x2="16" y2="7"/>
-  <line x1="8" y1="11" x2="14" y2="11"/>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 44H52C54.2091 44 56 45.7909 56 48V52C56 54.2091 54.2091 56 52 56H12C9.79086 56 8 54.2091 8 52V48C8 45.7909 9.79086 44 12 44Z" fill="#4B8B02"/>
+  <path d="M12 40H52C54.2091 40 56 41.7909 56 44V48C56 50.2091 54.2091 52 52 52H12C9.79086 52 8 50.2091 8 48V44C8 41.7909 9.79086 40 12 40Z" fill="#58CC02"/>
+  <rect x="12" y="44" width="40" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.3"/>
+  
+  <path d="M10 28H50C52.2091 28 54 29.7909 54 32V36C54 38.2091 52.2091 40 50 40H10C7.79086 40 6 38.2091 6 36V32C6 29.7909 7.79086 28 10 28Z" fill="#1899d6"/>
+  <path d="M10 24H50C52.2091 24 54 25.7909 54 28V32C54 34.2091 52.2091 36 50 36H10C7.79086 36 6 34.2091 6 32V28C6 25.7909 7.79086 24 10 24Z" fill="#1CB0F6"/>
+  <rect x="10" y="28" width="40" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.3"/>
+
+  <path d="M8 12H48C50.2091 12 52 13.7909 52 16V20C52 22.2091 50.2091 24 48 24H8C5.79086 24 4 22.2091 4 20V16C4 13.7909 5.79086 12 8 12Z" fill="#d43636"/>
+  <path d="M8 8H48C50.2091 8 52 9.79086 52 12V16C52 18.2091 50.2091 20 48 20H8C5.79086 20 4 18.2091 4 16V12C4 9.79086 8 8 8 8Z" fill="#FF4B4B"/>
+  <rect x="8" y="12" width="40" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.3"/>
 </svg>

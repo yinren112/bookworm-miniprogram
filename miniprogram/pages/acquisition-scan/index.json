@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "按本收购",
-  "enablePullDownRefresh": false
+  "enablePullDownRefresh": false,
+  "usingComponents": {
+    "empty-state": "/components/ui/empty-state/index"
+  }
 }

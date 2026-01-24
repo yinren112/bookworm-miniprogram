@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "客服与帮助"
+  "navigationBarTitleText": "客服与帮助",
+  "usingComponents": {
+    "card-flat": "/components/ui/card-flat/index",
+    "juicy-button": "/components/ui/juicy-button/index"
+  }
 }

@@ -1,0 +1,11 @@
+<view class="ss">
+  <view class="ss__item">
+    <text class="ss__value ss__value--{{leftTone}}">{{leftValue}}</text>
+    <text class="ss__label">{{leftLabel}}</text>
+  </view>
+  <view class="ss__divider"></view>
+  <view class="ss__item">
+    <text class="ss__value ss__value--{{rightTone}}">{{rightValue}}</text>
+    <text class="ss__label">{{rightLabel}}</text>
+  </view>
+</view>

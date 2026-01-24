@@ -1,0 +1,63 @@
+.ls {
+  width: 100%;
+  padding: var(--space-10) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  animation: lsFadeIn var(--duration-normal) var(--ease-standard);
+}
+
+.ls--inline {
+  padding: var(--space-4) 0;
+  gap: var(--space-4);
+}
+
+.ls__page,
+.ls__inline {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ls__inline {
+  flex-direction: row;
+  gap: var(--space-3);
+}
+
+.ls__block {
+  background: var(--color-bg-soft);
+  border-radius: var(--radius-pill);
+}
+
+.ls__block--title {
+  width: 56%;
+  height: 40rpx;
+  border-radius: var(--radius-card);
+}
+
+.ls__block--line {
+  width: 100%;
+  height: 28rpx;
+}
+
+.ls__block--short {
+  width: 78%;
+}
+
+.ls__block--chip {
+  flex: 1;
+  height: 28rpx;
+}
+
+.ls__text {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-light);
+  text-align: center;
+}
+
+@keyframes lsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

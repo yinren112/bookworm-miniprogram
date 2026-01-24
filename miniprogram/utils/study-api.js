@@ -398,6 +398,15 @@ const getActivityHistory = (options = {}) => {
   });
 };
 
+const pulseStudyActivity = (payload) => {
+  return request({
+    url: '/study/activity/pulse',
+    method: 'POST',
+    data: payload,
+    requireAuth: true,
+  });
+};
+
 /**
  * 订阅复习提醒
  * @param {Object} payload
@@ -459,6 +468,7 @@ module.exports = {
   getStarredItems,
   // Phase 5.5: 热力图
   getActivityHistory,
+  pulseStudyActivity,
   subscribeStudyReminder,
   getStudyReminderStatus,
 };

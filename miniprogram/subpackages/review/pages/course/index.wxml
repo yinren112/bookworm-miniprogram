@@ -1,29 +1,30 @@
 <!-- subpackages/review/pages/course/index.wxml -->
 <!-- 课程详情页 -->
 <view class="container">
-  <!-- 课程头部 -->
-  <view class="course-header clay-card" wx:if="{{course}}">
+  <loading-state wx:if="{{loading}}" variant="page" text="正在加载知识库..." />
+  <error-state wx:elif="{{!loading && !course}}" title="加载失败" desc="请重试" bind:retry="loadCourse" />
+
+  <card-flat wx:if="{{course}}">
     <text class="course-title">{{course.title}}</text>
-    <text class="course-desc">{{course.description || '课程还没有简介，内容更精彩'}}</text>
+    <text class="course-desc">{{course.description || '课程还没有简介'}}</text>
     <view class="course-meta">
       <view class="meta-item">
         <image class="meta-icon" src="/images/icons/review/flashcards.svg" mode="aspectFit" />
         <text class="meta-value">{{course.totalCards || 0}}</text>
         <text class="meta-label">知识卡片</text>
       </view>
-      <!-- divider removed -->
       <view class="meta-item">
         <image class="meta-icon" src="/images/icons/review/book.svg" mode="aspectFit" />
         <text class="meta-value">{{course.units.length || 0}}</text>
         <text class="meta-label">章节数</text>
       </view>
-      <!-- divider removed -->
       <view class="meta-item">
         <image class="meta-icon" src="/images/icons/review/trending-up.svg" mode="aspectFit" />
         <text class="meta-value">{{course.enrollment ? '已加入' : '待加入'}}</text>
         <text class="meta-label">状态</text>
       </view>
     </view>
+
     <view class="exam-row" wx:if="{{course.enrollment}}">
       <text class="exam-label">考试日期</text>
       <picker mode="date" value="{{course.enrollment.examDate}}" bindchange="onExamDateChange">
@@ -34,9 +35,8 @@
       </picker>
       <text class="exam-clear" wx:if="{{course.enrollment.examDate}}" bindtap="clearExamDate">清除</text>
     </view>
-  </view>
-  <!-- 今日队列 -->
-  <view class="queue-section clay-card" wx:if="{{course && course.enrollment && todaySummary}}">
+  </card-flat>
+  <card-flat wx:if="{{course && course.enrollment && todaySummary}}">
     <view class="queue-header">
       <text class="queue-title">今日复习</text>
     </view>
@@ -54,62 +54,47 @@
         <text class="queue-label">已完成</text>
       </view>
     </view>
-    <button class="start-btn clay-btn-primary" bindtap="startReview" wx:if="{{todaySummary.dueCards > 0 || todaySummary.newCards > 0}}">
-      开始复习
-    </button>
-  </view>
-  <!-- 注册按钮 -->
-  <view class="enroll-section" wx:if="{{course && !course.enrollment && !loading}}">
-    <button class="enroll-btn clay-btn-primary" bindtap="enrollCourse">注册课程</button>
-  </view>
-  <!-- 学习工具栏 -->
-  <view class="tool-bar clay-card" wx:if="{{course && course.enrollment}}">
-    <view class="tool-item" bindtap="startAllFlashcard">
-      <image class="tool-icon-img" src="/images/icons/review/flashcards.svg" mode="aspectFit" />
-      <text class="tool-label">背一背</text>
+    <juicy-button type="primary" full wx:if="{{todaySummary.dueCards > 0 || todaySummary.newCards > 0}}" bind:tap="startReview">开始复习</juicy-button>
+  </card-flat>
+
+  <juicy-button wx:if="{{course && !course.enrollment && !loading}}" type="primary" full bind:tap="enrollCourse">注册课程</juicy-button>
+
+  <card-flat wx:if="{{course && course.enrollment}}">
+    <view class="tool-grid">
+      <view class="tool-item" bindtap="startAllFlashcard">
+        <image class="tool-icon-img" src="/images/icons/review/flashcards.svg" mode="aspectFit" />
+        <text class="tool-label">背一背</text>
+      </view>
+      <view class="tool-item" bindtap="startAllQuiz">
+        <image class="tool-icon-img" src="/images/icons/review/quiz.svg" mode="aspectFit" />
+        <text class="tool-label">练一练</text>
+      </view>
+      <view class="tool-item" bindtap="goToCheatsheet">
+        <image class="tool-icon-img" src="/images/icons/review/cheatsheet.svg" mode="aspectFit" />
+        <text class="tool-label">急救包</text>
+      </view>
     </view>
-    <!-- divider removed -->
-    <view class="tool-item" bindtap="startAllQuiz">
-      <image class="tool-icon-img" src="/images/icons/review/quiz.svg" mode="aspectFit" />
-      <text class="tool-label">练一练</text>
-    </view>
-    <!-- divider removed -->
-    <view class="tool-item" bindtap="goToCheatsheet">
-      <image class="tool-icon-img" src="/images/icons/review/cheatsheet.svg" mode="aspectFit" />
-      <text class="tool-label">急救包</text>
-    </view>
-  </view>
+  </card-flat>
   <!-- 章节目录 -->
   <view class="section" wx:if="{{course}}">
     <view class="section-header">
       <text class="section-title">章节目录</text>
     </view>
     <view class="unit-list">
-      <view class="unit-item clay-card" wx:for="{{course.units}}" wx:key="id" bindtap="goToUnit" data-unit-id="{{item.id}}" hover-class="card-hover">
-        <view class="unit-left-group">
-          <view class="unit-order">
-            <text class="order-text">{{item.orderIndex < 10 ? '0' + item.orderIndex : item.orderIndex}}</text>
+      <card-flat wx:for="{{course.units}}" wx:key="id" clickable custom-class="unit-item" bind:tap="goToUnit" data-unit-id="{{item.id}}">
+        <view class="unit-row">
+          <view class="unit-left-group">
+            <pill-tag variant="neutral" size="sm">{{item.orderIndex < 10 ? '0' + item.orderIndex : item.orderIndex}}</pill-tag>
+            <view class="unit-info">
+              <text class="unit-title">{{item.title}}</text>
+              <text class="unit-subtitle">{{item.cardCount || 0}} 卡片</text>
+            </view>
           </view>
-          <view class="unit-info">
-            <text class="unit-title">{{item.title}}</text>
-            <text class="unit-subtitle">{{item.cardCount || 0}} 卡片</text>
-          </view>
+          <image class="unit-arrow" src="/images/icons/arrow-right.svg" />
         </view>
-        <image class="unit-arrow" src="/images/icons/arrow-right.svg" />
-      </view>
-      <view class="empty-state" wx:if="{{course.units.length === 0}}">
-        <text class="empty-text">章节内容正在路上，敬请期待</text>
-      </view>
+      </card-flat>
+      <empty-state wx:if="{{course.units.length === 0}}" status="empty" title="暂无章节" subtitle="章节内容正在路上" />
     </view>
-  </view>
-  <!-- 加载状态 -->
-  <view class="loading-state" wx:if="{{loading}}">
-    <text class="loading-text">正在加载知识库...</text>
-  </view>
-  <!-- 错误状态 -->
-  <view class="error-state" wx:if="{{!loading && !course}}">
-    <text class="error-text">哎呀，出了点小问题，再试一次？</text>
-    <button class="retry-btn" bindtap="loadCourse">重试</button>
   </view>
 </view>
 

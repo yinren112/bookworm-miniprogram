@@ -1,0 +1,10 @@
+<view class="tb__container" style="background: {{background}}; height: {{statusBarHeight + navBarHeight}}px;" wx:if="{{show}}">
+  <view class="tb__status" style="height: {{statusBarHeight}}px;"></view>
+  <view class="tb__bar" style="height: {{navBarHeight}}px;">
+    <view class="tb__left" wx:if="{{back}}" bindtap="onBack">
+      <view class="tb__chevron" style="color: {{color}}"></view>
+    </view>
+    <view class="tb__title" style="color: {{color}}">{{title}}</view>
+  </view>
+</view>
+<view class="tb__placeholder" style="height: {{statusBarHeight + navBarHeight}}px;" wx:if="{{show}}"></view>

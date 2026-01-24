@@ -42,16 +42,27 @@
   <view class="section-title">新书上架</view>
 
   <!-- Skeleton Loading State -->
-  <skeleton wx:if="{{state.status === 'loading'}}" type="grid" count="4" />
+  <loading-state wx:if="{{state.status === 'loading'}}" variant="page" text="加载中..." />
 
-  <view wx:if="{{state.status === 'error'}}" class="error-message">{{state.error}}</view>
-  <view wx:if="{{state.status === 'success' && state.data.length === 0}}" class="empty-state">
-    <image class="empty-img" src="/images/{{searchPerformed ? 'empty-search.png' : 'empty-shelf.png'}}" mode="widthFix" />
-    <text class="empty-text">{{searchPerformed ? '没有找到匹配的图书' : '暂时没有可售图书'}}</text>
-  </view>
+  <error-state
+    wx:if="{{state.status === 'error'}}"
+    mode="network"
+    title="加载失败"
+    desc="{{state.error}}"
+    bind:retry="onRetry"
+  />
+  <empty-state
+    wx:if="{{state.status === 'success' && state.data.length === 0}}"
+    title="{{searchPerformed ? '没有找到匹配的图书' : '暂时没有可售图书'}}"
+    desc="{{searchPerformed ? '换个关键词试试' : '稍后再来看看'}}"
+    actionText="清空搜索"
+    actionType="outline"
+    showAction="{{searchPerformed}}"
+    bind:action="onClearSearch"
+  />
 
   <!-- Real Content Grid -->
-  <view wx:if="{{state.status === 'success' && state.data.length > 0}}" class="book-grid">
+  <view wx:if="{{(state.status === 'success' || state.status === 'error') && state.data.length > 0}}" class="book-grid">
     <navigator wx:for="{{state.data}}" wx:key="id" class="book-card-navigator" url="/pages/book-detail/index?id={{item.id}}" hover-class="none">
       <view class="book-card" hover-class="card-hover">
         <!-- 图片凹陷容器 -->

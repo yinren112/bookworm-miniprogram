@@ -1,4 +1,4 @@
 <!-- pages/review-entry/index.wxml -->
 <view class="container">
-  <text class="loading-text">Loading...</text>
+  <loading-state variant="page" text="跳转中..." />
 </view>

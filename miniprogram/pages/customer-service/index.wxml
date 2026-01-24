@@ -1,6 +1,5 @@
 <view class="container page-container">
-  <!-- 客服名片 (Business Card) -->
-  <view class="contact-card">
+  <card-flat>
     <view class="card-header">
       <image class="avatar" src="/images/icons/customer-service.svg" />
       <view class="card-info">
@@ -14,9 +13,11 @@
         <text class="label">微信号</text>
         <text class="value">{{customerServiceWechat}}</text>
       </view>
-      <button class="copy-btn" bindtap="copyWechatId">复制</button>
+      <view class="copy-action">
+        <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" bind:tap="copyWechatId">复制</juicy-button>
+      </view>
     </view>
-  </view>
+  </card-flat>
 
   <!-- 常见问题 (Chat Bubbles) -->
   <view class="faq-section">

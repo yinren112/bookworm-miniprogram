@@ -1,0 +1,48 @@
+.pc__track {
+  height: 32rpx;
+  border-radius: 16rpx;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.pc__fill {
+  height: 100%;
+  border-radius: 16rpx;
+  transition: width var(--duration-normal) var(--ease-standard);
+  position: relative;
+}
+
+/* Add a highlight shine to make it look 3D/Plastic */
+.pc__fill::after {
+  content: '';
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  right: 4rpx;
+  height: 8rpx;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4rpx;
+}
+
+.pc__fill--yellow { background: var(--color-juicy-yellow); }
+.pc__fill--green { background: var(--color-juicy-green); }
+.pc__fill--blue { background: var(--color-juicy-blue); }
+.pc__fill--red { background: var(--color-juicy-red); }
+
+.pc__meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+}
+
+.pc__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+}
+
+.pc__value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-light);
+}

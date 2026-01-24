@@ -3,6 +3,7 @@
 
 const { startSession, submitCardAnswer, starItem, unstarItem, getStarredItems } = require('../../utils/study-api');
 const { getResumeSession, saveResumeSession, clearResumeSession, setLastSessionType } = require('../../utils/study-session');
+const studyTimer = require('../../utils/study-timer');
 const logger = require('../../../../utils/logger');
 const haptic = require('../../../../utils/haptic');
 const soundManager = require('../../../../utils/sound-manager');
@@ -71,6 +72,15 @@ Page({
         icon: 'none',
       });
     }
+  },
+
+  onShow() {
+    studyTimer.start('card');
+    studyTimer.onInteraction();
+  },
+
+  onUserInteraction() {
+    studyTimer.onInteraction();
   },
 
   tryResumeSession(courseKey) {
@@ -401,6 +411,8 @@ Page({
 
   onHide() {
     this.trackAbort('hide');
+    studyTimer.flush();
+    studyTimer.stop();
   },
 
   updateProgress(currentIndex) {
@@ -444,6 +456,8 @@ Page({
 
   onUnload() {
     this.trackAbort('close');
+    studyTimer.flush();
+    studyTimer.stop();
     // 释放音效实例，避免长期资源占用
     soundManager.destroyAll();
   },

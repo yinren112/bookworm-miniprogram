@@ -5,7 +5,10 @@
     <view class="celebration-title">本次完成总结</view>
     <view class="celebration-subtitle">做得不错，继续保持</view>
   </view>
-  <view class="stats-card clay-card">
+
+  <canvas type="2d" id="confetti" class="confetti-canvas"></canvas>
+
+  <card-flat>
     <view class="stats-title">学习数据</view>
     <view class="stat-grid">
       <view class="stat-item">
@@ -26,15 +29,16 @@
       </view>
     </view>
     <view class="stat-row" wx:if="{{starredCount > 0}}">
-      <text class="stat-label">星标收藏</text>
+      <pill-tag variant="neutral" size="sm">星标收藏</pill-tag>
       <text class="stat-value">{{starredCount}} 张</text>
     </view>
     <view class="stat-row" wx:if="{{mode === 'quiz'}}">
-      <text class="stat-label">错题数</text>
+      <pill-tag variant="neutral" size="sm">错题数</pill-tag>
       <text class="stat-value">{{wrongCount}} 题</text>
     </view>
-  </view>
-  <view class="streak-card clay-card" wx:if="{{!loading}}">
+  </card-flat>
+
+  <card-flat wx:if="{{!loading}}">
     <image class="streak-flame" src="/images/icons/review/flame.svg" mode="aspectFit" />
     <view class="streak-info">
       <view class="streak-current">
@@ -43,20 +47,21 @@
       </view>
       <view class="streak-best" wx:if="{{bestStreak > 0}}">历史最佳 {{bestStreak}} 天</view>
     </view>
-  </view>
+  </card-flat>
   <view class="shortcut-actions" wx:if="{{wrongCount > 0}}">
-    <button class="shortcut-btn" bindtap="startWrongQuiz">错题强化</button>
+    <juicy-button type="outline" full bind:tap="startWrongQuiz">错题强化</juicy-button>
   </view>
   <view class="action-area">
-    <button class="action-btn primary" bindtap="continueReview" loading="{{actionLoading && actionType === 'continue'}}" disabled="{{actionLoading}}">
-      再来一组
-    </button>
-    <button class="action-btn secondary" bindtap="goHome" loading="{{actionLoading && actionType === 'home'}}" disabled="{{actionLoading}}">
-      回到首页
-    </button>
-    <button class="action-btn ghost" bindtap="onSubscribeReminder" disabled="{{reminderStatus === 'ACCEPT' || reminderStatus === 'ACTIVE' || subscribeLoading}}">
+    <juicy-button type="primary" full disabled="{{actionLoading}}" bind:tap="continueReview">再来一组</juicy-button>
+    <juicy-button type="secondary" full disabled="{{actionLoading}}" bind:tap="goHome">回到首页</juicy-button>
+    <juicy-button
+      type="secondary"
+      full
+      disabled="{{reminderStatus === 'ACCEPT' || reminderStatus === 'ACTIVE' || subscribeLoading}}"
+      bind:tap="onSubscribeReminder"
+    >
       {{reminderStatus === 'ACCEPT' || reminderStatus === 'ACTIVE' ? '已订阅下次提醒' : '订阅下次提醒'}}
-    </button>
+    </juicy-button>
     <text class="subscribe-tip">订阅一次收到一次，可在我的里管理</text>
   </view>
 </view>
