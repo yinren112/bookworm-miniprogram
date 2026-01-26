@@ -95,18 +95,14 @@
   - `artifacts/p1mp_subscribe_evidence/E3_backend_payload_mapping.md`
 - Owner：WeChatAdmin
 
-### P1-MP-CONTENT-001：协议/隐私内容兜底已补，但需最终文案（Needs Content Finalization）
+### P1-MP-CONTENT-001：协议/隐私最终文案与落库机制已完成（Done）
 
-- 现状（修复后）：/content 拉取失败时自动回退到本地模板，页面不再空白；本地模板已标注 TODO 等待最终文案。
+- 现状（修复后）：后端启动链路在 production/staging 自动 upsert 协议/隐私内容；小程序本地兜底已同步最终文案，后端不可用时仍可展示。
 - 证据：
-  - `miniprogram/utils/content-resolver.js`
-  - `miniprogram/utils/local-content.js`
-  - `artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_fallback_script.txt`
-  - `artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_manual_steps.md`
-  - `artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_diff.txt`
-- 影响：若最终文案未补齐，将继续展示占位模板。
+  - `artifacts/p1mp_content_evidence/E1_ensure_script_run.txt`
+  - `artifacts/p1mp_content_evidence/E2_curl_content.txt`
+  - `artifacts/p1mp_content_evidence/E3_miniprogram_fallback_steps.md`
 - Owner：Ops
-- 行动建议：补齐最终协议/隐私文案，并同步后端 Content 数据与本地兜底模板。
 
 ## 5. P2 建议清单（同上）
 

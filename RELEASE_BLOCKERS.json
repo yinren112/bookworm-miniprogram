@@ -136,16 +136,24 @@
   {
     "id": "P1-MP-CONTENT-001",
     "severity": "P1",
+    "status": "Done",
     "title": "用户协议/隐私政策页面依赖后端 Content 记录，但 seed 明确禁止在 production/staging 运行",
     "evidence": [
-      "miniprogram/app.js:65 `terms-of-service` 通过 /content/:slug 拉取",
-      "bookworm-backend/prisma/seed.ts:360-364 拒绝在 production/staging 运行 seed"
+      "artifacts/p1mp_content_evidence/E1_ensure_script_run.txt",
+      "artifacts/p1mp_content_evidence/E2_curl_content.txt",
+      "artifacts/p1mp_content_evidence/E3_miniprogram_fallback_steps.md"
     ],
     "paths": [
-      "miniprogram/app.js",
-      "miniprogram/pages/profile/index.js",
-      "bookworm-backend/prisma/seed.ts",
-      "bookworm-backend/src/routes/content.ts"
+      "bookworm-backend/assets/legal/terms-of-service.md",
+      "bookworm-backend/assets/legal/privacy-policy.md",
+      "bookworm-backend/scripts/ensure_legal_content.mjs",
+      "bookworm-backend/entrypoint.sh",
+      "bookworm-backend/Dockerfile",
+      "bookworm-backend/Dockerfile.prod",
+      "miniprogram/utils/local-content.js",
+      "artifacts/p1mp_content_evidence/E1_ensure_script_run.txt",
+      "artifacts/p1mp_content_evidence/E2_curl_content.txt",
+      "artifacts/p1mp_content_evidence/E3_miniprogram_fallback_steps.md"
     ],
     "owner": "Ops",
     "action": "在生产环境通过迁移/后台管理/初始化脚本保证 terms-of-service/privacy-policy 两条 Content 记录存在。"

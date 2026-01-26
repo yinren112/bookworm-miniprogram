@@ -49,6 +49,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY package.json .
 # Now copy the compiled code
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/assets/legal ./assets/legal
+COPY --from=builder /app/scripts/ensure_legal_content.mjs ./scripts/ensure_legal_content.mjs
 
 EXPOSE 8080
 

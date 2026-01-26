@@ -34,6 +34,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY package.json .
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/assets/legal ./assets/legal
+COPY --from=builder /app/scripts/ensure_legal_content.mjs ./scripts/ensure_legal_content.mjs
 COPY --from=builder /app/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

@@ -1,0 +1,22 @@
+bookworm-backend/src\index.ts:28:import contentRoutes from "./routes/content";
+bookworm-backend/src\routes\content.ts:1:// src/routes/content.ts
+bookworm-backend/src\routes\content.ts:4:import { getContentBySlug } from "../services/contentService";
+bookworm-backend/src\routes\content.ts:10:  slug: Type.String({ minLength: 1 }),
+bookworm-backend/src\routes\content.ts:20:    "/api/content/:slug",
+bookworm-backend/src\routes\content.ts:27:      const { slug } = request.params;
+bookworm-backend/src\routes\content.ts:28:      const content = await getContentBySlug(prisma, slug);
+bookworm-backend/src\routes\content.ts:34:    "/api/content/proxy-image",
+bookworm-backend/src\services\contentService.ts:1:// src/services/contentService.ts
+bookworm-backend/src\services\contentService.ts:5:export async function getContentBySlug(dbCtx: PrismaClient | Prisma.TransactionClient, slug: string) {
+bookworm-backend/src\services\contentService.ts:7:    where: { slug },
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:60:      // slug：包含时间戳/递增后缀的场景，如 test-content-1697... 或 ...-123
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:61:      if (lowerKey === 'slug' && typeof value === 'string') {
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:63:          out[key] = '[DYNAMIC_SLUG]';
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:339:    it("GET /api/content/:slug - 获取静态内容", async () => {
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:341:      const testSlug = `test-content-${Date.now()}`;
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:344:          slug: testSlug,
+bookworm-backend/src\tests\contract\api.contract.integration.test.ts:351:        .get(`/api/content/${testSlug}`);
+bookworm-backend/src\tests\contract\__snapshots__\api.contract.integration.test.ts.snap:26:exports[`API Contract Tests > Content APIs > GET /api/content/:slug - 获取静态内容 1`] = `
+bookworm-backend/src\tests\contract\__snapshots__\api.contract.integration.test.ts.snap:31:  "slug": "[DYNAMIC_SLUG]",
+bookworm-backend/src\tests\paymentSecurity.integration.test.ts:62:vi.mock("../services/contentService", () => ({
+bookworm-backend/src\tests\paymentSecurity.integration.test.ts:63:  getContentBySlug: vi.fn(),

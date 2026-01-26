@@ -1,0 +1,8 @@
+miniprogram\scripts\verify-content-fallback.js:23:    'terms-of-service',
+miniprogram\scripts\verify-content-fallback.js:33:    'privacy-policy',
+miniprogram\pages\webview\index.js:57:          url: '/content/' + slug,
+miniprogram\utils\local-content.js:2:  'terms-of-service': {
+miniprogram\utils\local-content.js:13:  'privacy-policy': {
+miniprogram\utils\image.js:4:const PROXY_ENDPOINT = '/content/proxy-image';
+miniprogram\pages\profile\index.js:198:      url: '/pages/webview/index?slug=terms-of-service'
+miniprogram\pages\profile\index.js:204:      url: '/pages/webview/index?slug=privacy-policy'

@@ -1,0 +1,8 @@
+Command: node bookworm-backend/scripts/ensure_legal_content.mjs
+ensure_legal_content failed: 
+Invalid `prisma.content.upsert()` invocation:
+
+
+Can't reach database server at `localhost:65432`
+
+Please make sure your database server is running at `localhost:65432`.
