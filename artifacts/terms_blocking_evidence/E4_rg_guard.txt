@@ -1,0 +1,22 @@
+命令:
+rg -n "termsAccepted|pages/terms/index|exitMiniProgram|Page\(" miniprogram/app.js miniprogram/pages/terms -S
+
+输出:
+miniprogram/app.js:14:const TERMS_PAGE_ROUTE = 'pages/terms/index';
+miniprogram/app.js:24:    return originalPage(pageConfig);
+miniprogram/app.js:47:  return originalPage(pageConfig);
+miniprogram/app.js:56:    termsAccepted: false,
+miniprogram/app.js:57:    termsAcceptedAt: '',
+miniprogram/app.js:98:    this.globalData.termsAccepted = accepted;
+miniprogram/app.js:99:    this.globalData.termsAcceptedAt = acceptedAt;
+miniprogram/app.js:104:    return this.globalData.termsAccepted || readTermsAcceptedFromStorage();
+miniprogram/pages/terms\index.wxml:1:<!-- miniprogram/pages/terms/index.wxml -->
+miniprogram/pages/terms\index.wxss:1:/* miniprogram/pages/terms/index.wxss */
+miniprogram/pages/terms\index.js:1:// miniprogram/pages/terms/index.js
+miniprogram/pages/terms\index.js:106:Page({
+miniprogram/pages/terms\index.js:127:      app.globalData.termsAccepted = true;
+miniprogram/pages/terms\index.js:128:      app.globalData.termsAcceptedAt = acceptedAt;
+miniprogram/pages/terms\index.js:150:          this.exitMiniProgram();
+miniprogram/pages/terms\index.js:156:  exitMiniProgram() {
+miniprogram/pages/terms\index.js:165:    if (typeof wx.exitMiniProgram !== 'function') {
+miniprogram/pages/terms\index.js:172:    wx.exitMiniProgram({

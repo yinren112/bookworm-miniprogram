@@ -15,7 +15,7 @@
 
 ## 2. 结论摘要（P0/P1/P2 数量，列最关键 8 条）
 
-- 数量汇总（未关闭）：P0=0，P1=2，P2=1（详见 `RELEASE_BLOCKERS.json`）
+- 数量汇总（未关闭）：P0=0，P1=2，P2=0（详见 `RELEASE_BLOCKERS.json`）
 - 最关键 8 条：
   1. P0：生产镜像迁移离线可用（Done，见 artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt）
   2. P0：后端启动入口统一为 dist/src/index.js（Done，见 artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt）
@@ -121,10 +121,14 @@
   - `artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_prod_validation_output.txt`
   - `artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_acceptance.txt`
 
-### P2-MP-TERMS-001：用户拒绝协议仅 toast 提示，不阻断继续使用
+### P2-MP-TERMS-001：用户拒绝协议仅 toast 提示，不阻断继续使用（Done）
 
-- 证据：`miniprogram/app.js:40-60`
-- 建议：与合规口径对齐；若要求“拒绝即不可用”，需要增加硬阻断并提供退出路径。
+- 现状（修复后）：全局 Page onShow guard 强制拦截未同意用户；协议页提供同意落盘与拒绝退出路径。
+- 证据：
+  - `artifacts/terms_blocking_evidence/E1_blocking_steps.md`
+  - `artifacts/terms_blocking_evidence/E2_reject_exit.md`
+  - `artifacts/terms_blocking_evidence/E3_accept_storage.md`
+  - `artifacts/terms_blocking_evidence/E4_rg_guard.txt`
 
 ### P2-MP-URL-001：trial/release 强制 https（Done）
 

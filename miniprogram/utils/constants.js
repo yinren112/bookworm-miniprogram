@@ -29,6 +29,10 @@ const REVIEW_DASHBOARD_CACHE_VERSION = 'v1';
 const REVIEW_COURSES_CACHE_VERSION = 'v1';
 const RESUME_SESSION_STORAGE_KEY = 'study:resumeSession';
 const LAST_SESSION_TYPE_KEY = 'study:lastSessionType';
+const TERMS_STORAGE_KEY = 'termsAccepted';
+const TERMS_ACCEPTED_AT_KEY = 'termsAcceptedAt';
+const TERMS_VERSION_KEY = 'termsVersion';
+const TERMS_VERSION = 'v1';
 
 module.exports = {
   ORDER_STATUS,
@@ -38,4 +42,8 @@ module.exports = {
   REVIEW_COURSES_CACHE_VERSION,
   RESUME_SESSION_STORAGE_KEY,
   LAST_SESSION_TYPE_KEY,
+  TERMS_STORAGE_KEY,
+  TERMS_ACCEPTED_AT_KEY,
+  TERMS_VERSION_KEY,
+  TERMS_VERSION,
 };

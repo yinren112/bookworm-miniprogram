@@ -1,23 +1,68 @@
+/* global globalThis */
 // miniprogram/app.js
 const privacy = require('./utils/privacy');
 const { track, flushQueue } = require('./utils/track');
 const logger = require('./utils/logger');
 const theme = require('./utils/theme');
+const {
+  TERMS_STORAGE_KEY,
+  TERMS_ACCEPTED_AT_KEY,
+  TERMS_VERSION_KEY,
+  TERMS_VERSION
+} = require('./utils/constants');
+
+const TERMS_PAGE_ROUTE = 'pages/terms/index';
+const TERMS_PAGE_URL = `/${TERMS_PAGE_ROUTE}`;
+
+function readTermsAcceptedFromStorage() {
+  return wx.getStorageSync(TERMS_STORAGE_KEY) === true;
+}
+
+const originalPage = Page;
+const patchedPage = function (pageConfig) {
+  if (!pageConfig || typeof pageConfig !== 'object') {
+    return originalPage(pageConfig);
+  }
+
+  const originalOnShow = pageConfig.onShow;
+  pageConfig.onShow = function (...args) {
+    const currentRoute = this.route || '';
+    if (currentRoute !== TERMS_PAGE_ROUTE) {
+      const app = getApp();
+      const accepted = app && typeof app.isTermsAccepted === 'function'
+        ? app.isTermsAccepted()
+        : readTermsAcceptedFromStorage();
+      if (!accepted) {
+        wx.reLaunch({ url: TERMS_PAGE_URL });
+        return;
+      }
+    }
+
+    if (typeof originalOnShow === 'function') {
+      return originalOnShow.apply(this, args);
+    }
+    return undefined;
+  };
+
+  return originalPage(pageConfig);
+};
+const globalRef = typeof globalThis !== 'undefined' ? globalThis : null;
+if (globalRef && typeof globalRef.Page === 'function') {
+  globalRef.Page = patchedPage;
+}
 
 App({
-  TERMS_COPY: {
-    title: '服务协议与隐私政策',
-    content: '欢迎使用！为保障您的权益，请在使用前仔细阅读并同意《用户服务协议》和《隐私政策》。您可在“我的-设置”中随时查看。',
-    confirmText: '同意',
-    cancelText: '拒绝',
-    rejectToast: '您需要同意协议才能使用本服务'
+  globalData: {
+    termsAccepted: false,
+    termsAcceptedAt: '',
+    termsVersion: TERMS_VERSION
   },
 
   onLaunch() {
     theme.applyTheme(theme.getSystemTheme());
     theme.startThemeListener();
     privacy.setupPrivacyAuthorization();
-    this.checkTermsAgreement();
+    this.loadTermsAgreement();
     this.initPerformanceTracking();
   },
 
@@ -37,33 +82,26 @@ App({
     logger.error('[app] unhandled rejection', safeMessage);
   },
 
-  checkTermsAgreement() {
-    const hasAgreed = wx.getStorageSync('hasAgreedToTerms');
-    if (!hasAgreed) {
-      wx.showModal({
-        title: this.TERMS_COPY.title,
-        content: this.TERMS_COPY.content,
-        confirmText: this.TERMS_COPY.confirmText,
-        cancelText: this.TERMS_COPY.cancelText,
-        success: (res) => {
-          if (res.confirm) {
-            wx.setStorageSync('hasAgreedToTerms', true);
-          } else if (res.cancel) {
-            wx.showToast({
-              title: this.TERMS_COPY.rejectToast,
-              icon: 'none',
-              duration: 3000
-            });
-          }
-        }
-      });
+  loadTermsAgreement() {
+    let accepted = readTermsAcceptedFromStorage();
+    let acceptedAt = wx.getStorageSync(TERMS_ACCEPTED_AT_KEY) || '';
+    let storedVersion = wx.getStorageSync(TERMS_VERSION_KEY) || TERMS_VERSION;
+
+    if (!accepted && wx.getStorageSync('hasAgreedToTerms') === true) {
+      accepted = true;
+      acceptedAt = new Date().toISOString();
+      storedVersion = TERMS_VERSION;
+      wx.setStorageSync(TERMS_STORAGE_KEY, true);
+      wx.setStorageSync(TERMS_ACCEPTED_AT_KEY, acceptedAt);
+      wx.setStorageSync(TERMS_VERSION_KEY, storedVersion);
     }
+    this.globalData.termsAccepted = accepted;
+    this.globalData.termsAcceptedAt = acceptedAt;
+    this.globalData.termsVersion = storedVersion;
   },
 
-  showTerms() {
-    wx.navigateTo({
-      url: '/pages/webview/index?slug=terms-of-service'
-    });
+  isTermsAccepted() {
+    return this.globalData.termsAccepted || readTermsAcceptedFromStorage();
   },
 
   initPerformanceTracking() {

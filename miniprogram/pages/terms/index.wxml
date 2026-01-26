@@ -1,0 +1,40 @@
+<!-- miniprogram/pages/terms/index.wxml -->
+<view class="terms-page">
+  <view class="page-header">
+    <text class="title">用户服务协议与隐私政策</text>
+    <text class="subtitle">使用前请阅读并同意</text>
+  </view>
+
+  <view class="tab-bar">
+    <view class="tab {{activeTab === 'terms' ? 'active' : ''}}" data-tab="terms" bindtap="onTabChange">
+      用户服务协议
+    </view>
+    <view class="tab {{activeTab === 'privacy' ? 'active' : ''}}" data-tab="privacy" bindtap="onTabChange">
+      隐私政策
+    </view>
+  </view>
+
+  <scroll-view class="content" scroll-y>
+    <block wx:if="{{activeTab === 'terms'}}">
+      <view class="section" wx:for="{{termsSections}}" wx:for-item="section" wx:key="title">
+        <text class="section-title">{{section.title}}</text>
+        <view class="paragraph" wx:for="{{section.paragraphs}}" wx:for-item="paragraph" wx:key="*this">
+          <text>{{paragraph}}</text>
+        </view>
+      </view>
+    </block>
+    <block wx:elif="{{activeTab === 'privacy'}}">
+      <view class="section" wx:for="{{privacySections}}" wx:for-item="section" wx:key="title">
+        <text class="section-title">{{section.title}}</text>
+        <view class="paragraph" wx:for="{{section.paragraphs}}" wx:for-item="paragraph" wx:key="*this">
+          <text>{{paragraph}}</text>
+        </view>
+      </view>
+    </block>
+  </scroll-view>
+
+  <view class="actions">
+    <button class="primary" bindtap="handleAccept">同意并继续</button>
+    <button class="secondary" bindtap="handleReject">拒绝并退出</button>
+  </view>
+</view>

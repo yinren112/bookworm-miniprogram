@@ -5,6 +5,7 @@
   "pages": [
     "pages/review/index",
     "pages/profile/index",
+    "pages/terms/index",
     "pages/webview/index",
     "pages/customer-service/index"
   ],
