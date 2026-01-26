@@ -72,6 +72,40 @@ remotion/
 docs/HANDOFF_REVIEW_BUGS.md
 docs/REVIEW_ONLY_MODE_PLAN.md
 
+# Temporary docs/reports/scripts (local only)
+reports/
+*_report.md
+*_report.txt
+*_report.json
+*_report.html
+*_report.xml
+*_report.csv
+*_draft.md
+*_notes.md
+*_wip.md
+*_scratch.md
+*_temp.md
+*_tmp.md
+tmp_*.md
+temp_*.md
+
+# Temporary scripts (local only)
+*_tmp.js
+*_tmp.ts
+*_tmp.sh
+*_tmp.ps1
+*_scratch.js
+*_scratch.ts
+*_scratch.sh
+*_scratch.ps1
+tmp_*/
+temp_*/
+scratch_*/
+
+# Keep release reports tracked
+!RELEASE_READINESS_REPORT.md
+!RELEASE_AUDIT_REPORT.md
+
 # AI/agent scratchpads (local only)
 task_plan.md
 progress.md
