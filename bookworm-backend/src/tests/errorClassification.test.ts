@@ -2,7 +2,7 @@
 // Unit tests for Payment Error Classification Service
 
 import { describe, it, expect } from 'vitest';
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { PaymentErrorClassificationService } from '../services/errorClassification';
 import { ApiError, PaymentQueryError } from '../errors';
 
@@ -59,7 +59,7 @@ describe('PaymentErrorClassificationService', () => {
 
   describe('Database Transient Errors', () => {
     it('should classify P1001 (connection failed) as retryable', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Connection failed', {
+      const error = new PrismaClientKnownRequestError('Connection failed', {
         code: 'P1001',
         clientVersion: '5.0.0',
       });
@@ -72,7 +72,7 @@ describe('PaymentErrorClassificationService', () => {
     });
 
     it('should classify P1002 (connection timeout) as retryable', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Connection timeout', {
+      const error = new PrismaClientKnownRequestError('Connection timeout', {
         code: 'P1002',
         clientVersion: '5.0.0',
       });
@@ -84,7 +84,7 @@ describe('PaymentErrorClassificationService', () => {
     });
 
     it('should classify P1008 (operation timeout) as retryable', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Operation timeout', {
+      const error = new PrismaClientKnownRequestError('Operation timeout', {
         code: 'P1008',
         clientVersion: '5.0.0',
       });
@@ -95,7 +95,7 @@ describe('PaymentErrorClassificationService', () => {
     });
 
     it('should NOT classify other Prisma errors as retryable', () => {
-      const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      const error = new PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',
         clientVersion: '5.0.0',
       });
@@ -171,7 +171,7 @@ describe('PaymentErrorClassificationService', () => {
       const errors = [
         new ApiError(400, 'Invalid', 'TIMESTAMP_INVALID'),
         new PaymentQueryError('WECHAT_QUERY_FAILED_TRANSIENT'),
-        new Prisma.PrismaClientKnownRequestError('Timeout', { code: 'P1008', clientVersion: '5.0.0' }),
+        new PrismaClientKnownRequestError('Timeout', { code: 'P1008', clientVersion: '5.0.0' }),
         new Error('Random'),
       ];
 

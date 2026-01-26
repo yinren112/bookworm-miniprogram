@@ -2,7 +2,7 @@
 // Unified error classification service for payment notifications
 // Implements Strategy + Chain of Responsibility patterns
 
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError, PaymentQueryError } from "../errors";
 import { WECHAT_CONSTANTS } from "../constants";
 
@@ -90,7 +90,7 @@ class DatabaseTransientErrorClassifier implements ErrorClassifier {
   private transientCodes = ['P1001', 'P1002', 'P1008'];
 
   canHandle(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError &&
+    return error instanceof PrismaClientKnownRequestError &&
            this.transientCodes.includes(error.code);
   }
 

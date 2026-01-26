@@ -14,6 +14,7 @@ const baseEnv = {
   WXPAY_API_V3_KEY: "12345678901234567890123456789012",
   WXPAY_NOTIFY_URL: "https://example.com/notify",
   CORS_ORIGIN: "https://admin.example.com",
+  METRICS_AUTH_TOKEN: "test-metrics-token",
 };
 
 describe("config production validation", () => {
@@ -107,5 +108,28 @@ describe("config production validation", () => {
     }).rejects.toThrow("process.exit:1");
 
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("config test runtime", () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv, NODE_ENV: "test" };
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.restoreAllMocks();
+  });
+
+  it("should import without required env in test", async () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.JWT_SECRET;
+    delete process.env.WX_APP_ID;
+    delete process.env.WX_APP_SECRET;
+
+    await expect(import("../config")).resolves.toBeDefined();
   });
 });

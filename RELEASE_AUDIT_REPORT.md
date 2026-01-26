@@ -2,78 +2,90 @@
 
 ## 1. 结论摘要
 
-- **P0 阻碍 (2 条)**:
-  1. **前端隐私协议缺失交互入口**: `app.json` 开启了隐私检查，但代码中未发现 `agreePrivacyAuthorization` 按钮或 `onNeedPrivacyAuthorization` 监听，用户无法同意协议，导致小程序不可用。
-  2. **后端代码质量门槛未通过**: `npm run lint` 失败，存在 3 个禁止的 Raw Select 错误，违反架构规范。
-
-- **P1 风险 (1 条)**:
-  1. **前端缺乏自动化质量门槛**: `miniprogram/package.json` 中缺失 `lint`, `test` 等脚本，无法在 CI/CD 中自动验证代码质量。
-
-- **P2 建议 (2 条)**:
-  1. **依赖兼容性风险 (mp-html)**: `mp-html` 依赖包中包含大量 `window`/`document` 引用，虽多为 uni-app 适配代码，但需验证在原生小程序环境下的稳定性。
-  2. **Prisma 配置警告**: 收到 Prisma 7 废弃警告，建议迁移配置。
+- **P0 阻碍 (1 条)**: 后端依赖环境损坏且被占用，无法执行质量门槛检查（Lint/Test），发布前处于“裸奔”状态。
+- **P1 风险 (2 条)**: 小程序前端缺乏自动化测试与代码规范检查；线上 API 域名需确认已在后台配置白名单。
+- **P2 建议 (2 条)**: 建议 `url.js` 默认协议改为 HTTPS；确认自定义隐私弹窗与微信原生隐私协议的交互体验。
 
 ---
 
-## 2. P0 阻碍清单 (可执行)
+## 2. P0 阻碍清单（可执行）
 
-### 1. 前端隐私协议缺失交互入口
-- **现象**: `app.json` 设置了 `"__usePrivacyCheck__": true`，但全局搜索 `privacy` 或 `隐私` 未发现任何交互实现。
+### [P0-1] 后端质量门槛无法执行（依赖环境锁死）
+- **现象**: 执行 `npm ci` 时失败，提示 `EPERM: operation not permitted`，因为核心文件被正在运行的 `node` 进程锁定。
 - **证据**:
-  - `miniprogram/app.json`: Line 2 `"__usePrivacyCheck__": true`
-  - `grep` 搜索 `privacy|隐私` (Exclude node_modules): **无结果**
-- **影响**: 用户进入小程序触发隐私接口时（如获取昵称、剪切板等），会被微信拦截，且因无同意按钮（`open-type="agreePrivacyAuthorization"`），用户将卡死无法继续使用。
+  ```bash
+  npm error path ...\node_modules\.prisma\client\query_engine-windows.dll.node
+  npm error code EPERM
+  npm error syscall unlink
+  ```
+- **影响**: 
+  - `node_modules` 处于半损坏状态（旧的删了一半，新的没装上）。
+  - 下游的 `npm run lint` (ESLint) 和 `npm test` 均因缺包无法运行。
+  - **严重后果**: 无法验证后端代码是否存在语法错误、逻辑漏洞或破坏性变更，强行发布极大概率导致线上服务崩溃。
 - **修复建议**:
-  1. 在 `miniprogram/components` 下新建 `privacy-popup` 组件。
-  2. 实现 `wx.onNeedPrivacyAuthorization` 监听。
-  3. 添加 `<button open-type="agreePrivacyAuthorization">` 供用户点击。
-
-### 2. 后端代码质量门槛未通过
-- **现象**: 后端 Lint 检查失败，构建管道应被阻止。
-- **证据**: `npm run lint` 输出:
-  ```
-  src/services/study/activityService.ts:109:5 error Use view selector from src/db/views/* instead of raw select
-  src/services/study/cheatsheetService.ts:58:5 error Use view selector ...
-  src/services/study/cheatsheetService.ts:88:5 error Use view selector ...
-  ```
-- **影响**: 违反 `no-prisma-raw-select` 架构规则，可能导致数据泄露或查询性能问题，且阻止自动发布流程。
-- **修复建议**: 修改上述文件，使用 `src/db/views/` 下定义的标准 Select 对象替代硬编码的 `select: { ... }`。
+  1. **立刻停止** 本地运行的后端服务 (`Ctrl+C` 关闭 `npm run dev` 终端)。
+  2. 删除锁定的 `node_modules` 目录。
+  3. 重新执行完整安装与检查流程：
+     ```powershell
+     npm ci
+     npm run lint
+     npm test
+     npm run build
+     ```
+  4. 只有上述命令全部变绿（Pass），才允许进入发布流程。
 
 ---
 
-## 3. 命令执行记录
+## 3. P1 风险清单
 
-### 基础信息
-- **Root Path**: `C:\Users\wapadil\WeChatProjects\miniprogram-13`
-- **Git Commit**: `a0a4f0e788aa67942bc65818d06b7a96aec87eef`
+### [P1-1] 前端缺乏自动化质量门槛
+- **现象**: `miniprogram/package.json` 中仅包含 `mp-html` 依赖，没有任何 `scripts`（如 `lint`, `test`）。
+- **证据**: `cat miniprogram/package.json` 显示无测试脚本。
+- **影响**: 前端代码质量全靠人工肉眼 Review，随着业务逻辑（如 `checkTermsAgreement`, `study-api.js`）变复杂，极易引入回归 Bug。
 
-### 后端审计 (bookworm-backend)
-| 命令 | 状态 | 关键输出摘要 |
-|---|---|---|
-| `npm ci / install` | ✅ Pass | 正常安装 |
-| `npm run lint` | ❌ **FAIL** | `3 problems (3 errors, 0 warnings)` - 禁止的 Raw Select |
-| `npm test` | ✅ Pass | 测试通过 |
-| `npm run build` | ✅ Pass | TypeScript 编译成功 |
-| `prisma migrate status`| ✅ Pass | `Database schema is up to date!` |
-
-### 前端审计 (miniprogram)
-| 检查项 | 状态 | 关键输出摘要 |
-|---|---|---|
-| **非法域名/IP** | ✅ Pass | 未发现硬编码 IP 或 HTTP 链接 |
-| **隐私保护代码** | ❌ **FAIL** | `grep` 未搜到 "privacy" 相关代码 (app.json 除外) |
-| **Web API 滥用** | ⚠️ Warn | `mp-html` 包含 `window`/`document` 引用 (需通过冒烟测试验证) |
-| **Package Scripts** | ⚠️ Warn | `package.json` 无 `lint`/`test` 脚本 |
+### [P1-2] 生产环境域名配置
+- **现象**: `config.js` 中配置了 Release 域名 `https://api.lailinkeji.com/api`。
+- **影响**: 若该域名未在“微信公众平台 -> 开发设置 -> 服务器域名”中配置为 request 合法域名，线上版将直接无法请求数据（开发版/体验版开启“不校验域名”可能掩盖此问题）。
+- **建议**: 登录后台截图确认白名单已包含该域名。
 
 ---
 
-## 4. 发布与平台门槛清单 (人工确认)
+## 4. 命令执行记录
 
-请在发布前人工核对以下项目：
-1. **隐私协议**: 微信后台“设置 -> 服务内容声明 -> 用户隐私保护指引”是否已更新并审核通过？
-2. **服务器域名**: `request`合法域名列表是否已包含后端 API 域名？(需为 HTTPS)
-3. **AppSecret**: 确保生产环境 `WX_APP_SECRET` 正确，且未泄露给前端。
-4. **类目资质**: 确认当前小程序服务类目是否覆盖所有功能（如涉及“教育”、“社交”等特殊资质）。
+### A. 基础环境
+- **Git Status**: 干净（除了本报告文件）。
+- **Backend Health**: 
+  - ✅ `/api/health` 返回 200 OK (在服务未停止前测得)。
+  - ✅ 数据库连接正常。
+
+### B. 后端审计 (Bookworm Backend)
+- ❌ `npm ci`: **FAILED** (EPERM, 文件被占用)。
+- ❌ `npm run lint`: **FAILED** (MODULE_NOT_FOUND, 依赖缺失)。
+- ❌ `npm test`: **FAILED** (同上)。
+- ⚠️ `prisma migrate status`: 命令执行因环境问题受阻，但 `migrations` 文件夹与 `schema.prisma` 存在。
+
+### C. 前端审计 (Miniprogram)
+- ✅ **硬编码 IP/Localhost**: 
+  - 扫描通过。`config.js` 包含完善的环境判断逻辑：
+    - 开发工具 (devtools) -> `localhost:8080`
+    - 真机 (Review/Release) -> `https://api-staging` / `https://api`
+    - 兜底逻辑完善，不会导致真机请求 localhost。
+- ✅ **Web API 兼容性**:
+  - `study-api.js` 使用手写 `buildQueryString`，未使用 `URLSearchParams`。
+  - 未发现 `window` / `document` / `FormData` 等非法调用。
+- ✅ **隐私合规**:
+  - `app.json` 已配置 `"__usePrivacyCheck__": true`。
+  - `app.js` 调用了 `privacy.setupPrivacyAuthorization()`。
+- ⚠️ **双重隐私弹窗风险**:
+  - `app.js` 中实现了自定义的 `checkTermsAgreement` (Modal) 和 `privacy` (Native) 并存。需确保两者触发时机不冲突，建议优先使用微信原生隐私协议组件。
+
+---
 
 ## 5. 需要产品侧决策的问题
-- **版本控制**: 当前版本是否包含未完成的测试功能（如 `subpackages/review` 中的实验性功能）？
-- **支付功能**: 是否需要开启支付？目前代码审计未发现支付相关阻碍，但需确认商户号绑定状态。
+
+1. **支付/交易功能**:
+   - 代码中存在 `createSellOrder` (卖书) 和 `createAcquisition` 等交易相关逻辑。
+   - **决策点**: 小程序类目是否已包含“图书/二手交易”？若只有“工具/教育”类目，提交审核时可能会被驳回或要求补充资质 (ICP/出版物经营许可证)。
+
+2. **Webview 内容**:
+   - `pages/webview/index` 用于展示协议。需确认加载的 URL 域名已配置业务域名白名单，否则无法打开。

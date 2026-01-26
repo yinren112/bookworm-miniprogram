@@ -75,7 +75,7 @@ function performRequest(options, attempt = 0) {
     const finalUrl = `${config.apiBaseUrl}${url}`;
     if (!/^https?:\/\//i.test(finalUrl) || /[：／]/.test(finalUrl) || /[`"'“”‘’]/.test(finalUrl) || /\s/.test(finalUrl)) {
       reject({
-        message: '请求地址非法，请检查 DEV_API_BASE_URL 是否包含全角冒号/反引号/空格',
+        message: '请求地址非法，请检查 API 地址配置是否包含全角冒号/反引号/空格',
         errorCode: 'INVALID_URL',
         requestId,
         url: finalUrl,

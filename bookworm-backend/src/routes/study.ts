@@ -3,6 +3,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { FeedbackRating, FeedbackReasonType } from "@prisma/client";
 import prisma from "../db";
+import config from "../config";
 import {
   cardIdOnlyView,
   courseIdOnlyView,
@@ -102,6 +103,7 @@ import {
   StarredItemsQuery,
   ReminderSubscribeBodySchema,
   ReminderSubscribeBody,
+  ReminderConfigResponseSchema,
   ReminderSubscribeResponseSchema,
   ReminderStatusQuerySchema,
   ReminderStatusQuery,
@@ -907,6 +909,23 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
   // 复习提醒订阅端点
   // ============================================
 
+  // GET /api/study/reminders/config - 获取提醒模板配置
+  fastify.get(
+    "/api/study/reminders/config",
+    {
+      preHandler: [fastify.authenticate],
+      schema: {
+        response: {
+          200: ReminderConfigResponseSchema,
+        },
+      },
+    },
+    async (_request, reply) => {
+      const templateId = config.STUDY_REMINDER_TEMPLATE_ID || null;
+      reply.send({ templateId });
+    },
+  );
+
   // POST /api/study/reminders/subscribe - 订阅或拒绝提醒
   fastify.post<{ Body: ReminderSubscribeBody }>(
     "/api/study/reminders/subscribe",
@@ -922,11 +941,19 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
     async (request, reply) => {
       const userId = request.user!.userId;
       const { templateId, result, timezone } = request.body;
+      const resolvedTemplateId = templateId || config.STUDY_REMINDER_TEMPLATE_ID;
+      if (!resolvedTemplateId) {
+        throw new ApiError(
+          409,
+          "Study reminder template is not configured",
+          "STUDY_REMINDER_TEMPLATE_NOT_CONFIGURED",
+        );
+      }
 
       const subscription = await upsertStudyReminderSubscription(
         prisma,
         userId,
-        templateId,
+        resolvedTemplateId,
         result,
         timezone,
       );
@@ -956,7 +983,8 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const userId = request.user!.userId;
       const { templateId } = request.query;
 
-      const status = await getStudyReminderStatus(prisma, userId, templateId);
+      const resolvedTemplateId = templateId || config.STUDY_REMINDER_TEMPLATE_ID || undefined;
+      const status = await getStudyReminderStatus(prisma, userId, resolvedTemplateId);
 
       reply.send({
         status: status.status,

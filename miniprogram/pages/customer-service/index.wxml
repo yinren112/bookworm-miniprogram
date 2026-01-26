@@ -9,13 +9,9 @@
     </view>
     
     <view class="wechat-row">
-      <view class="wechat-box">
-        <text class="label">微信号</text>
-        <text class="value">{{customerServiceWechat}}</text>
-      </view>
-      <view class="copy-action">
-        <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" bind:tap="copyWechatId">复制</juicy-button>
-      </view>
+      <juicy-button type="primary" size="sm" full openType="contact">
+        进入官方客服
+      </juicy-button>
     </view>
   </card-flat>
 

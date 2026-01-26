@@ -2,13 +2,14 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import { createWechatPayAdapter, WechatPayAdapter } from "./adapters/wechatPayAdapter";
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError, ServiceError } from "./errors";
 import config from "./config";
 import { verifyDatabaseConstraints } from "./utils/dbVerifier";
 import prisma from "./db";
 import { ERROR_CODES, ERROR_MESSAGES } from "./constants";
 import * as fs from "fs";
+import * as crypto from "crypto";
 import path from "path";
 import { sanitizeObject } from "./lib/logSanitizer";
 import {
@@ -83,6 +84,16 @@ const sensitiveFields = [
 ];
 
 const fastify = Fastify({
+  requestIdHeader: "x-request-id",
+  genReqId: (req) => {
+    const rawHeader = req.headers["x-request-id"];
+    const headerValue = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    if (typeof headerValue === "string") {
+      const trimmed = headerValue.trim();
+      if (trimmed) return trimmed.slice(0, 128);
+    }
+    return crypto.randomUUID();
+  },
   logger: {
     level: config.LOG_LEVEL,
     // 仅在开发环境且明确设置 LOG_EXPOSE_DEBUG=true 时禁用 redaction
@@ -180,8 +191,9 @@ try {
 // --- Global Error Handler ---
 fastify.setErrorHandler(
   async (error: unknown, request: FastifyRequest, reply: FastifyReply) => {
+    reply.header("x-request-id", request.id);
     request.log.error(
-      { err: error, req: request },
+      { err: error, req: request, requestId: request.id },
       "An error occurred during the request",
     );
 
@@ -240,7 +252,7 @@ fastify.setErrorHandler(
     }
 
     // Layer 5: Prisma database errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === "P2025") {
         return reply.code(404).send({
           code: ERROR_CODES.RECORD_NOT_FOUND,
@@ -273,67 +285,25 @@ fastify.setErrorHandler(
   },
 );
 
-// Production configuration validation
-const validateProductionConfig = () => {
-  if (process.env.NODE_ENV !== "production") {
-    return; // Only validate in production
-  }
-
-  const criticalMissingConfigs: string[] = [];
-
-  // JWT Secret validation
-  if (config.JWT_SECRET === "default-secret-for-dev" || !config.JWT_SECRET) {
-    criticalMissingConfigs.push("JWT_SECRET");
-  }
-
-  // WeChat App validation
-  if (config.WX_APP_ID === "YOUR_APP_ID" || !config.WX_APP_ID) {
-    criticalMissingConfigs.push("WX_APP_ID");
-  }
-  if (config.WX_APP_SECRET === "YOUR_APP_SECRET" || !config.WX_APP_SECRET) {
-    criticalMissingConfigs.push("WX_APP_SECRET");
-  }
-
-  // Database URL validation
-  if (!process.env.DATABASE_URL) {
-    criticalMissingConfigs.push("DATABASE_URL");
-  }
-
-  if (criticalMissingConfigs.length > 0) {
-    console.error("");
-    console.error(
-      "🚨 FATAL ERROR: Critical configuration missing in production environment!",
-    );
-    console.error("❌ Missing required environment variables:");
-    criticalMissingConfigs.forEach((config) => {
-      console.error(`   - ${config}`);
-    });
-    console.error("");
-    console.error(
-      "📋 Please set these environment variables and restart the application.",
-    );
-    console.error(
-      "🛑 Shutting down to prevent production deployment with insecure configuration.",
-    );
-    console.error("");
-    process.exit(1);
-  }
-
-  console.error("✅ Production configuration validation passed"); // Startup log
-};
-
 const setupApplication = async () => {
   const reqStartKey = Symbol.for("reqStartNs");
-  fastify.addHook("onRequest", async (request) => {
+  fastify.addHook("onRequest", async (request, reply) => {
     (request as unknown as Record<symbol, bigint>)[reqStartKey] = process.hrtime.bigint();
+    reply.header("x-request-id", request.id);
     const remoteAddress = request.ip || request.socket.remoteAddress || "";
-    fastify.log.info({ method: request.method, url: request.url, remoteAddress }, "onRequest");
+    fastify.log.info(
+      { requestId: request.id, method: request.method, url: request.url, remoteAddress },
+      "onRequest",
+    );
   });
 
   fastify.addHook("onResponse", async (request, reply) => {
     const start = (request as unknown as Record<symbol, bigint>)[reqStartKey];
     const durationMs = start ? Number(process.hrtime.bigint() - start) / 1e6 : null;
-    fastify.log.info({ statusCode: reply.statusCode, durationMs }, "onResponse");
+    fastify.log.info(
+      { requestId: request.id, statusCode: reply.statusCode, durationMs },
+      "onResponse",
+    );
   });
 
   // Register CORS plugin
@@ -377,7 +347,6 @@ export const buildApp = async () => {
 
 const start = async () => {
   try {
-    validateProductionConfig();
     await verifyDatabaseConstraints(prisma);
 
     await setupApplication();

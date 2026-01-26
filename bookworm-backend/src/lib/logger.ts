@@ -8,7 +8,7 @@
 import pino from 'pino';
 import { buildRedactions, parseEnvRedactions } from '../log/redaction';
 
-const isProd = process.env.NODE_ENV === 'production';
+const isProd = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
 const isTest = process.env.NODE_ENV === 'test';
 const enableDebug = !isProd || process.env.LOG_DEBUG === '1';
 

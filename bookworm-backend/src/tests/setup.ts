@@ -2,6 +2,12 @@
 import { vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
 
+process.env.NODE_ENV ??= "test";
+process.env.VITEST ??= "true";
+process.env.JWT_SECRET ??= "test-secret";
+process.env.WX_APP_ID ??= "test-app-id";
+process.env.WX_APP_SECRET ??= "test-app-secret";
+
 // Create a mock Prisma client
 const prismaMock = {
   bookMaster: {

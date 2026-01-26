@@ -1,7 +1,0 @@
-{
-  "navigationBarTitleText": "开发设置",
-  "usingComponents": {
-    "card-flat": "/components/ui/card-flat/index",
-    "juicy-button": "/components/ui/juicy-button/index"
-  }
-}

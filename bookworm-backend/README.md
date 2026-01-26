@@ -84,7 +84,7 @@ npm run test:integration
 ### Production Database
 ```bash
 # Run migrations (instead of db push)
-npx prisma migrate deploy
+./node_modules/.bin/prisma migrate deploy
 ```
 
 ## Available Scripts
@@ -165,7 +165,7 @@ bookworm-backend/
 - `GET /api/orders/pending-pickup` - List pending pickup orders (STAFF only)
 
 ### System
-- `GET /metrics` - Prometheus metrics (for monitoring)
+- `GET /metrics` - Prometheus metrics (requires Authorization: Bearer <METRICS_AUTH_TOKEN> by default)
 
 ## Error Handling
 
@@ -202,6 +202,13 @@ JWT_SECRET="your-secret-key-here"
 WX_APP_ID="your-wechat-app-id"
 WX_APP_SECRET="your-wechat-app-secret"
 
+# Metrics
+METRICS_AUTH_TOKEN="your-metrics-token"
+METRICS_ALLOW_ANONYMOUS=false
+
+# Study Reminders
+STUDY_REMINDER_TEMPLATE_ID=""
+
 # Business Rules
 ORDER_PAYMENT_TTL_MINUTES=15
 MAX_ITEMS_PER_ORDER=10
@@ -211,7 +218,7 @@ API_RATE_LIMIT_MAX=5
 ## Monitoring & Observability
 
 ### Metrics
-Prometheus metrics available at `/metrics`:
+Prometheus metrics available at `/metrics` (protected by bearer token unless `METRICS_ALLOW_ANONYMOUS=true`):
 - Request/response metrics
 - Order lifecycle counters
 - Inventory status gauges
@@ -239,7 +246,7 @@ docker run -p 8080:8080 --env-file .env bookworm-backend
 ```
 
 ### Configuration Validation
-The application validates critical configuration in production:
+The application validates critical configuration in `src/config.ts` on startup (production/staging):
 - JWT_SECRET must not be default value
 - WeChat credentials must be configured
 - Database connection must be available

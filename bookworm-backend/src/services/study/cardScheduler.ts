@@ -2,6 +2,7 @@
 // Leitner 盒子法排程算法实现
 import crypto from "crypto";
 import { Prisma, PrismaClient, FeedbackRating } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import {
   cardSelectPublic,
   cardCourseIdView,
@@ -389,7 +390,7 @@ export async function submitCardFeedback(
         created = true;
       } catch (error) {
         if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error instanceof PrismaClientKnownRequestError &&
           error.code === "P2002"
         ) {
           cardState = await tx.userCardState.findUnique({

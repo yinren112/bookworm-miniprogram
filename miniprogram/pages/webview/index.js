@@ -1,6 +1,7 @@
 const { request } = require('../../utils/api');
 const { extractErrorMessage } = require('../../utils/error');
 const logger = require('../../utils/logger');
+const { resolveContentWithFallback } = require('../../utils/content-resolver');
 
 Page({
   data: {
@@ -51,14 +52,16 @@ Page({
     }
 
     try {
-      const data = await request({
-        url: '/content/' + slug,
-        method: 'GET'
+      const resolved = await resolveContentWithFallback(slug, async () => {
+        return request({
+          url: '/content/' + slug,
+          method: 'GET'
+        });
       });
-      const { title, body } = data;
-      wx.setNavigationBarTitle({ title });
+
+      wx.setNavigationBarTitle({ title: resolved.title });
       this.setData({
-        content: { title, body },
+        content: { title: resolved.title, body: resolved.body },
         isLoading: false
       });
     } catch (error) {

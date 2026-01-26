@@ -1,0 +1,194 @@
+[
+  {
+    "id": "P0-BE-DEPLOY-001",
+    "severity": "P0",
+    "status": "Done",
+    "title": "生产镜像运行期迁移依赖 Prisma CLI，但生产依赖安装省略 devDependencies",
+    "evidence": [
+      "bookworm-backend/entrypoint.sh 使用本地 CLI：`./node_modules/.bin/prisma migrate deploy`",
+      "bookworm-backend/package.json：`prisma` 已迁移到 dependencies（生产镜像离线可用）",
+      "artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt"
+    ],
+    "paths": [
+      "bookworm-backend/entrypoint.sh",
+      "bookworm-backend/Dockerfile.prod",
+      "bookworm-backend/package.json",
+      "artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt"
+    ],
+    "owner": "Ops",
+    "action": "确保生产镜像内可离线执行 migrate deploy（提供 Prisma CLI 或改迁移策略），并做一次冷启动演练。"
+  },
+  {
+    "id": "P0-BE-DEPLOY-002",
+    "severity": "P0",
+    "status": "Done",
+    "title": "后端启动入口不一致：npm start/Dockerfile/Dockerfile.prod/entrypoint 指向不同 dist 路径",
+    "evidence": [
+      "tsc 产物结构证明入口为 dist/src/index.js：artifacts/p0_fix_evidence/p0-be-deploy-002_dist_structure.txt",
+      "bookworm-backend/package.json / Dockerfile / Dockerfile.prod / entrypoint.sh 已统一使用 dist/src/index.js",
+      "artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt（health=200, checks.database=ok）"
+    ],
+    "paths": [
+      "bookworm-backend/package.json",
+      "bookworm-backend/tsconfig.json",
+      "bookworm-backend/Dockerfile",
+      "bookworm-backend/Dockerfile.prod",
+      "bookworm-backend/entrypoint.sh",
+      "artifacts/p0_fix_evidence/p0-be-deploy-002_dist_structure.txt",
+      "artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt"
+    ],
+    "owner": "Ops",
+    "action": "统一并锁死“唯一启动入口”路径（dist/index.js 或 dist/src/index.js 二选一），同时同步 npm start 与 Dockerfile*。"
+  },
+  {
+    "id": "P0-MP-REVIEW-001",
+    "severity": "P0",
+    "status": "Done",
+    "title": "发布包仍包含开发后端配置页（dev-settings），存在审核发现后高风险且包含内网/IP 文案",
+    "evidence": [
+      "miniprogram/app.json 已移除 pages/dev-settings/index 注册",
+      "miniprogram/pages/dev-settings 已删除且 profile 隐藏入口已移除",
+      "rg 校验：artifacts/p0_fix_evidence/p0-mp-review-001_rg_dev-settings.txt",
+      "内网/IP/占位符清理：artifacts/p0_fix_evidence/p0-mp-review-001_no_internal_ip.txt"
+    ],
+    "paths": [
+      "miniprogram/app.json",
+      "miniprogram/pages/profile/index.js",
+      "artifacts/p0_fix_evidence/p0-mp-review-001_rg_dev-settings.txt",
+      "artifacts/p0_fix_evidence/p0-mp-review-001_no_internal_ip.txt"
+    ],
+    "owner": "Dev",
+    "action": "发布/提审版本移除 dev-settings 页与入口（或仅在 devtools/develop 可访问），并清理内网/IP 文案。"
+  },
+  {
+    "id": "P0-MP-CS-001",
+    "severity": "P0",
+    "status": "Done",
+    "title": "客服微信号为占位符，用户可见且会直接暴露为无效信息",
+    "evidence": [
+      "Profile 不再展示客服微信号占位符，改为官方客服入口（open-type=contact）",
+      "客服页也提供官方客服入口（openType=contact）",
+      "rg 证据：artifacts/p0_fix_evidence/p0-mp-cs-001_contact_entry.txt"
+    ],
+    "paths": [
+      "miniprogram/pages/profile/index.js",
+      "miniprogram/pages/profile/index.wxml",
+      "miniprogram/pages/customer-service/index.wxml",
+      "artifacts/p0_fix_evidence/p0-mp-cs-001_contact_entry.txt"
+    ],
+    "owner": "Dev",
+    "action": "替换为真实客服渠道（微信号/企业客服/小程序客服），并准备审核说明中“联系客服入口”。"
+  },
+  {
+    "id": "P1-BE-OBS-001",
+    "severity": "P1",
+    "status": "Done",
+    "title": "请求链路缺少稳定 requestId 观测：访问日志不包含 request.id，难以端到端排障",
+    "evidence": [
+      "bookworm-backend/src/index.ts：onRequest/onResponse 统一写入 requestId，并回写响应头 x-request-id",
+      "miniprogram/utils/request.js：统一生成并发送 X-Request-ID",
+      "bookworm-backend/src/tests/request-id.test.ts：覆盖 requestId 透传/回写/日志字段"
+    ],
+    "paths": [
+      "bookworm-backend/src/index.ts",
+      "miniprogram/utils/request.js",
+      "bookworm-backend/src/tests/request-id.test.ts"
+    ],
+    "owner": "Dev",
+    "action": "定义 requestId 生成/透传/回写策略，并在 onRequest/onResponse 与错误日志统一输出。"
+  },
+  {
+    "id": "P1-BE-SEC-001",
+    "severity": "P1",
+    "status": "Done",
+    "title": "/metrics 默认公开暴露，需明确隔离策略（内网/反代白名单/鉴权）",
+    "evidence": [
+      "bookworm-backend/src/plugins/metrics.ts：/metrics 默认要求 Authorization: Bearer <METRICS_AUTH_TOKEN>（可用 METRICS_ALLOW_ANONYMOUS=true 配合网络层隔离）",
+      "bookworm-backend/src/tests/metrics-auth.test.ts：覆盖鉴权与匿名开关行为"
+    ],
+    "paths": [
+      "bookworm-backend/src/plugins/metrics.ts",
+      "bookworm-backend/src/config.ts",
+      "bookworm-backend/src/tests/metrics-auth.test.ts"
+    ],
+    "owner": "Ops",
+    "action": "在生产反向代理/安全组层限制 /metrics 访问（或在应用层加保护），并在部署文档写清。"
+  },
+  {
+    "id": "P1-MP-SUBSCRIBE-001",
+    "severity": "P1",
+    "title": "订阅消息模板 ID 硬编码，需确认后台模板存在、类目匹配与失败降级一致",
+    "evidence": [
+      "miniprogram/utils/constants.js:28 `STUDY_REMINDER_TEMPLATE_ID` 硬编码",
+      "miniprogram/pages/profile/index.js:149 `wx.requestSubscribeMessage` 使用该模板"
+    ],
+    "paths": [
+      "miniprogram/utils/constants.js",
+      "miniprogram/pages/profile/index.js",
+      "miniprogram/subpackages/review/pages/session-complete/index.js"
+    ],
+    "owner": "WeChatAdmin",
+    "action": "核对订阅消息模板 ID、审核状态与触发场景，并准备审核说明（用途/频率/用户关闭路径）。"
+  },
+  {
+    "id": "P1-MP-CONTENT-001",
+    "severity": "P1",
+    "title": "用户协议/隐私政策页面依赖后端 Content 记录，但 seed 明确禁止在 production/staging 运行",
+    "evidence": [
+      "miniprogram/app.js:65 `terms-of-service` 通过 /content/:slug 拉取",
+      "bookworm-backend/prisma/seed.ts:360-364 拒绝在 production/staging 运行 seed"
+    ],
+    "paths": [
+      "miniprogram/app.js",
+      "miniprogram/pages/profile/index.js",
+      "bookworm-backend/prisma/seed.ts",
+      "bookworm-backend/src/routes/content.ts"
+    ],
+    "owner": "Ops",
+    "action": "在生产环境通过迁移/后台管理/初始化脚本保证 terms-of-service/privacy-policy 两条 Content 记录存在。"
+  },
+  {
+    "id": "P2-BE-CONFIG-001",
+    "severity": "P2",
+    "title": "生产配置校验逻辑重复：src/config.ts 与 src/index.ts 各自维护一套规则",
+    "evidence": [
+      "bookworm-backend/src/config.ts:121-202 已做 production/staging 强校验并 process.exit(1)",
+      "bookworm-backend/src/index.ts:276-323 又定义 validateProductionConfig（规则与提示不一致）"
+    ],
+    "paths": [
+      "bookworm-backend/src/config.ts",
+      "bookworm-backend/src/index.ts"
+    ],
+    "owner": "Dev",
+    "action": "保留单一配置真相源（建议仅保留 src/config.ts），删除或改造重复校验避免漂移。"
+  },
+  {
+    "id": "P2-MP-TERMS-001",
+    "severity": "P2",
+    "title": "用户拒绝协议仅 toast 提示，不阻断继续使用（合规口径需确认）",
+    "evidence": [
+      "miniprogram/app.js:40-60 拒绝仅提示 `您需要同意协议才能使用本服务`，未做硬阻断"
+    ],
+    "paths": [
+      "miniprogram/app.js"
+    ],
+    "owner": "Dev",
+    "action": "与合规口径对齐：若要求“拒绝即不可用”，需在 UI/路由层增加硬阻断并给出退出路径。"
+  },
+  {
+    "id": "P2-MP-URL-001",
+    "severity": "P2",
+    "title": "normalizeApiBaseUrl 对无协议输入默认补 http://（仅 develop 路径可触发，但建议锁死为 https）",
+    "evidence": [
+      "miniprogram/utils/url.js:19-26 无协议时补 `http://` 并补 `/api`",
+      "miniprogram/config.js:41-68 develop 真机可能从 storage/query 读取 DEV_API_BASE_URL"
+    ],
+    "paths": [
+      "miniprogram/utils/url.js",
+      "miniprogram/config.js",
+      "miniprogram/pages/dev-settings/index.js"
+    ],
+    "owner": "Dev",
+    "action": "限制 DEV_API_BASE_URL 仅允许 https（或仅 devtools 使用 http），避免真机/审核环境触发明文 HTTP。"
+  }
+]

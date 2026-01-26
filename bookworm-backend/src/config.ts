@@ -3,6 +3,10 @@ import { envSchema } from "env-schema";
 import { Static, Type } from "@sinclair/typebox";
 import * as fs from "fs";
 
+const isTestRuntime =
+  process.env.NODE_ENV === "test" ||
+  process.env.npm_lifecycle_event === "test" ||
+  typeof process.env.VITEST !== "undefined";
 
 const schema = Type.Object({
   // Server
@@ -15,15 +19,17 @@ const schema = Type.Object({
   LOG_LEVEL: Type.String({ default: "info" }),
 
   // Database
-  DATABASE_URL: Type.String(),
+  DATABASE_URL: Type.String(
+    isTestRuntime ? { default: "postgresql://test:test@localhost:5432/test" } : {},
+  ),
 
   // JWT
-  JWT_SECRET: Type.String(),
+  JWT_SECRET: Type.String(isTestRuntime ? { default: "test-secret" } : {}),
   JWT_EXPIRES_IN: Type.String({ default: "7d" }),
 
   // WeChat Mini Program
-  WX_APP_ID: Type.String(),
-  WX_APP_SECRET: Type.String(),
+  WX_APP_ID: Type.String(isTestRuntime ? { default: "test-app-id" } : {}),
+  WX_APP_SECRET: Type.String(isTestRuntime ? { default: "test-app-secret" } : {}),
 
   // WeChat Pay (optional, can be empty strings in dev)
   WXPAY_MCHID: Type.String({ default: "" }),
@@ -62,12 +68,19 @@ const schema = Type.Object({
   // Weekly reset: Monday 00:00 Beijing time (UTC+8) = Sunday 16:00 UTC
   CRON_WEEKLY_POINTS_RESET: Type.String({ default: "0 16 * * 0" }),
 
+  // Study Reminder Template
+  STUDY_REMINDER_TEMPLATE_ID: Type.String({ default: "" }),
+
   // API Rate Limiting
   API_LOGIN_RATE_LIMIT_MAX: Type.Number({ default: 10 }),
   API_FULFILL_RATE_LIMIT_MAX: Type.Number({ default: 30 }),
 
   // Logging Security
   LOG_EXPOSE_DEBUG: Type.Boolean({ default: false }), // DANGER: 仅在本地调试时设为 true，禁止在生产环境使用
+
+  // Metrics
+  METRICS_AUTH_TOKEN: Type.String({ default: "" }),
+  METRICS_ALLOW_ANONYMOUS: Type.Boolean({ default: false }),
 
   // CORS Configuration
   // 逗号分隔的允许来源列表，例如: "https://example.com,https://app.example.com"
@@ -80,7 +93,7 @@ type Schema = Static<typeof schema>;
 // The `dotenv: true` option will automatically load the .env file
 const config = envSchema<Schema>({
   schema,
-  dotenv: true,
+  dotenv: !isTestRuntime,
 });
 
 // Strong secret validation helper
@@ -175,6 +188,12 @@ if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
   if (config.LOG_EXPOSE_DEBUG) {
     errors.push(
       "LOG_EXPOSE_DEBUG must be false in production. This setting exposes sensitive data in logs."
+    );
+  }
+
+  if (!config.METRICS_ALLOW_ANONYMOUS && !config.METRICS_AUTH_TOKEN) {
+    errors.push(
+      "METRICS_AUTH_TOKEN must be set in production/staging (or set METRICS_ALLOW_ANONYMOUS=true and restrict /metrics at the network layer).",
     );
   }
 

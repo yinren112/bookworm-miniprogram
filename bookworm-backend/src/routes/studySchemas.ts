@@ -399,9 +399,13 @@ export const StarredItemsResponseSchema = Type.Object({
 // ============================================
 
 export const ReminderSubscribeBodySchema = Type.Object({
-  templateId: Type.String({ minLength: 1, maxLength: 100 }),
+  templateId: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
   result: Type.Union([Type.Literal("accept"), Type.Literal("reject")]),
   timezone: Type.Optional(Type.String({ maxLength: 64 })),
+});
+
+export const ReminderConfigResponseSchema = Type.Object({
+  templateId: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
 });
 
 export const ReminderSubscribeResponseSchema = Type.Object({

@@ -1,7 +1,7 @@
 // src/tests/test-helpers/errorHelpers.ts
 // Helper functions to create properly typed test errors without 'as any'
 
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 /**
  * Create a Prisma unique constraint error for testing
@@ -9,8 +9,8 @@ import { Prisma } from "@prisma/client";
 export function createPrismaUniqueConstraintError(
   target: string | string[] = [],
   message = "Unique constraint failed"
-): Prisma.PrismaClientKnownRequestError {
-  const error = new Prisma.PrismaClientKnownRequestError(
+): PrismaClientKnownRequestError {
+  const error = new PrismaClientKnownRequestError(
     message,
     {
       code: "P2002",
@@ -26,8 +26,8 @@ export function createPrismaUniqueConstraintError(
  */
 export function createPrismaSerializationError(
   message = "could not serialize access due to concurrent update"
-): Prisma.PrismaClientKnownRequestError {
-  const error = new Prisma.PrismaClientKnownRequestError(
+): PrismaClientKnownRequestError {
+  const error = new PrismaClientKnownRequestError(
     message,
     {
       code: "P2034",
@@ -40,6 +40,6 @@ export function createPrismaSerializationError(
 /**
  * Create a pickup code constraint error for testing
  */
-export function createPickupCodeConstraintError(): Prisma.PrismaClientKnownRequestError {
+export function createPickupCodeConstraintError(): PrismaClientKnownRequestError {
   return createPrismaUniqueConstraintError("pickup_code", "Unique constraint failed");
 }

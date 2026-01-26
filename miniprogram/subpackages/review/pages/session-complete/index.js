@@ -1,8 +1,7 @@
 // subpackages/review/pages/session-complete/index.js
 // 复习完成结算页面
 
-const { getStreakInfo, getDashboard, subscribeStudyReminder, getStudyReminderStatus } = require('../../../../utils/study-api');
-const { STUDY_REMINDER_TEMPLATE_ID } = require('../../../../utils/constants');
+const { getStreakInfo, getDashboard, subscribeStudyReminder, getStudyReminderStatus, getStudyReminderConfig } = require('../../../../utils/study-api');
 const { track } = require('../../../../utils/track');
 const logger = require('../../../../utils/logger');
 const Confetti = require('../../../../utils/confetti');
@@ -131,11 +130,13 @@ Page({
   },
 
   async loadReminderStatus() {
-    if (!STUDY_REMINDER_TEMPLATE_ID || STUDY_REMINDER_TEMPLATE_ID === 'TEMPLATE_ID') {
-      return;
-    }
     try {
-      const status = await getStudyReminderStatus({ templateId: STUDY_REMINDER_TEMPLATE_ID });
+      const configRes = await getStudyReminderConfig();
+      const templateId = configRes && configRes.templateId ? configRes.templateId : '';
+      if (!templateId) {
+        return;
+      }
+      const status = await getStudyReminderStatus({ templateId });
       this.setData({
         reminderStatus: status.status || 'UNKNOWN',
         nextSendAt: status.nextSendAt || null,
@@ -148,7 +149,15 @@ Page({
   async onSubscribeReminder() {
     if (this.data.subscribeLoading) return;
 
-    if (!STUDY_REMINDER_TEMPLATE_ID || STUDY_REMINDER_TEMPLATE_ID === 'TEMPLATE_ID') {
+    let templateId = '';
+    try {
+      const configRes = await getStudyReminderConfig();
+      templateId = configRes && configRes.templateId ? configRes.templateId : '';
+    } catch (err) {
+      logger.error('Failed to load reminder config:', err);
+    }
+
+    if (!templateId) {
       wx.showToast({
         title: '订阅模板未配置',
         icon: 'none',
@@ -160,15 +169,15 @@ Page({
     track('subscribe_click', { entry: 'settlement' });
 
     wx.requestSubscribeMessage({
-      tmplIds: [STUDY_REMINDER_TEMPLATE_ID],
+      tmplIds: [templateId],
       success: async (res) => {
-        const result = res[STUDY_REMINDER_TEMPLATE_ID];
+        const result = res[templateId];
         const normalized = result === 'accept' ? 'accept' : 'reject';
         track('subscribe_result', { result: normalized });
 
         try {
           const response = await subscribeStudyReminder({
-            templateId: STUDY_REMINDER_TEMPLATE_ID,
+            templateId,
             result: normalized,
             timezone: 'Asia/Shanghai',
           });

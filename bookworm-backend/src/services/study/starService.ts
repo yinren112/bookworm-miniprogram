@@ -1,6 +1,7 @@
 // src/services/study/starService.ts
 // 星标收藏服务
 import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { cardContentIdView, questionIdOnlyView } from "../../db/views";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
@@ -44,7 +45,7 @@ export async function starItem(
     });
   } catch (error) {
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error instanceof PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
       return;

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## 项目结构与模块组织
-- `miniprogram/`：微信小程序前端；`pages/`承载复习主页(`pages/review`)、个人中心(`pages/profile`)、开发设置(`pages/dev-settings`)、WebView(`pages/webview`)与客服(`pages/customer-service`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
+- `miniprogram/`：微信小程序前端；`pages/`承载复习主页(`pages/review`)、个人中心(`pages/profile`)、WebView(`pages/webview`)与客服(`pages/customer-service`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
 - `miniprogram/components/mp-html/`：第三方富文本组件，保持原样，不做规则性格式化或 ESLint 改造。
 - `bookworm-backend/`：Fastify + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
 - 根目录脚本`test_metrics.sh`与`update_user_metrics.js`用于观测性验证，改动前须先与运维同步。
@@ -10,7 +10,7 @@
 - 安装依赖：`cd bookworm-backend && npm install`。
 - 开发环境：`npm run dev`启动热重载；正式部署使用`npm run build`后接`npm run start`。
 - 测试流程：`npm test`运行单元覆盖，`npm run test:integration`串行执行数据库集成，必要时用`npm run db:migrate:test:reset`重置测试库。
-- 小程序开发需在微信开发者工具导入`miniprogram/`，通过 Preview 与 Upload 验证；`pages/dev-settings` 用于设置本地调试 `DEV_API_BASE_URL`。
+- 小程序开发需在微信开发者工具导入`miniprogram/`，通过 Preview 与 Upload 验证；API 端点由 `miniprogram/config.js` 根据 `envVersion` 选择，复习模式不提供应用内切换入口。
 
 ## 代码风格与命名约定
 - 全局采用两空格缩进与 UTF-8 编码；JavaScript/TypeScript 遵循 ESLint 规则，对`_ignored`等前缀允许未使用变量，对`any`仅警告。
@@ -33,6 +33,7 @@
 - 通过复制`.env.example`生成`.env`；实际密钥不入库。Vitest 使用`.env.test`。
 - 小程序敏感凭据保存在`project.private.config.json`，输出日志与截图需脱敏。
 - `docker-compose.yml`与`docker-compose.monitoring.yml`默认使用 3000、5432、8080 端口，如需调整请使用 override 文件。
+ - `/metrics` 默认应受保护：生产环境通过 `METRICS_AUTH_TOKEN`（Bearer）或反向代理白名单限制访问；避免公开暴露。
 
 ## 当前复习模式（上线优先）
 - TabBar 仅包含“复习/我的”，对应 `pages/review/index` 与 `pages/profile/index`。
@@ -49,6 +50,10 @@
 
 ## 学习活动热力图
 - 接口：`GET /study/activity-history`，用于获取热力图活动数据。
+
+## 观测性（requestId）
+- 小程序请求统一走 `miniprogram/utils/request.js`，会为每次请求生成 `X-Request-ID: <timestamp-rand>`。
+- 后端会回写 `x-request-id` 响应头，并在访问日志/错误日志中输出同一个 requestId（便于端到端排障）。
 
 ## 沟通方式与角色定义
 - 所有协作者必须以中文思考、讨论与记录；命令及代码标识保持原文。

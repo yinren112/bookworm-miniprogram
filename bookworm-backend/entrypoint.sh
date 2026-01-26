@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
-npx prisma migrate deploy
+./node_modules/.bin/prisma migrate deploy
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
 
 exec node dist/src/index.js

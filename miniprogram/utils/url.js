@@ -27,7 +27,25 @@ function normalizeApiBaseUrl(input) {
   return url;
 }
 
+function enforceApiBaseUrlPolicy(url, options = {}) {
+  if (!url || typeof url !== 'string') return '';
+  const envVersion = typeof options.envVersion === 'string' ? options.envVersion : '';
+  const platform = typeof options.platform === 'string' ? options.platform : '';
+
+  const allowHttp = envVersion === 'develop' && platform === 'devtools';
+  if (allowHttp) {
+    return url;
+  }
+
+  if (!/^https:\/\//i.test(url)) {
+    throw new Error(`API base URL must use https in envVersion=${envVersion || 'unknown'}`);
+  }
+
+  return url;
+}
+
 module.exports = {
   normalizeApiBaseUrl,
   sanitizeUrlInput,
+  enforceApiBaseUrlPolicy,
 };

@@ -1,11 +1,13 @@
 // src/services/study/quizService.ts
 // 刷题服务 - 题目拉取、答题提交、错题本管理
 
-import { Prisma, PrismaClient, QuestionType } from "@prisma/client";
+import { PrismaClient, QuestionType } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { v4 as uuidv4 } from "uuid";
 import {
   questionSelectPublic,
   questionSelectWithAnswer,
+  questionAttemptQuestionIdView,
   wrongItemWithQuestionInclude,
   wrongItemListInclude,
 } from "../../db/views";
@@ -110,7 +112,6 @@ export async function startQuizSession(
 
     if (remainingSlots > 0) {
       // 使用 DISTINCT ON + ORDER BY 选择每道题最早的答题记录
-      /* eslint-disable local-rules/no-prisma-raw-select -- no view for UserQuestionAttempt.questionId */
       const oldestAttempts = await db.userQuestionAttempt.findMany({
         where: {
           userId,
@@ -119,9 +120,8 @@ export async function startQuizSession(
         orderBy: { attemptedAt: "asc" },
         distinct: ["questionId"],
         take: remainingSlots,
-        select: { questionId: true },
+        select: questionAttemptQuestionIdView,
       });
-      /* eslint-enable local-rules/no-prisma-raw-select */
       const backfillIds = oldestAttempts.map((a) => a.questionId);
 
       if (backfillIds.length > 0) {
@@ -243,7 +243,7 @@ export async function submitQuizAnswer(
     });
   } catch (error) {
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error instanceof PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
       const attempt = await db.userQuestionAttempt.findUnique({

@@ -398,6 +398,14 @@ const getActivityHistory = (options = {}) => {
   });
 };
 
+const getStudyReminderConfig = () => {
+  return request({
+    url: '/study/reminders/config',
+    method: 'GET',
+    requireAuth: true,
+  });
+};
+
 const pulseStudyActivity = (payload) => {
   return request({
     url: '/study/activity/pulse',
@@ -469,6 +477,7 @@ module.exports = {
   // Phase 5.5: 热力图
   getActivityHistory,
   pulseStudyActivity,
+  getStudyReminderConfig,
   subscribeStudyReminder,
   getStudyReminderStatus,
 };

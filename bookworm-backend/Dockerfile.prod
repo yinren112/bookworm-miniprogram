@@ -29,7 +29,8 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 # We need dev dependencies for prisma generate and build
 RUN npm install --ignore-scripts
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
+RUN ./node_modules/.bin/prisma -v
 RUN npm run build
 # Copy static files that tsc doesn't handle
 RUN mkdir -p dist && cp -r public dist/public

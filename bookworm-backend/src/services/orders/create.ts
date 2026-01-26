@@ -3,6 +3,7 @@
 // Implements atomic order creation with PostgreSQL advisory locks
 
 import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import config from "../../config";
 import { ApiError } from "../../errors";
 import { metrics } from "../../plugins/metrics";
@@ -326,7 +327,7 @@ export async function createOrder(
       );
     }
   } catch (e: unknown) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    if (e instanceof PrismaClientKnownRequestError) {
       // Unique constraint on pending payment order
       if (e.code === "P2002") {
         throw new ApiError(

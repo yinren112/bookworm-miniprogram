@@ -228,8 +228,7 @@ The system follows a strict "books as atomic inventory items" model where each i
 - `pages/review/` - 复习首页（主包，TabBar）
 - `pages/profile/` - 个人中心（TabBar，复习模式隐藏交易入口）
 - `subpackages/review/pages/` - 复习子页面（课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图）
-- `pages/dev-settings/` - 开发环境 API 地址配置（本地调试用）
-- `pages/customer-service/` - Customer support (WeChat ID copy)
+- `pages/customer-service/` - Customer support / FAQ
 - `pages/webview/` - Generic WebView for dynamic content loading
 - `pages/review-entry/` - Legacy redirect page (not registered in review-only TabBar)
 - `pages/market/` - Book marketplace (kept, not registered in review-only)
@@ -261,7 +260,7 @@ The system follows a strict "books as atomic inventory items" model where each i
   - `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
   - `study-api.js`: Review system API wrapper
   - `study-session.js`: Review session state helpers
-  - `url.js`: Normalize DEV_API_BASE_URL and URLs
+  - `url.js`: Normalize API base URL (anti fullwidth-colon/backticks)
   - `track.js`: Lightweight analytics tracking
   - `haptic.js`/`sound-manager.js`/`confetti.js`/`theme.js`: Interaction and theme helpers
 
@@ -290,6 +289,11 @@ npm run start
 npm test                    # Unit tests with coverage
 npm run test:integration    # Integration tests
 
+说明：
+- Unit 测试不连数据库，不依赖 `.env`；test 模式下后端配置会禁用 dotenv 自动加载，并为必需 env 提供测试默认值。
+- `npm test`/`npm run build` 会先执行 `prisma generate`，避免 Prisma 类型缺失导致的编译与测试崩溃。
+- CI 增加 migration-check：临时 Postgres + `prisma generate/migrate deploy/migrate status`，发布前闸门验证迁移链条可用。
+
 # Code Quality
 npm run lint                # Run ESLint checks
 npm run lint:fix            # Auto-fix ESLint issues
@@ -311,7 +315,7 @@ npx prisma migrate dev
 
 ### WeChat Mini Program
 - Use WeChat Developer Tools to open the `miniprogram/` directory
-- Configure API endpoint in `miniprogram/config.js`; local devices can set `DEV_API_BASE_URL` via `pages/dev-settings`
+- API endpoint is selected by envVersion in `miniprogram/config.js`; no in-app endpoint switching in review packages
 - TabBar icons must be PNG format (81x81px); current review-only TabBar uses `images/icons/home.png` and `images/icons/usercenter.png`
 
 ## Database Schema
@@ -617,6 +621,7 @@ npm run test:integration    # Run integration tests with Testcontainers
 - Structured JSON logging via Fastify
 - Request/response logging with redacted auth headers
 - Error tracking with stack traces
+- RequestId 策略：小程序发送 `X-Request-ID`，后端回写 `x-request-id` 响应头；访问日志与错误日志统一输出同一个 requestId（字段：`reqId`/`requestId`），用于端到端排障
 
 ## Background Jobs & Scheduled Tasks
 
@@ -654,7 +659,7 @@ docker run -p 8080:8080 --env-file .env bookworm-backend
 ```
 
 **Multi-stage Build (Dockerfile.prod):**
-- Stage 1 (base): Node.js 20 alpine with npm mirror configuration
+- Stage 1 (base): Node.js 18 alpine with npm mirror configuration
 - Stage 2 (dependencies): Install production dependencies
 - Stage 3 (builder): Build TypeScript and generate Prisma client
 - Stage 4 (production): Lightweight runtime with only production dependencies
@@ -674,8 +679,7 @@ docker-compose -f docker-compose.staging.yml up -d
 
 **⚠️ Port Configuration Note:**
 - Default application port: **8080** (configurable via PORT env var)
-- `Dockerfile` exposes port 3000 (legacy/dev config, ignore this)
-- `Dockerfile.prod` correctly exposes port 8080 (production config)
+- `Dockerfile` 与 `Dockerfile.prod` 均暴露并使用 8080
 - Local development (`npm run dev`) uses PORT from config.ts (default: 8080)
 
 **Production Checklist:**
@@ -748,3 +752,31 @@ Host lailinkeji
 3. 导入接口是 `STAFF` 权限：JWT payload 必须带 `role=STAFF`，提升角色后必须重新登录才能拿到可用 token。
 4. 验证只做两步：`GET /api/study/courses`（只返回 PUBLISHED）与 `GET /api/study/courses/:courseKey`（核对 units/cards/questions 数量）。
 5. 详细操作手册见：`docs/operations/课程导入SOP（给定课程包文件夹）.md`。
+
+### SOP-单测不依赖 .env（避免 import 阶段炸）
+1. 一旦 `src/config.ts` 在 import 阶段强校验 env，测试框架的 setupFiles 不一定救得回来；主修复必须在 `config.ts` 内做 test 分支。
+2. test 模式硬要求禁用 dotenv 自动加载：避免“本地 .env 偷跑绿，CI 仍红”和不可复现。
+3. 最小 env 默认值只为通过 import 与类型生成：`DATABASE_URL/JWT_SECRET/WX_APP_ID/WX_APP_SECRET` 用占位即可，单测不允许触发真实 DB 连接。
+4. 写“锁死行为”测试时必须 `vi.resetModules()` 后再动态 `import('../config')`，否则模块缓存会让用例形同虚设。
+
+### SOP-Prisma 类型缺失导致 build/test 爆炸
+1. 现象：TypeScript 报 Prisma 类型/枚举不存在、或出现 `@prisma/client did not initialize yet`，通常是 Prisma Client 未生成或生成产物被锁定/损坏。
+2. 约束：本仓库把 `prisma generate` 固化到 `npm test`/`npm run build` 的前置步骤，优先保证 CI 与本地一致。
+3. Prisma v6+：不要在业务代码里依赖 `Prisma.PrismaClientKnownRequestError` 做 `instanceof`（易因运行时导出变化失效）；统一使用 `@prisma/client/runtime/library` 的 `PrismaClientKnownRequestError`。
+4. Windows 常见坑：若 `npm test`/`prisma generate` 报 `EPERM ... rename query_engine-windows.dll.node.tmp*`，说明 DLL 被正在运行的后端占用；先停掉 `npm run dev`（nodemon/ts-node 进程），再重试。
+5. 注意：`prisma generate` 默认会读 `.env`；脚本层可用占位 `DATABASE_URL` 兜底，但不允许把真实库地址写进仓库。
+
+### SOP-新增 Prisma 查询写法（必须走 db/views）
+1. 规则：业务代码里禁止手写 `select/include` 字面量；统一从 `src/db/views/index.ts` 导入常量。
+2. 示例（select）：`import { courseSelectPublic } from "../db/views";` → `db.studyCourse.findMany({ select: courseSelectPublic })`
+3. 示例（include）：`import { orderDetailInclude } from "../db/views";` → `db.order.findUnique({ where: { id }, include: orderDetailInclude })`
+4. 例外：只允许在 `src/db/views/*.ts` 里定义嵌套的 select/include。
+
+### SOP-Windows 上 npm ci 失败（Prisma 引擎被占用）
+1. 现象：`npm ci` 报 `EPERM unlink ...query_engine-windows.dll.node`，通常是文件被占用（dev server、编辑器、杀软）。
+2. 处理：先停掉 `npm run dev`/相关 node 进程，再重试 `npm ci`；必要时临时关闭杀软对该目录的实时扫描。
+
+### SOP-CI migration-check（发布前闸门）
+1. 迁移验证必须是独立 job，不要插在“起 DB 之前”的步骤里赌顺序。
+2. job 内启动临时 Postgres，注入临时 `DATABASE_URL`，然后依次跑：`prisma generate` → `prisma migrate deploy` → `prisma migrate status`。
+3. 该 job 不接触生产凭据，目的是验证 migrations 链条可用且可重复。

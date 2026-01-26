@@ -1,51 +1,42 @@
-# ---- Stage 1: Build ----
-# Use a Node.js image that includes build tools
-FROM node:18-alpine AS builder
-
-# Set the working directory
+# ---- Base Stage ----
+FROM node:18-alpine AS base
 WORKDIR /app
+RUN npm config set registry https://registry.npmmirror.com \
+  && npm config set fetch-retry-maxtimeout 600000 \
+  && npm config set fetch-retry-mintimeout 10000 \
+  && npm config set fetch-retries 5
+ENV PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma \
+    npm_config_fetch_retry_maxtimeout=600000 \
+    npm_config_fetch_retry_mintimeout=10000 \
+    npm_config_fetch_retries=5
 
-# Copy package.json and package-lock.json
+# ---- Dependencies Stage ----
+FROM base AS dependencies
 COPY package*.json ./
+RUN npm install --omit=dev --ignore-scripts
 
-# Install all dependencies, including devDependencies for building
-RUN npm install
-
-# Copy the rest of the application source code
+# ---- Build Stage ----
+FROM base AS builder
+COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-
-# Generate Prisma Client
-RUN npx prisma generate
-
-# Build the TypeScript code
+RUN npm install --ignore-scripts
+RUN ./node_modules/.bin/prisma generate
+RUN ./node_modules/.bin/prisma -v
 RUN npm run build
+RUN mkdir -p dist && cp -r public dist/public
 
-# Prune devDependencies for a smaller node_modules in the next stage
-RUN npm prune --production
-
-
-# ---- Stage 2: Production ----
-# Use a lightweight Node.js image for the final image
-FROM node:18-alpine
-
-# Set the working directory
-WORKDIR /app
-
-# Copy pruned node_modules from the builder stage
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy the compiled JavaScript code from the builder stage
-COPY --from=builder /app/dist ./dist
-
-# Copy Prisma schema for runtime
+# ---- Production Stage ----
+FROM base
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
-
-# Copy the public directory for the admin panel
+COPY package.json .
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# Expose the port the app runs on
 EXPOSE 8080
-
-# The command to run the application
-# Note: We run the compiled JS file, not the TS source
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["node", "dist/src/index.js"]

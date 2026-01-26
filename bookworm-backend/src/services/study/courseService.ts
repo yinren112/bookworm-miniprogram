@@ -1,5 +1,6 @@
 // src/services/study/courseService.ts
 import { Prisma, PrismaClient, CourseStatus } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import {
   courseSelectPublic,
   unitWithCountsView,
@@ -192,7 +193,7 @@ export async function enrollCourse(
     return { enrolled: true, alreadyEnrolled: false };
   } catch (error) {
     // P2002: Unique constraint violation (already enrolled)
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
       return { enrolled: true, alreadyEnrolled: true };
     }
     throw error;

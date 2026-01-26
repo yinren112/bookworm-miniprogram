@@ -8,26 +8,26 @@ function assertEqual(actual, expected, label) {
 
 function run() {
   assertEqual(
-    normalizeApiBaseUrl('192.168.0.2：8080'),
-    'http://192.168.0.2:8080/api',
+    normalizeApiBaseUrl('api.example.com：8080'),
+    'http://api.example.com:8080/api',
     'fullwidth-colon'
   );
 
   assertEqual(
-    normalizeApiBaseUrl('http：//192.168.0.2：8080/'),
-    'http://192.168.0.2:8080/api',
+    normalizeApiBaseUrl('http：//api.example.com：8080/'),
+    'http://api.example.com:8080/api',
     'fullwidth-scheme-and-colon'
   );
 
   assertEqual(
-    normalizeApiBaseUrl('`192.168.0.2:8080`'),
-    'http://192.168.0.2:8080/api',
+    normalizeApiBaseUrl('`api.example.com:8080`'),
+    'http://api.example.com:8080/api',
     'backticks-wrapped'
   );
 
   assertEqual(
-    normalizeApiBaseUrl('`http://192.168.0.2:8080/api`'),
-    'http://192.168.0.2:8080/api',
+    normalizeApiBaseUrl('`http://api.example.com:8080/api`'),
+    'http://api.example.com:8080/api',
     'backticks-wrapped-full'
   );
 

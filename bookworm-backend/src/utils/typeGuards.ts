@@ -3,7 +3,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError } from "../errors";
 
 /**
@@ -43,8 +43,8 @@ export function isFastifyValidationError(error: unknown): error is FastifyValida
 /**
  * Type guard for Prisma known request errors
  */
-export function isPrismaKnownError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
-  return error instanceof Prisma.PrismaClientKnownRequestError;
+export function isPrismaKnownError(error: unknown): error is PrismaClientKnownRequestError {
+  return error instanceof PrismaClientKnownRequestError;
 }
 
 /**
@@ -98,7 +98,7 @@ export function isPrismaRetryableError(error: unknown): boolean {
 /**
  * Type guard for Prisma unique constraint errors
  */
-export function isPrismaUniqueConstraintError(error: unknown): error is Prisma.PrismaClientKnownRequestError & { code: "P2002" } {
+export function isPrismaUniqueConstraintError(error: unknown): error is PrismaClientKnownRequestError & { code: "P2002" } {
   return isPrismaKnownError(error) && error.code === "P2002";
 }
 

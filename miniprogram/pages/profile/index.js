@@ -4,8 +4,7 @@ const authGuard = require('../../utils/auth-guard');
 const ui = require('../../utils/ui');
 const logger = require('../../utils/logger');
 const privacy = require('../../utils/privacy');
-const { getStudyReminderStatus, subscribeStudyReminder } = require('../../utils/study-api');
-const { STUDY_REMINDER_TEMPLATE_ID } = require('../../utils/constants');
+const { getStudyReminderStatus, subscribeStudyReminder, getStudyReminderConfig } = require('../../utils/study-api');
 const { track } = require('../../utils/track');
 const { APP_CONFIG } = require('../../config');
 
@@ -17,7 +16,6 @@ Page({
       role: 'USER' // 默认角色
     },
     serviceInfo: {
-      wechatId: 'your_service_wechat_id',
       time: '工作日 9:00 - 18:00'
     },
     hasPhoneNumber: false, // 是否已授权手机号
@@ -27,8 +25,6 @@ Page({
     reminderStatusText: '未开启',
     nextSendAtText: '',
     reminderLoading: false,
-    devTapCount: 0,
-    devTapLastTs: 0
   },
 
   onShow() {
@@ -54,17 +50,19 @@ Page({
   },
 
   async loadReminderStatus() {
-    if (!STUDY_REMINDER_TEMPLATE_ID || STUDY_REMINDER_TEMPLATE_ID === 'TEMPLATE_ID') {
-      this.setData({
-        reminderStatus: 'UNKNOWN',
-        reminderStatusText: '未配置模板',
-        nextSendAtText: ''
-      });
-      return;
-    }
-
     try {
-      const status = await getStudyReminderStatus({ templateId: STUDY_REMINDER_TEMPLATE_ID });
+      const configRes = await getStudyReminderConfig();
+      const templateId = configRes && configRes.templateId ? configRes.templateId : '';
+      if (!templateId) {
+        this.setData({
+          reminderStatus: 'UNKNOWN',
+          reminderStatusText: '未配置模板',
+          nextSendAtText: ''
+        });
+        return;
+      }
+
+      const status = await getStudyReminderStatus({ templateId });
       const nextSendAtText = formatDateTime(status.nextSendAt);
       this.setData({
         reminderStatus: status.status || 'UNKNOWN',
@@ -133,28 +131,40 @@ Page({
     }
   },
 
-  onReminderSubscribe() {
+  async onReminderSubscribe() {
     if (this.data.reminderLoading) return;
-    if (!STUDY_REMINDER_TEMPLATE_ID || STUDY_REMINDER_TEMPLATE_ID === 'TEMPLATE_ID') {
+    this.setData({ reminderLoading: true });
+    track('subscribe_click', { entry: 'profile' });
+
+    let templateId = '';
+    try {
+      const configRes = await getStudyReminderConfig();
+      templateId = configRes && configRes.templateId ? configRes.templateId : '';
+    } catch (err) {
+      logger.error('Failed to load reminder config:', err);
+      ui.showError('订阅失败，请稍后重试');
+      this.setData({ reminderLoading: false });
+      return;
+    }
+
+    if (!templateId) {
       wx.showToast({
         title: '订阅模板未配置',
         icon: 'none'
       });
+      this.setData({ reminderLoading: false });
       return;
     }
 
-    this.setData({ reminderLoading: true });
-    track('subscribe_click', { entry: 'profile' });
-
     wx.requestSubscribeMessage({
-      tmplIds: [STUDY_REMINDER_TEMPLATE_ID],
+      tmplIds: [templateId],
       success: async (res) => {
-        const result = res[STUDY_REMINDER_TEMPLATE_ID];
+        const result = res[templateId];
         const normalized = result === 'accept' ? 'accept' : 'reject';
         track('subscribe_result', { result: normalized });
         try {
           const response = await subscribeStudyReminder({
-            templateId: STUDY_REMINDER_TEMPLATE_ID,
+            templateId,
             result: normalized,
             timezone: 'Asia/Shanghai'
           });
@@ -183,13 +193,6 @@ Page({
     });
   },
 
-  copyWechatId() {
-    wx.setClipboardData({
-      data: this.data.serviceInfo.wechatId,
-      success: () => { wx.showToast({ title: '已复制' }); }
-    });
-  },
-
   showTerms() {
     wx.navigateTo({
       url: '/pages/webview/index?slug=terms-of-service'
@@ -206,19 +209,6 @@ Page({
     wx.navigateTo({
       url: '/pages/customer-service/index'
     });
-  },
-
-  onDevConfigTap() {
-    const now = Date.now();
-    const last = this.data.devTapLastTs || 0;
-    const within = now - last < 800;
-    const nextCount = within ? (this.data.devTapCount || 0) + 1 : 1;
-    this.setData({ devTapCount: nextCount, devTapLastTs: now });
-
-    if (nextCount >= 5) {
-      this.setData({ devTapCount: 0, devTapLastTs: 0 });
-      wx.navigateTo({ url: '/pages/dev-settings/index' });
-    }
   },
 
   onShareAppMessage() {

@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import config from "../config";
 import { metrics } from "../plugins/metrics";
 
@@ -25,7 +26,7 @@ const DEFAULT_OPTIONS: Required<Omit<TxRetryOptions, "transactionOptions">> = {
 const RETRYABLE_PRISMA_CODES = new Set(["P2034"]);
 const RETRYABLE_PG_CODES = new Set(["40001", "40P01", "55P03"]);
 
-function getPgCode(error: Prisma.PrismaClientKnownRequestError): string | undefined {
+function getPgCode(error: PrismaClientKnownRequestError): string | undefined {
   const meta = error.meta as { code?: string } | undefined;
   if (meta?.code) {
     return String(meta.code);
@@ -35,7 +36,7 @@ function getPgCode(error: Prisma.PrismaClientKnownRequestError): string | undefi
 }
 
 export function isRetryableTxError(error: unknown): boolean {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaClientKnownRequestError) {
     if (RETRYABLE_PRISMA_CODES.has(error.code)) {
       return true;
     }

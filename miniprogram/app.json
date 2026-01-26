@@ -5,7 +5,6 @@
   "pages": [
     "pages/review/index",
     "pages/profile/index",
-    "pages/dev-settings/index",
     "pages/webview/index",
     "pages/customer-service/index"
   ],

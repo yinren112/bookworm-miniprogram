@@ -5,7 +5,8 @@
  * 预期：数据库 attempt 只新增一条，另一个请求返回同一条 attempt 的结果
  */
 
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
 
@@ -82,7 +83,7 @@ async function createAttemptWithIdempotency(
     return { success: true, attempt, duration }
   } catch (error) {
     const duration = Date.now() - startTime
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
       // 唯一约束冲突 - 这在并发场景下是预期的
       console.log(`[${requestId}] ⚠️ 唯一约束冲突 (P2002) - 正在重试获取记录... (耗时 ${duration}ms)`)
       

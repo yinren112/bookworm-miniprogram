@@ -1,9 +1,4 @@
 // src/services/study/studyReminderTemplate.ts
-// 一次性订阅消息模板配置
-// Template ID: kNHUGMC5tapQG7aTC2zalWgnW0iFuBjbwp06xDOXRjk
-
-export const STUDY_REMINDER_TEMPLATE_ID = "kNHUGMC5tapQG7aTC2zalWgnW0iFuBjbwp06xDOXRjk";
-
 // 真实 Key 映射 (Verified by User)
 export const REMINDER_TEMPLATE_KEYS = {
   CONTENT: "thing2",      // 复习内容

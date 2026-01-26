@@ -2,6 +2,7 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import client from "prom-client";
+import config from "../config";
 
 // 启用默认的 Node.js 指标 (CPU, memory, etc.)
 // 只在非测试环境中收集默认指标，避免重复注册错误
@@ -78,10 +79,16 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
 
 async function metricsPlugin(fastify: FastifyInstance) {
   fastify.get("/metrics", async (request, reply) => {
+    if (!config.METRICS_ALLOW_ANONYMOUS) {
+      const expected = config.METRICS_AUTH_TOKEN;
+      const actual = request.headers.authorization;
+      if (!expected || actual !== `Bearer ${expected}`) {
+        return reply.code(401).send({ code: "UNAUTHORIZED", message: "Unauthorized" });
+      }
+    }
     reply.header("Content-Type", client.register.contentType);
     reply.send(await client.register.metrics());
   });
-  console.error("Metrics endpoint registered at /metrics"); // Startup log
 }
 
 export default fp(metricsPlugin);

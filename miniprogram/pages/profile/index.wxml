@@ -64,10 +64,10 @@
 
   <card-flat>
     <view class="menu-list">
-      <view class="menu-item" bindtap="copyWechatId" hover-class="item-hover">
+      <button class="menu-item share-button" open-type="contact" hover-class="item-hover">
         <text class="menu-text">联系客服</text>
         <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-      </view>
+      </button>
       <button class="menu-item share-button" open-type="share" hover-class="item-hover">
         <text class="menu-text">分享给好友</text>
         <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
@@ -86,9 +86,9 @@
       </view>
     </view>
   </card-flat>
-  <view class="support-info" bindtap="onDevConfigTap">
-    <text>客服微信: {{serviceInfo.wechatId}} (点击复制)</text>
+  <view class="support-info">
     <text>服务时间: {{serviceInfo.time}}</text>
+    <text>如需帮助，请使用上方「联系客服」或查看「联系客服与帮助」。</text>
   </view>
 </view>
 </view>
