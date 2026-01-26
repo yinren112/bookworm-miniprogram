@@ -15,14 +15,14 @@
 
 ## 2. 结论摘要（P0/P1/P2 数量，列最关键 8 条）
 
-- 数量汇总（未关闭）：P0=0，P1=2，P2=3（详见 `RELEASE_BLOCKERS.json`）
+- 数量汇总（未关闭）：P0=0，P1=2，P2=1（详见 `RELEASE_BLOCKERS.json`）
 - 最关键 8 条：
   1. P0：生产镜像迁移离线可用（Done，见 artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt）
   2. P0：后端启动入口统一为 dist/src/index.js（Done，见 artifacts/p0_fix_evidence/p0-be-deploy-001_002_evidence.txt）
   3. P0：移除 dev-settings 后门页与内网/IP 文案（Done，见 artifacts/p0_fix_evidence/p0-mp-review-001_rg_dev-settings.txt）
   4. P0：客服入口可用且无占位符（Done，见 artifacts/p0_fix_evidence/p0-mp-cs-001_contact_entry.txt）
-  5. P1：订阅消息模板 ID 硬编码（需确认模板、类目与审核说明）
-  6. P1：用户协议/隐私政策依赖 DB Content，但 seed 禁止 prod/staging（需生产初始化保障）
+  5. P1：订阅消息模板改为后端下发（待微信后台核对模板与类目，Needs WeChat Admin）
+  6. P1：协议/隐私内容增加本地兜底（待最终文案，Needs Content Finalization）
   7. P1：/metrics 默认公开（Done：已加 Bearer 鉴权/匿名开关）
   8. P1：访问日志缺 requestId（Done：已回写 x-request-id 并统一日志字段）
 
@@ -80,45 +80,58 @@
 ### P1-BE-SEC-001：/metrics 默认公开暴露（Done）
 
 - 现状（修复后）：`/metrics` 默认要求 `Authorization: Bearer <METRICS_AUTH_TOKEN>`（可通过 `METRICS_ALLOW_ANONYMOUS=true` 配合网络层隔离）。
+- 证据：
+  - `artifacts/p1p2_fix_evidence/P1-BE-SEC-001_metrics_no_token.txt`
+  - `artifacts/p1p2_fix_evidence/P1-BE-SEC-001_metrics_with_token.txt`
+  - `artifacts/p1p2_fix_evidence/P1-BE-SEC-001_acceptance.txt`
 - Owner：Ops
 
-### P1-MP-SUBSCRIBE-001：订阅消息模板 ID 硬编码，需确认后台配置与审核口径
+### P1-MP-SUBSCRIBE-001：订阅消息模板改为后端下发（Needs WeChat Admin）
 
+- 现状（修复后）：前端不再硬编码 templateId；改为 `/api/study/reminders/config` 下发，缺失时 UI 明确提示且不阻断主流程。
 - 证据：
-  - `miniprogram/utils/constants.js:28`
-  - `miniprogram/pages/profile/index.js:149-178`
-  - `miniprogram/subpackages/review/pages/session-complete/index.js:162-197`
-- 影响：模板 ID 一旦错误/被替换/环境不同，用户订阅入口会直接失败；审核也可能要求解释用途与关闭路径。
+  - `artifacts/p1p2_fix_evidence/P1-MP-SUBSCRIBE-001_rg_constants.txt`
+  - `bookworm-backend/src/routes/study.ts`
+  - `artifacts/wechat_admin_checklist.md`
+  - `artifacts/p1p2_fix_evidence/P1-MP-SUBSCRIBE-001_build_check_steps.md`
+- 影响：仍需微信后台确认模板、类目与审核说明，否则订阅入口会被提示“未配置模板”。
 - Owner：WeChatAdmin
-- 行动建议：核对模板存在/类目匹配/触发点说明，并准备失败降级策略说明（已在 UI 中 toast/提示重试）。
+- 行动建议：在后台确认模板审核状态与触发说明，并将模板 ID 配置到后端环境变量 `STUDY_REMINDER_TEMPLATE_ID`。
 
-### P1-MP-CONTENT-001：用户协议/隐私政策依赖 DB Content，但 seed 禁止 prod/staging
+### P1-MP-CONTENT-001：协议/隐私内容兜底已补，但需最终文案（Needs Content Finalization）
 
+- 现状（修复后）：/content 拉取失败时自动回退到本地模板，页面不再空白；本地模板已标注 TODO 等待最终文案。
 - 证据：
-  - `miniprogram/app.js:63-67`、`miniprogram/pages/profile/index.js:193-203`（通过 `/content/:slug` 拉取）
-  - `bookworm-backend/prisma/seed.ts:360-364`（拒绝在 production/staging 运行 seed）
-- 影响：若生产库缺 `terms-of-service/privacy-policy` 两条 Content，审核点进去会直接报错。
+  - `miniprogram/utils/content-resolver.js`
+  - `miniprogram/utils/local-content.js`
+  - `artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_fallback_script.txt`
+  - `artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_manual_steps.md`
+  - `artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_diff.txt`
+- 影响：若最终文案未补齐，将继续展示占位模板。
 - Owner：Ops
-- 行动建议：生产环境用迁移/后台管理/初始化脚本保证内容存在（不得依赖 seed）。
+- 行动建议：补齐最终协议/隐私文案，并同步后端 Content 数据与本地兜底模板。
 
 ## 5. P2 建议清单（同上）
 
-### P2-BE-CONFIG-001：生产配置校验逻辑重复，存在漂移风险
+### P2-BE-CONFIG-001：生产配置校验逻辑去重（Done）
 
+- 现状（修复后）：仅保留 `src/config.ts` 的生产校验逻辑。
 - 证据：
-  - `bookworm-backend/src/config.ts:121-202`
-  - `bookworm-backend/src/index.ts:276-323`
-- 建议：保留单一真相源（建议仅保留 `src/config.ts`），避免两套规则长期漂移。
+  - `artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_dedup_rg.txt`
+  - `artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_prod_validation_output.txt`
+  - `artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_acceptance.txt`
 
 ### P2-MP-TERMS-001：用户拒绝协议仅 toast 提示，不阻断继续使用
 
 - 证据：`miniprogram/app.js:40-60`
 - 建议：与合规口径对齐；若要求“拒绝即不可用”，需要增加硬阻断并提供退出路径。
 
-### P2-MP-URL-001：normalizeApiBaseUrl 对无协议输入默认补 http://
+### P2-MP-URL-001：trial/release 强制 https（Done）
 
-- 证据：`miniprogram/utils/url.js:19-26`
-- 建议：限制 develop 真机只允许 https（或仅 devtools 允许 http），降低误配风险。
+- 现状（修复后）：trial/release 环境非 https 直接拒绝；仅 develop/devtools 允许 http。
+- 证据：
+  - `artifacts/p1p2_fix_evidence/P2-MP-URL-001_verify_https_policy.txt`
+  - `artifacts/p1p2_fix_evidence/P2-MP-URL-001_rg_config_urls.txt`
 
 ## 6. 小程序端审计结果（域名/隐私/敏感能力/弱网处理）
 
@@ -147,8 +160,8 @@
 - getPhoneNumber：
   - UI 在 `REVIEW_ONLY_MODE` 下隐藏（`miniprogram/pages/profile/index.wxml:10-18`），但代码仍存在，需要准备后台能力/额度/审核说明。
 - 订阅消息：
-  - 模板 ID 硬编码：`miniprogram/utils/constants.js:28`
-  - 失败降级：profile 与结算页均 toast/错误提示（见对应页面代码）
+  - 模板 ID 后端下发：`bookworm-backend/src/routes/study.ts`
+  - 失败降级：缺失模板时 UI 提示“未配置模板”且不中断主流程
 
 ### 6.4 小程序不兼容 API 风险（运行期崩溃）
 
@@ -168,7 +181,7 @@
 
 ### 7.1 基本命令可用性（只读验证）
 
-- `npm ci` / `npm run lint` / `npm test` / `npm run build` 均返回 exit code 0（详见 `artifacts/be_*.txt`）
+- `npm ci` / `npm run lint` / `npm test` / `npm run build` 均返回 exit code 0（详见 `artifacts/p1p2_fix_evidence/P1-BE-SEC-001_acceptance.txt`）
 
 ### 7.2 生产环境变量清单（从 config schema 反推）
 

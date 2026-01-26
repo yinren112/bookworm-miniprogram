@@ -104,7 +104,10 @@
     "title": "/metrics 默认公开暴露，需明确隔离策略（内网/反代白名单/鉴权）",
     "evidence": [
       "bookworm-backend/src/plugins/metrics.ts：/metrics 默认要求 Authorization: Bearer <METRICS_AUTH_TOKEN>（可用 METRICS_ALLOW_ANONYMOUS=true 配合网络层隔离）",
-      "bookworm-backend/src/tests/metrics-auth.test.ts：覆盖鉴权与匿名开关行为"
+      "bookworm-backend/src/tests/metrics-auth.test.ts：覆盖鉴权与匿名开关行为",
+      "artifacts/p1p2_fix_evidence/P1-BE-SEC-001_metrics_no_token.txt",
+      "artifacts/p1p2_fix_evidence/P1-BE-SEC-001_metrics_with_token.txt",
+      "artifacts/p1p2_fix_evidence/P1-BE-SEC-001_acceptance.txt"
     ],
     "paths": [
       "bookworm-backend/src/plugins/metrics.ts",
@@ -117,13 +120,17 @@
   {
     "id": "P1-MP-SUBSCRIBE-001",
     "severity": "P1",
+    "status": "Needs WeChat Admin",
     "title": "订阅消息模板 ID 硬编码，需确认后台模板存在、类目匹配与失败降级一致",
     "evidence": [
-      "miniprogram/utils/constants.js:28 `STUDY_REMINDER_TEMPLATE_ID` 硬编码",
-      "miniprogram/pages/profile/index.js:149 `wx.requestSubscribeMessage` 使用该模板"
+      "artifacts/p1p2_fix_evidence/P1-MP-SUBSCRIBE-001_rg_constants.txt",
+      "bookworm-backend/src/routes/study.ts：/api/study/reminders/config 下发 templateId",
+      "artifacts/wechat_admin_checklist.md",
+      "artifacts/p1p2_fix_evidence/P1-MP-SUBSCRIBE-001_build_check_steps.md"
     ],
     "paths": [
-      "miniprogram/utils/constants.js",
+      "bookworm-backend/src/config.ts",
+      "bookworm-backend/src/routes/study.ts",
       "miniprogram/pages/profile/index.js",
       "miniprogram/subpackages/review/pages/session-complete/index.js"
     ],
@@ -133,14 +140,21 @@
   {
     "id": "P1-MP-CONTENT-001",
     "severity": "P1",
+    "status": "Needs Content Finalization",
     "title": "用户协议/隐私政策页面依赖后端 Content 记录，但 seed 明确禁止在 production/staging 运行",
     "evidence": [
-      "miniprogram/app.js:65 `terms-of-service` 通过 /content/:slug 拉取",
-      "bookworm-backend/prisma/seed.ts:360-364 拒绝在 production/staging 运行 seed"
+      "miniprogram/utils/content-resolver.js：/content 失败时回退本地模板",
+      "miniprogram/utils/local-content.js：本地协议占位模板（含 TODO）",
+      "artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_fallback_script.txt",
+      "artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_manual_steps.md",
+      "artifacts/p1p2_fix_evidence/P1-MP-CONTENT-001_diff.txt"
     ],
     "paths": [
       "miniprogram/app.js",
       "miniprogram/pages/profile/index.js",
+      "miniprogram/pages/webview/index.js",
+      "miniprogram/utils/content-resolver.js",
+      "miniprogram/utils/local-content.js",
       "bookworm-backend/prisma/seed.ts",
       "bookworm-backend/src/routes/content.ts"
     ],
@@ -150,10 +164,12 @@
   {
     "id": "P2-BE-CONFIG-001",
     "severity": "P2",
+    "status": "Done",
     "title": "生产配置校验逻辑重复：src/config.ts 与 src/index.ts 各自维护一套规则",
     "evidence": [
-      "bookworm-backend/src/config.ts:121-202 已做 production/staging 强校验并 process.exit(1)",
-      "bookworm-backend/src/index.ts:276-323 又定义 validateProductionConfig（规则与提示不一致）"
+      "artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_dedup_rg.txt",
+      "artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_prod_validation_output.txt",
+      "artifacts/p1p2_fix_evidence/P2-BE-CONFIG-001_acceptance.txt"
     ],
     "paths": [
       "bookworm-backend/src/config.ts",
@@ -178,15 +194,15 @@
   {
     "id": "P2-MP-URL-001",
     "severity": "P2",
+    "status": "Done",
     "title": "normalizeApiBaseUrl 对无协议输入默认补 http://（仅 develop 路径可触发，但建议锁死为 https）",
     "evidence": [
-      "miniprogram/utils/url.js:19-26 无协议时补 `http://` 并补 `/api`",
-      "miniprogram/config.js:41-68 develop 真机可能从 storage/query 读取 DEV_API_BASE_URL"
+      "artifacts/p1p2_fix_evidence/P2-MP-URL-001_verify_https_policy.txt",
+      "artifacts/p1p2_fix_evidence/P2-MP-URL-001_rg_config_urls.txt"
     ],
     "paths": [
       "miniprogram/utils/url.js",
-      "miniprogram/config.js",
-      "miniprogram/pages/dev-settings/index.js"
+      "miniprogram/config.js"
     ],
     "owner": "Dev",
     "action": "限制 DEV_API_BASE_URL 仅允许 https（或仅 devtools 使用 http），避免真机/审核环境触发明文 HTTP。"
