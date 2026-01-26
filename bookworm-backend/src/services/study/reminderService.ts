@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { PrismaClient, Prisma, StudyReminderStatus } from "@prisma/client";
 import config from "../../config";
 import { retryAsync } from "../../utils/retry";
-import { getBeijingNow, isSameDayBeijing } from "../../utils/timezone";
+import { getBeijingNow, isSameDayBeijing, toBeijingDate } from "../../utils/timezone";
 import { getUserEnrolledCourses, getCourseByKey } from "./courseService";
 import { getTodayQueueSummary } from "./cardScheduler";
 import { WECHAT_CONSTANTS } from "../../constants";
@@ -18,8 +18,6 @@ type DbCtx = PrismaClient | Prisma.TransactionClient;
 const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_SEND_HOUR = 9;
 const DEFAULT_SEND_MINUTE = 0;
-const CARD_SECONDS_PER_ITEM = 8;
-const QUIZ_SECONDS_PER_ITEM = 30;
 const REMINDER_ENTRY_PAGE = "pages/review/index?source=reminder";
 
 interface ReminderSendResult {
@@ -323,18 +321,19 @@ async function buildReminderPayload(
 
   if (!hasTasks) return null;
 
-  const etaMinutes = estimateMinutes(dueCardCount, dueQuizCount);
-  const summaryText = `到期卡片${dueCardCount} · 待测验${dueQuizCount} · 错题${wrongCount}`;
-  const etaText = etaMinutes > 0 ? `预计${etaMinutes}分钟` : "预计不足1分钟";
+  const reviewCount = Math.max(0, dueCardCount + dueQuizCount + wrongCount);
+  const contentText = truncateText(course.title ? `${course.title} 复习` : "今日复习任务", 20);
+  const startTimeText = formatBeijingDateTime(new Date());
+  const remarkText = "15分钟内有效，点击查看";
 
   return {
     templateId,
     page: REMINDER_ENTRY_PAGE,
     data: {
-      [REMINDER_TEMPLATE_KEYS.CONTENT]: { value: "今日复习提醒" },
-      [REMINDER_TEMPLATE_KEYS.COUNT]: { value: summaryText },
-      [REMINDER_TEMPLATE_KEYS.TIME]: { value: etaText },
-      [REMINDER_TEMPLATE_KEYS.REMARK]: { value: "点我继续复习" }, // Remark as CTA
+      [REMINDER_TEMPLATE_KEYS.CONTENT]: { value: contentText },
+      [REMINDER_TEMPLATE_KEYS.COUNT]: { value: String(reviewCount) },
+      [REMINDER_TEMPLATE_KEYS.TIME]: { value: startTimeText },
+      [REMINDER_TEMPLATE_KEYS.REMARK]: { value: remarkText },
     },
   };
 }
@@ -401,10 +400,15 @@ async function getWrongCount(
   });
 }
 
-function estimateMinutes(dueCardCount: number, dueQuizCount: number): number {
-  const seconds = dueCardCount * CARD_SECONDS_PER_ITEM + dueQuizCount * QUIZ_SECONDS_PER_ITEM;
-  if (seconds <= 0) return 0;
-  return Math.ceil(seconds / 60);
+function formatBeijingDateTime(date: Date): string {
+  const beijingDate = toBeijingDate(date);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${beijingDate.getFullYear()}-${pad(beijingDate.getMonth() + 1)}-${pad(beijingDate.getDate())} ${pad(beijingDate.getHours())}:${pad(beijingDate.getMinutes())}`;
+}
+
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength);
 }
 
 function hashPayload(payload: unknown): string {

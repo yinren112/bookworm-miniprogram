@@ -86,17 +86,14 @@
   - `artifacts/p1p2_fix_evidence/P1-BE-SEC-001_acceptance.txt`
 - Owner：Ops
 
-### P1-MP-SUBSCRIBE-001：订阅消息模板改为后端下发（Needs WeChat Admin）
+### P1-MP-SUBSCRIBE-001：订阅消息模板改为后端下发（Done）
 
-- 现状（修复后）：前端不再硬编码 templateId；改为 `/api/study/reminders/config` 下发，缺失时 UI 明确提示且不阻断主流程。
+- 现状（修复后）：前端通过 `/api/study/reminders/config` 获取 templateId；后端由 `STUDY_REMINDER_TEMPLATE_ID` 注入固定模板 ID；订阅与发送字段映射已对齐模板要求。
 - 证据：
-  - `artifacts/p1p2_fix_evidence/P1-MP-SUBSCRIBE-001_rg_constants.txt`
-  - `bookworm-backend/src/routes/study.ts`
-  - `artifacts/wechat_admin_checklist.md`
-  - `artifacts/p1p2_fix_evidence/P1-MP-SUBSCRIBE-001_build_check_steps.md`
-- 影响：仍需微信后台确认模板、类目与审核说明，否则订阅入口会被提示“未配置模板”。
+  - `artifacts/p1mp_subscribe_evidence/E1_backend_config.txt`
+  - `artifacts/p1mp_subscribe_evidence/E2_miniprogram_subscribe_steps.md`
+  - `artifacts/p1mp_subscribe_evidence/E3_backend_payload_mapping.md`
 - Owner：WeChatAdmin
-- 行动建议：在后台确认模板审核状态与触发说明，并将模板 ID 配置到后端环境变量 `STUDY_REMINDER_TEMPLATE_ID`。
 
 ### P1-MP-CONTENT-001：协议/隐私内容兜底已补，但需最终文案（Needs Content Finalization）
 

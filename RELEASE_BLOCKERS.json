@@ -117,13 +117,16 @@
   {
     "id": "P1-MP-SUBSCRIBE-001",
     "severity": "P1",
+    "status": "Done",
     "title": "订阅消息模板 ID 硬编码，需确认后台模板存在、类目匹配与失败降级一致",
     "evidence": [
-      "miniprogram/utils/constants.js:28 `STUDY_REMINDER_TEMPLATE_ID` 硬编码",
-      "miniprogram/pages/profile/index.js:149 `wx.requestSubscribeMessage` 使用该模板"
+      "artifacts/p1mp_subscribe_evidence/E1_backend_config.txt",
+      "artifacts/p1mp_subscribe_evidence/E2_miniprogram_subscribe_steps.md",
+      "artifacts/p1mp_subscribe_evidence/E3_backend_payload_mapping.md"
     ],
     "paths": [
-      "miniprogram/utils/constants.js",
+      "bookworm-backend/src/routes/study.ts",
+      "bookworm-backend/src/services/study/reminderService.ts",
       "miniprogram/pages/profile/index.js",
       "miniprogram/subpackages/review/pages/session-complete/index.js"
     ],
