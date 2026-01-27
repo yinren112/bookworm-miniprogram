@@ -1,8 +1,20 @@
 // bookworm-backend/prisma/seed.ts
 
 import { PrismaClient, book_condition, CourseStatus, QuestionType } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+function buildCheatsheetStableKey(
+  courseId: number,
+  unitId: number | null,
+  sheet: { title: string; assetType: string; version?: number },
+): string {
+  const unitPart = unitId ?? 0;
+  const version = sheet.version ?? 1;
+  const source = `${courseId}:${unitPart}:${sheet.assetType}:${sheet.title}:${version}`;
+  return crypto.createHash('md5').update(source).digest('hex');
+}
 
 const booksToSeed = [
   {
@@ -568,11 +580,13 @@ async function main() {
         assetType: string;
         url: string;
         unitKey?: string;
+        version?: number;
       }> }).cheatSheets || [];
 
       for (let i = 0; i < cheatSheets.length; i++) {
         const sheetData = cheatSheets[i];
         const unitId = sheetData.unitKey ? unitMap[sheetData.unitKey] : null;
+        const stableKey = buildCheatsheetStableKey(course.id, unitId, sheetData);
 
         // Delete existing and recreate (simpler than upsert for cheatsheets)
         await tx.studyCheatSheet.deleteMany({
@@ -587,8 +601,10 @@ async function main() {
             courseId: course.id,
             unitId,
             title: sheetData.title,
+            stableKey,
             assetType: sheetData.assetType,
             url: sheetData.url,
+            version: sheetData.version ?? 1,
             sortOrder: i,
           },
         });

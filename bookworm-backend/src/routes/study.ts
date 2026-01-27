@@ -4,6 +4,7 @@ import { FastifyPluginAsync } from "fastify";
 import { FeedbackRating, FeedbackReasonType } from "@prisma/client";
 import prisma from "../db";
 import config from "../config";
+import { metrics } from "../plugins/metrics";
 import {
   cardIdOnlyView,
   courseIdOnlyView,
@@ -132,18 +133,31 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
   const resolveCardByContentId = async (
     userId: number,
     contentId: string,
-    courseKey?: string,
+    options: { courseKey?: string; courseId?: number; requireCourseKey?: boolean } = {},
   ) => {
+    const { courseKey, courseId, requireCourseKey = false } = options;
     let courseIds: number[] = [];
-    if (courseKey) {
-      const course = await getCourseByKey(prisma, courseKey);
+    if (courseId) {
+      const enrollment = await prisma.userCourseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: enrollmentCourseIdView,
+      });
+      if (!enrollment) {
+        throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+      }
+      courseIds = [courseId];
+    } else if (courseKey) {
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
       courseIds = [course.id];
+    } else if (requireCourseKey) {
+      metrics.courseScopeRequiredTotal.inc();
+      throw new ApiError(400, "Course scope is required", "COURSE_SCOPE_REQUIRED");
     } else {
       const enrollments = await prisma.userCourseEnrollment.findMany({
-        where: { userId },
+        where: { userId, isActive: true },
         select: enrollmentCourseIdView,
       });
       courseIds = enrollments.map((enrollment) => enrollment.courseId);
@@ -176,18 +190,22 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
   const resolveQuestionById = async (
     userId: number,
     questionId: number,
-    courseKey?: string,
+    options: { courseKey?: string; requireCourseKey?: boolean } = {},
   ) => {
+    const { courseKey, requireCourseKey = false } = options;
     let courseIds: number[] = [];
     if (courseKey) {
-      const course = await getCourseByKey(prisma, courseKey);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
       courseIds = [course.id];
+    } else if (requireCourseKey) {
+      metrics.courseScopeRequiredTotal.inc();
+      throw new ApiError(400, "Course scope is required", "COURSE_SCOPE_REQUIRED");
     } else {
       const enrollments = await prisma.userCourseEnrollment.findMany({
-        where: { userId },
+        where: { userId, isActive: true },
         select: enrollmentCourseIdView,
       });
       courseIds = enrollments.map((enrollment) => enrollment.courseId);
@@ -368,7 +386,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const { courseKey } = request.query;
 
       // 获取课程 ID
-      const course = await getCourseByKey(prisma, courseKey);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
@@ -427,7 +445,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const { courseKey, unitId, limit } = request.body;
 
       // 获取课程 ID
-      const course = await getCourseByKey(prisma, courseKey);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
@@ -459,9 +477,13 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
     async (request, reply) => {
       const userId = request.user!.userId;
       const { contentId } = request.params;
-      const { rating, sessionId, courseKey } = request.body;
+      const { rating, sessionId, courseKey, courseId } = request.body;
 
-      const card = await resolveCardByContentId(userId, contentId, courseKey);
+      const card = await resolveCardByContentId(userId, contentId, {
+        courseKey,
+        courseId,
+        requireCourseKey: true,
+      });
 
       // 转换 rating 字符串为枚举
       const ratingEnum = rating as FeedbackRating;
@@ -509,7 +531,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const { courseKey, unitId, limit, wrongItemsOnly } = request.body;
 
       // 获取课程 ID
-      const course = await getCourseByKey(prisma, courseKey);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
@@ -577,7 +599,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
 
       let courseId: number | undefined;
       if (courseKey) {
-        const course = await getCourseByKey(prisma, courseKey);
+        const course = await getCourseByKey(prisma, courseKey, { userId });
         if (!course) {
           throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
         }
@@ -634,7 +656,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
 
       let courseId: number | undefined;
       if (courseKey) {
-        const course = await getCourseByKey(prisma, courseKey);
+        const course = await getCourseByKey(prisma, courseKey, { userId });
         if (!course) {
           throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
         }
@@ -661,10 +683,11 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       },
     },
     async (request, reply) => {
+      const userId = request.user!.userId;
       const { courseKey, unitId } = request.query;
 
       // 获取课程 ID
-      const course = await getCourseByKey(prisma, courseKey);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
@@ -715,7 +738,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
       const { courseKey, cardId, questionId, reason, message } = request.body;
 
       // 获取课程 ID
-      const course = await getCourseByKey(prisma, courseKey);
+      const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
@@ -822,12 +845,18 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
 
       if (type === "card") {
         const { contentId, courseKey } = request.body;
-        await resolveCardByContentId(userId, contentId, courseKey);
+        await resolveCardByContentId(userId, contentId, {
+          courseKey,
+          requireCourseKey: true,
+        });
 
         await starItem(prisma, userId, { type: "card", contentId });
       } else {
         const { questionId, courseKey } = request.body;
-        await resolveQuestionById(userId, questionId, courseKey);
+        await resolveQuestionById(userId, questionId, {
+          courseKey,
+          requireCourseKey: true,
+        });
 
         await starItem(prisma, userId, { type: "question", questionId });
       }
@@ -851,12 +880,18 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
 
       if (type === "card") {
         const { contentId, courseKey } = request.body;
-        await resolveCardByContentId(userId, contentId, courseKey);
+        await resolveCardByContentId(userId, contentId, {
+          courseKey,
+          requireCourseKey: true,
+        });
 
         await unstarItem(prisma, userId, { type: "card", contentId });
       } else {
         const { questionId, courseKey } = request.body;
-        await resolveQuestionById(userId, questionId, courseKey);
+        await resolveQuestionById(userId, questionId, {
+          courseKey,
+          requireCourseKey: true,
+        });
 
         await unstarItem(prisma, userId, { type: "question", questionId });
       }
@@ -880,7 +915,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
 
       let courseId: number | undefined;
       if (courseKey) {
-        const course = await getCourseByKey(prisma, courseKey);
+        const course = await getCourseByKey(prisma, courseKey, { userId });
         if (!course) {
           throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
         }

@@ -16,6 +16,14 @@ if (process.env.NODE_ENV !== 'test') {
 const mockIncrementer = { inc: () => {} };
 const mockSetter = { set: () => {} };
 
+function getOrCreateCounter(name: string, help: string) {
+  const existing = client.register.getSingleMetric(name);
+  if (existing) {
+    return existing as client.Counter<string>;
+  }
+  return new client.Counter({ name, help });
+}
+
 // Only create metrics in non-test environments to avoid conflicts
 export const metrics = process.env.NODE_ENV !== 'test' ? {
   ordersCreated: new client.Counter({
@@ -63,6 +71,18 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
     name: "bookworm_amount_mismatch_total",
     help: "Total number of critical amount mismatches detected. THIS SHOULD ALWAYS BE ZERO.",
   }),
+  courseScopeRequiredTotal: getOrCreateCounter(
+    "bookworm_course_scope_required_total",
+    "Total number of requests rejected due to missing course scope.",
+  ),
+  coursePublishArchiveFailedTotal: getOrCreateCounter(
+    "bookworm_course_publish_archive_failed_total",
+    "Total number of failures archiving old published course versions.",
+  ),
+  enrollmentActiveConflictTotal: getOrCreateCounter(
+    "bookworm_enrollment_active_conflict_total",
+    "Total number of detected conflicts with multiple active enrollments per user and courseKey.",
+  ),
 } : {
   // Mock metrics for testing - reuse singleton objects
   ordersCreated: { labels: () => mockIncrementer, inc: () => {} },
@@ -75,6 +95,9 @@ export const metrics = process.env.NODE_ENV !== 'test' ? {
   orderFulfillmentDurationSeconds: { observe: () => {} },
   operationLatency: { startTimer: () => () => {}, labels: () => ({ startTimer: () => () => {} }) },
   amountMismatchDetected: mockIncrementer,
+  courseScopeRequiredTotal: mockIncrementer,
+  coursePublishArchiveFailedTotal: mockIncrementer,
+  enrollmentActiveConflictTotal: mockIncrementer,
 };
 
 async function metricsPlugin(fastify: FastifyInstance) {

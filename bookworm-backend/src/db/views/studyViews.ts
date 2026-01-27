@@ -36,6 +36,16 @@ export const courseIdStatusView = {
 } as const satisfies Prisma.StudyCourseSelect;
 
 /**
+ * 课程 ID + 状态 + 课程 key（注册与权限校验用）
+ * Used by: courseService enrollCourse
+ */
+export const courseIdStatusKeyView = {
+  id: true,
+  status: true,
+  courseKey: true,
+} as const satisfies Prisma.StudyCourseSelect;
+
+/**
  * 课程版本信息（版本列表用）
  * Used by: listCourseVersions
  */
@@ -65,6 +75,14 @@ export const courseIdVersionView = {
  */
 export const courseIdOnlyView = {
   id: true,
+} as const satisfies Prisma.StudyCourseSelect;
+
+/**
+ * 仅课程 key
+ * Used by: importService, courseService
+ */
+export const courseKeyOnlyView = {
+  courseKey: true,
 } as const satisfies Prisma.StudyCourseSelect;
 
 // ============================================
@@ -227,6 +245,14 @@ export const cheatsheetSelectPublic = {
   unitId: true,
 } as const satisfies Prisma.StudyCheatSheetSelect;
 
+/**
+ * 急救包 ID
+ * Used by: importService
+ */
+export const cheatsheetIdView = {
+  id: true,
+} as const satisfies Prisma.StudyCheatSheetSelect;
+
 export const cheatsheetSummaryView = {
   ...cheatsheetSelectPublic,
   unit: {
@@ -292,6 +318,13 @@ export const enrollmentWithCourseView = {
   lastStudiedAt: true,
   course: {
     select: courseSelectPublic,
+  },
+} as const satisfies Prisma.UserCourseEnrollmentSelect;
+
+export const enrollmentCourseKeyView = {
+  lastStudiedAt: true,
+  course: {
+    select: courseKeyOnlyView,
   },
 } as const satisfies Prisma.UserCourseEnrollmentSelect;
 

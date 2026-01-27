@@ -2,15 +2,18 @@
 // 课程包导入服务
 
 import { Prisma, PrismaClient, QuestionType, CourseStatus } from "@prisma/client";
+import crypto from "crypto";
 import {
   courseIdStatusView,
   courseIdVersionView,
+  courseKeyOnlyView,
   courseVersionView,
   unitIdOnlyView,
   cardIdOnlyView,
   questionIdOnlyView,
+  cheatsheetIdView,
 } from "../../db/views";
-import { updateCourseTotals } from "./courseService";
+import { updateCourseTotals, archiveOtherPublishedCourses } from "./courseService";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -353,6 +356,17 @@ function normalizeEscapedWhitespace(text: string): string {
   return text.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\t/g, "\t");
 }
 
+function buildCheatsheetStableKey(
+  courseId: number,
+  unitId: number | null,
+  cheatsheet: CheatSheetDefinition,
+): string {
+  const unitPart = unitId ?? 0;
+  const version = cheatsheet.version || 1;
+  const source = `${courseId}:${unitPart}:${cheatsheet.assetType}:${cheatsheet.title}:${version}`;
+  return crypto.createHash("md5").update(source).digest("hex");
+}
+
 export function parseCheatsheets(content: string): CheatSheetDefinition[] {
   const data = JSON.parse(content);
 
@@ -582,6 +596,9 @@ export async function importCoursePackage(
     let courseId: number;
 
     if (existingCourse) {
+      if (publishOnImport) {
+        await archiveOtherPublishedCourses(db, pkg.manifest.courseKey, existingCourse.id);
+      }
       // 更新现有课程
       await db.studyCourse.update({
         where: { id: existingCourse.id },
@@ -594,6 +611,9 @@ export async function importCoursePackage(
       });
       courseId = existingCourse.id;
     } else {
+      if (publishOnImport) {
+        await archiveOtherPublishedCourses(db, pkg.manifest.courseKey);
+      }
       // 检查是否存在相同 courseKey 的其他版本
       const existingAnyVersion = await db.studyCourse.findFirst({
         where: { courseKey: pkg.manifest.courseKey },
@@ -751,6 +771,7 @@ export async function importCoursePackage(
     }
 
     // 6. 导入急救包
+    let cheatSheetOrder = 0;
     for (const cs of pkg.cheatsheets) {
       let unitId: number | null = null;
       if (cs.unitKey) {
@@ -760,10 +781,27 @@ export async function importCoursePackage(
         }
       }
 
-      // 急救包总是创建新的（不做 upsert，因为没有 contentId）
-      await db.studyCheatSheet.create({
-        data: {
+      const stableKey = buildCheatsheetStableKey(courseId, unitId, cs);
+      const existingSheet = await db.studyCheatSheet.findUnique({
+        where: { stableKey },
+        select: cheatsheetIdView,
+      });
+
+      await db.studyCheatSheet.upsert({
+        where: { stableKey },
+        create: {
           courseId,
+          unitId,
+          title: cs.title,
+          stableKey,
+          assetType: cs.assetType,
+          url: cs.url ? cs.url : null,
+          content: cs.content ? normalizeEscapedWhitespace(cs.content) : null,
+          contentFormat: cs.contentFormat ? cs.contentFormat : null,
+          version: cs.version || 1,
+          sortOrder: cheatSheetOrder,
+        },
+        update: {
           unitId,
           title: cs.title,
           assetType: cs.assetType,
@@ -771,10 +809,14 @@ export async function importCoursePackage(
           content: cs.content ? normalizeEscapedWhitespace(cs.content) : null,
           contentFormat: cs.contentFormat ? cs.contentFormat : null,
           version: cs.version || 1,
-          sortOrder: result.stats.cheatsheetsCreated,
+          sortOrder: cheatSheetOrder,
         },
       });
-      result.stats.cheatsheetsCreated++;
+
+      if (!existingSheet) {
+        result.stats.cheatsheetsCreated++;
+      }
+      cheatSheetOrder++;
     }
 
     // 7. 更新课程统计
@@ -878,6 +920,16 @@ export async function setCourseStatus(
   courseId: number,
   status: CourseStatus,
 ): Promise<void> {
+  if (status === CourseStatus.PUBLISHED) {
+    const course = await db.studyCourse.findUnique({
+      where: { id: courseId },
+      select: courseKeyOnlyView,
+    });
+    if (course) {
+      await archiveOtherPublishedCourses(db, course.courseKey, courseId);
+    }
+  }
+
   await db.studyCourse.update({
     where: { id: courseId },
     data: { status },

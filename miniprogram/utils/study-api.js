@@ -126,14 +126,16 @@ const startSession = (courseKey, options = {}) => {
  * @param {string} contentId - 卡片内容ID
  * @param {string} sessionId - 会话ID
  * @param {string} rating - 反馈评分: FORGOT | FUZZY | KNEW | PERFECT
+ * @param {string} courseKey - 课程标识
  */
-const submitCardAnswer = (contentId, sessionId, rating) => {
+const submitCardAnswer = (contentId, sessionId, rating, courseKey) => {
   return request({
     url: `/study/cards/${encodeURIComponent(contentId)}/answer`,
     method: 'POST',
     data: {
       sessionId,
       rating,
+      courseKey,
     },
     requireAuth: true,
   });

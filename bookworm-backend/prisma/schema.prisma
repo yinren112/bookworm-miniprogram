@@ -516,6 +516,7 @@ model StudyCheatSheet {
   courseId  Int      @map("course_id")
   unitId    Int?     @map("unit_id") // 可选：关联到特定章节
   title     String   @db.VarChar(255)
+  stableKey String   @map("stable_key") @db.VarChar(64)
   assetType String   @db.VarChar(20)
   url       String?  @db.VarChar(500)
   content   String?  @db.Text
@@ -527,6 +528,7 @@ model StudyCheatSheet {
   course StudyCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
   unit   StudyUnit?  @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
+  @@unique([stableKey], map: "uniq_study_cheatsheet_stable_key")
   @@index([courseId, sortOrder])
   @@map("study_cheat_sheet")
 }
@@ -558,6 +560,7 @@ model UserCourseEnrollment {
   lastStudiedAt  DateTime? @map("last_studied_at") @db.Timestamptz(6)
   completedCards Int       @default(0) @map("completed_cards")
   examDate       DateTime? @map("exam_date") @db.Date
+  isActive       Boolean   @default(true) @map("is_active")
 
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   course StudyCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)

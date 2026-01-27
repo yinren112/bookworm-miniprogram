@@ -260,6 +260,7 @@ Page({
           currentCard.contentId,
           sessionId,
           rating,
+          this.data.courseKey,
         );
         
         // SRS Transparency Toast
@@ -359,8 +360,8 @@ Page({
       this.setData({ isStarred: newVal });
 
       const updatePromise = newVal
-        ? starItem({ type: 'card', contentId })
-        : unstarItem({ type: 'card', contentId });
+        ? starItem({ type: 'card', contentId, courseKey: this.data.courseKey })
+        : unstarItem({ type: 'card', contentId, courseKey: this.data.courseKey });
 
       updatePromise
         .then(() => {

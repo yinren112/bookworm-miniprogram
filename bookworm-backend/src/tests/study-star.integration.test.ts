@@ -287,7 +287,7 @@ describe("Study Star Integration", () => {
     expect(startPayload.cards.some((item: any) => item.contentId === card.contentId)).toBe(true);
   });
 
-  it("should enforce course scoping for contentId conflicts", async () => {
+  it("should require course scoping for contentId conflicts", async () => {
     const { token, userId } = await createTestUser("USER");
     const sharedContentId = `CARD_SHARED_${Date.now()}`;
 
@@ -371,7 +371,7 @@ describe("Study Star Integration", () => {
       headers: { authorization: `Bearer ${token}` },
       payload: { sessionId: crypto.randomUUID(), rating: "KNEW" },
     });
-    expect(ambiguousRes.statusCode).toBe(409);
+    expect(ambiguousRes.statusCode).toBe(400);
 
     const scopedRes = await app.inject({
       method: "POST",
@@ -475,7 +475,8 @@ describe("Study Star Integration", () => {
       headers: { authorization: `Bearer ${token}` },
       payload: { type: "card", contentId: sharedContentId },
     });
-    expect(ambiguousStarRes.statusCode).toBe(409);
+    expect(ambiguousStarRes.statusCode).toBe(400);
+    expect(JSON.parse(ambiguousStarRes.payload).code).toBe("COURSE_SCOPE_REQUIRED");
 
     const scopedStarRes = await app.inject({
       method: "POST",

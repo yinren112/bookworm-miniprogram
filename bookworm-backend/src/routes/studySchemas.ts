@@ -75,6 +75,7 @@ export const CardAnswerBodySchema = Type.Object({
   }),
   rating: FeedbackRatingSchema,
   courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+  courseId: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 // ============================================
@@ -110,6 +111,10 @@ export const CourseDetailSchema = Type.Object({
   contentVersion: Type.Integer(),
   totalCards: Type.Integer(),
   totalQuestions: Type.Integer(),
+  enrolledCourseId: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  enrolledContentVersion: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  latestContentVersion: Type.Optional(Type.Union([Type.Integer(), Type.Null()])),
+  upgradeAvailable: Type.Optional(Type.Boolean()),
   units: Type.Array(UnitListItemSchema),
   enrollment: Type.Optional(Type.Union([
     Type.Object({
