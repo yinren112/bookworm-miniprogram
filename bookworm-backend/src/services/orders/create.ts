@@ -3,15 +3,15 @@
 // Implements atomic order creation with PostgreSQL advisory locks
 
 import { Prisma, PrismaClient } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import config from "../../config";
 import { ApiError } from "../../errors";
 import { metrics } from "../../plugins/metrics";
-import { isPickupCodeConstraintError } from "../../utils/typeGuards";
+import { isPickupCodeConstraintError, isPrismaKnownError } from "../../utils/typeGuards";
 import { INVENTORY_STATUS } from "../../constants";
 import { withTxRetry } from "../../db/transaction";
 import { generateUniquePickupCode } from "../../domain/orders/utils";
 import { orderCountInclude } from "../../db/views";
+import { prismaErrorToApiError } from "../../utils/prismaError";
 
 /**
  * Validates and normalizes order input
@@ -327,16 +327,12 @@ export async function createOrder(
       );
     }
   } catch (e: unknown) {
-    if (e instanceof PrismaClientKnownRequestError) {
-      // Unique constraint on pending payment order
-      if (e.code === "P2002") {
-        throw new ApiError(
-          409,
-          "您有一个正在付款的订单，请先完成付款或等待订单过期",
-          "CONCURRENT_PENDING_ORDER",
-        );
-      }
+    const apiError = prismaErrorToApiError(e);
+    if (apiError) {
+      throw apiError;
+    }
 
+    if (isPrismaKnownError(e)) {
       // Check constraint: MAX_RESERVED_ITEMS_PER_USER
       if (
         e.code === "P2010" &&

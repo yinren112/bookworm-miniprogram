@@ -1,9 +1,9 @@
 import { Prisma, PrismaClient, SettlementType } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError } from "../errors";
 import { withTxRetry } from "../db/transaction";
 import { BUSINESS_LIMITS } from "../constants";
 import { userIdOnlyView, acquisitionDetailInclude, acquisitionListInclude } from "../db/views";
+import { prismaErrorToApiError } from "../utils/prismaError";
 
 /**
  * 单个待收购书籍的信息
@@ -110,8 +110,10 @@ async function createAcquisitionImpl(
           data: { phone_number: input.customerProfile.phoneNumber },
         });
       } catch (error: unknown) {
-        // 捕获唯一约束违反错误 (P2002)
-        if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+        const apiError = prismaErrorToApiError(error, {
+          phoneNumber: input.customerProfile.phoneNumber,
+        });
+        if (apiError) {
           // 手机号被占用，检查是被谁占用
           // 注意：不能使用失败的事务对象（tx），必须使用独立的dbCtx
           const conflictingUser = await dbCtx.user.findUnique({
@@ -119,21 +121,16 @@ async function createAcquisitionImpl(
             select: userIdOnlyView,
           });
 
-          // 如果手机号被其他用户占用，抛出 409 错误
-          if (conflictingUser && conflictingUser.id !== input.customerUserId) {
-            throw new ApiError(
-              409,
-              `手机号 ${input.customerProfile.phoneNumber} 已被其他用户占用`,
-              "PHONE_NUMBER_CONFLICT"
-            );
+          if (!conflictingUser || conflictingUser.id !== input.customerUserId) {
+            throw apiError;
           }
 
           // 如果手机号被当前用户占用（说明手机号没变化），忽略错误继续
           // 这种情况通常不会发生，因为 update 不会在值相同时触发唯一约束
-        } else {
-          // 其他错误，重新抛出
-          throw error;
         }
+
+        // 其他错误，重新抛出
+        throw error;
       }
     }
 

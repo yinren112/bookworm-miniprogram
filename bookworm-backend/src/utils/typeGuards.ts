@@ -44,7 +44,23 @@ export function isFastifyValidationError(error: unknown): error is FastifyValida
  * Type guard for Prisma known request errors
  */
 export function isPrismaKnownError(error: unknown): error is PrismaClientKnownRequestError {
-  return error instanceof PrismaClientKnownRequestError;
+  if (error instanceof PrismaClientKnownRequestError) {
+    return true;
+  }
+
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const maybeError = error as {
+    code?: unknown;
+    name?: unknown;
+  };
+
+  return (
+    typeof maybeError.code === "string" &&
+    maybeError.name === "PrismaClientKnownRequestError"
+  );
 }
 
 /**

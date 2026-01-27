@@ -2,7 +2,6 @@
 // 刷题服务 - 题目拉取、答题提交、错题本管理
 
 import { PrismaClient, QuestionType } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { v4 as uuidv4 } from "uuid";
 import {
   questionSelectPublic,
@@ -13,6 +12,7 @@ import {
 } from "../../db/views";
 import { recordActivity } from "./streakService";
 import { log } from "../../lib/logger";
+import { isPrismaUniqueConstraintError } from "../../utils/typeGuards";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -242,10 +242,7 @@ export async function submitQuizAnswer(
       },
     });
   } catch (error) {
-    if (
-      error instanceof PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (isPrismaUniqueConstraintError(error)) {
       const attempt = await db.userQuestionAttempt.findUnique({
         where: {
           sessionId_userId_questionId: { sessionId, userId, questionId },

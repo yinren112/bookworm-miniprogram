@@ -2,7 +2,6 @@
 import Fastify, { FastifyRequest, FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import { createWechatPayAdapter, WechatPayAdapter } from "./adapters/wechatPayAdapter";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError, ServiceError } from "./errors";
 import config from "./config";
 import { verifyDatabaseConstraints } from "./utils/dbVerifier";
@@ -15,8 +14,10 @@ import { sanitizeObject } from "./lib/logSanitizer";
 import {
   isFastifyHttpError,
   isFastifyValidationError,
-  getErrorMessage
+  getErrorMessage,
+  isPrismaKnownError,
 } from "./utils/typeGuards";
+import { prismaErrorToApiError } from "./utils/prismaError";
 
 // Plugins and Routes
 import { registerPlugins } from "./plugins";
@@ -252,7 +253,15 @@ fastify.setErrorHandler(
     }
 
     // Layer 5: Prisma database errors
-    if (error instanceof PrismaClientKnownRequestError) {
+    const prismaApiError = prismaErrorToApiError(error);
+    if (prismaApiError) {
+      return reply.code(prismaApiError.statusCode).send({
+        code: prismaApiError.code,
+        message: prismaApiError.message,
+      });
+    }
+
+    if (isPrismaKnownError(error)) {
       if (error.code === "P2025") {
         return reply.code(404).send({
           code: ERROR_CODES.RECORD_NOT_FOUND,

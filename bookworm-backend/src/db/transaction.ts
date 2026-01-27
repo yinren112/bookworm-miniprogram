@@ -26,12 +26,27 @@ const DEFAULT_OPTIONS: Required<Omit<TxRetryOptions, "transactionOptions">> = {
 const RETRYABLE_PRISMA_CODES = new Set(["P2034"]);
 const RETRYABLE_PG_CODES = new Set(["40001", "40P01", "55P03"]);
 
-function getPgCode(error: PrismaClientKnownRequestError): string | undefined {
-  const meta = error.meta as { code?: string } | undefined;
-  if (meta?.code) {
-    return String(meta.code);
+function getPgCodeFromError(error: unknown): string | undefined {
+  if (error instanceof PrismaClientKnownRequestError) {
+    const meta = error.meta as { code?: string } | undefined;
+    if (meta?.code) {
+      return String(meta.code);
+    }
+    const match = /SQLSTATE\s+"(?<code>\w{5})"/i.exec(error.message);
+    return match?.groups?.code;
   }
-  const match = /SQLSTATE\s+"(?<code>\w{5})"/i.exec(error.message);
+
+  if (typeof error === "object" && error !== null) {
+    const meta = (error as { meta?: { code?: unknown } }).meta;
+    if (meta?.code) {
+      return String(meta.code);
+    }
+  }
+
+  const message = typeof (error as { message?: string }).message === "string"
+    ? (error as { message: string }).message
+    : "";
+  const match = /SQLSTATE\s+"(?<code>\w{5})"/i.exec(message);
   return match?.groups?.code;
 }
 
@@ -40,19 +55,21 @@ export function isRetryableTxError(error: unknown): boolean {
     if (RETRYABLE_PRISMA_CODES.has(error.code)) {
       return true;
     }
+  }
 
-    const pgCode = getPgCode(error);
-    if (pgCode && RETRYABLE_PG_CODES.has(pgCode)) {
+  if (typeof error === "object" && error !== null) {
+    const prismaCode = (error as { code?: string }).code;
+    if (prismaCode && RETRYABLE_PRISMA_CODES.has(String(prismaCode))) {
       return true;
     }
   }
 
-  if (typeof error === "object" && error !== null) {
-    const pgCode = (error as { code?: string }).code;
-    if (pgCode && RETRYABLE_PG_CODES.has(String(pgCode))) {
-      return true;
-    }
+  const pgCode = getPgCodeFromError(error);
+  if (pgCode && RETRYABLE_PG_CODES.has(pgCode)) {
+    return true;
+  }
 
+  if (typeof error === "object" && error !== null) {
     const message = (error as { message?: string }).message?.toLowerCase() ?? "";
     if (
       message.includes("deadlock detected") ||
