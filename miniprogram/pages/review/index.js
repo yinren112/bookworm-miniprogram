@@ -9,6 +9,7 @@ const { REVIEW_DASHBOARD_CACHE_VERSION, REVIEW_COURSES_CACHE_VERSION } = require
 const { track } = require('../../utils/track');
 const feedback = require('../../utils/ui/feedback');
 const soundManager = require('../../utils/sound-manager');
+const config = require('../../config');
 
 Page({
   data: {
@@ -31,11 +32,18 @@ Page({
     highlightStart: false,
     noDueTasks: false,
     primaryCtaText: '开始今日挑战', // Updated Tone
+    isDevtools: false,
+    debugApiBaseUrl: '',
   },
 
   onLoad(options) {
     this.setTodayDate();
     soundManager.preload();
+    const isDevtools = config.isDevtools();
+    this.setData({
+      isDevtools,
+      debugApiBaseUrl: isDevtools ? config.apiBaseUrl : '',
+    });
     const selectedCourseKey = wx.getStorageSync('review:selectedCourseKey') || '';
     this.setData({ selectedCourseKey });
     if (options && options.source === 'reminder') {
@@ -62,6 +70,10 @@ Page({
   async loadData(options = {}) {
     const { forceRefresh = false } = options;
     this.setData({ loading: true, error: false });
+    const apiBaseUrl = config.apiBaseUrl;
+    const isDevtools = this.data.isDevtools || config.isDevtools();
+    const includeUnpublished = isDevtools;
+    const coursesCacheKey = `review:courses:${REVIEW_COURSES_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}`;
 
     try {
       const selectedCourseKey = this.data.selectedCourseKey || undefined;
@@ -94,16 +106,28 @@ Page({
 
       let courses = [];
       let recommendedCourses = [];
+      let coursesLoadFailed = false;
       try {
         const courseRes = await swrFetch(
-          `review:courses:${REVIEW_COURSES_CACHE_VERSION}`,
-          () => getCourses(),
+          coursesCacheKey,
+          () => getCourses({ includeUnpublished }),
           { ttlMs: 600000, forceRefresh }
         );
         courses = courseRes.courses || [];
         recommendedCourses = courses.filter((course) => !course.enrolled).slice(0, 3);
       } catch (err) {
+        coursesLoadFailed = true;
         logger.error('Failed to load courses:', err);
+      }
+
+      if (coursesLoadFailed) {
+        this.setData({
+          loading: false,
+          error: true,
+          isDevtools,
+          debugApiBaseUrl: isDevtools ? apiBaseUrl : '',
+        });
+        return;
       }
 
       const resumeSession = getResumeSession();
@@ -131,6 +155,8 @@ Page({
         noDueTasks,
         primaryCtaText: ctaText,
         loading: false,
+        isDevtools,
+        debugApiBaseUrl: isDevtools ? apiBaseUrl : '',
       }, () => this.refreshCourseLists());
 
       track('review_home_view', {

@@ -15,6 +15,10 @@ import { ApiError } from "../errors";
 import { CourseStatus } from "@prisma/client";
 import { getBeijingNow } from "../utils/timezone";
 import {
+  assertIncludeUnpublishedAllowed,
+  shouldIncludeUnpublishedFallback,
+} from "../utils/studyCourseVisibility";
+import {
   getCourseList,
   getCourseByKey,
   enrollCourse,
@@ -245,7 +249,9 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
     },
     async (request, reply) => {
       const userId = request.user!.userId;
-      const { enrolled } = request.query;
+      const { enrolled, includeUnpublished } = request.query;
+      const includeUnpublishedFlag = includeUnpublished === true;
+      assertIncludeUnpublishedAllowed(includeUnpublishedFlag, config.NODE_ENV);
 
       let courses;
       if (enrolled) {
@@ -254,6 +260,10 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         courses = await getCourseList(prisma, {
           publishedOnly: true,
           userId,
+          includeUnpublishedFallback: shouldIncludeUnpublishedFallback(
+            includeUnpublishedFlag,
+            config.NODE_ENV,
+          ),
         });
       }
 

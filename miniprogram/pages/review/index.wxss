@@ -22,6 +22,15 @@ page {
   gap: var(--space-6);
 }
 
+.error-debug {
+  margin-top: var(--space-4);
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+  padding: 0 var(--space-6);
+}
+
 .course-header {
   display: flex;
   justify-content: space-between;
@@ -199,6 +208,13 @@ page {
   transform: translateY(2rpx);
 }
 
+.course-chip-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
 .course-chip-title {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-heavy);
@@ -259,6 +275,13 @@ page {
   flex-direction: column;
   gap: 6rpx;
   min-width: 0;
+}
+
+.discover-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
 }
 
 .discover-item-title {
@@ -418,6 +441,13 @@ page {
 
 .picker-item.selected {
   border-color: var(--color-juicy-green);
+}
+
+.picker-item-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
 }
 
 .picker-item-title {

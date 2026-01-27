@@ -2,6 +2,7 @@
 // 复习系统 API 封装
 
 const { request } = require('./api');
+const config = require('../config');
 
 /**
  * 构建查询字符串（小程序兼容，替代 URLSearchParams）
@@ -22,10 +23,15 @@ function buildQueryString(params) {
  * 获取课程列表
  * @param {Object} options - 查询选项
  * @param {boolean} [options.enrolled] - 只返回已注册课程
+ * @param {boolean} [options.includeUnpublished] - 是否包含未发布课程（仅开发者工具）
  */
 const getCourses = (options = {}) => {
+  const includeUnpublished = typeof options.includeUnpublished === 'boolean'
+    ? options.includeUnpublished
+    : config.isDevtools();
   const queryString = buildQueryString({
     enrolled: options.enrolled ? 'true' : undefined,
+    includeUnpublished: includeUnpublished ? 'true' : undefined,
   });
   return request({
     url: `/study/courses${queryString}`,

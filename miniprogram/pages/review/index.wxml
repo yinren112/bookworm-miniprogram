@@ -2,7 +2,12 @@
   <topbar title="复习" back="{{false}}" color="var(--color-text-main)" background="var(--color-bg-card)"></topbar>
   <scroll-view scroll-y class="main-scroll" enable-flex>
     <loading-state wx:if="{{loading}}" variant="page" text="加载中..." />
-    <error-state wx:elif="{{error}}" mode="network" title="加载失败" desc="请重试" bind:retry="onRetry" />
+    <block wx:elif="{{error}}">
+      <error-state mode="network" title="加载失败" desc="请重试" bind:retry="onRetry" />
+      <view class="error-debug" wx:if="{{isDevtools && debugApiBaseUrl}}">
+        <text>DEVTOOLS API：{{debugApiBaseUrl}}</text>
+      </view>
+    </block>
     <view wx:else class="content-wrapper">
       <card-flat>
         <view
@@ -68,7 +73,10 @@
                 hover-class="course-chip--pressed"
                 hover-stay-time="80"
               >
-                <text class="course-chip-title">{{item.title}}</text>
+                <view class="course-chip-title-row">
+                  <text class="course-chip-title">{{item.title}}</text>
+                  <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+                </view>
                 <text class="course-chip-sub">{{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
               </view>
             </block>
@@ -98,7 +106,10 @@
               hover-stay-time="80"
             >
               <view class="discover-left">
-                <text class="discover-item-title">{{item.title}}</text>
+                <view class="discover-title-row">
+                  <text class="discover-item-title">{{item.title}}</text>
+                  <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+                </view>
                 <text class="discover-item-desc">{{item.description}}</text>
               </view>
               <image class="discover-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
@@ -159,7 +170,10 @@
             bindtap="selectEnrolledCourse"
             data-course-key="{{item.courseKey}}"
           >
-            <text class="picker-item-title">{{item.title}}</text>
+            <view class="picker-item-title-row">
+              <text class="picker-item-title">{{item.title}}</text>
+              <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+            </view>
             <text class="picker-item-sub">{{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
           </view>
         </block>
@@ -174,7 +188,10 @@
         </view>
         <block wx:for="{{filteredDiscoverCourses}}" wx:key="courseKey">
           <view class="picker-item" bindtap="viewCourseDetail" data-course-key="{{item.courseKey}}">
-            <text class="picker-item-title">{{item.title}}</text>
+            <view class="picker-item-title-row">
+              <text class="picker-item-title">{{item.title}}</text>
+              <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+            </view>
             <text class="picker-item-sub">{{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
           </view>
         </block>

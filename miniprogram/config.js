@@ -5,6 +5,24 @@
 
 const { enforceApiBaseUrlPolicy } = require('./utils/url');
 
+function getSystemPlatform() {
+  try {
+    const systemInfo = wx.getSystemInfoSync ? wx.getSystemInfoSync() : null;
+    return systemInfo && systemInfo.platform ? systemInfo.platform : '';
+  } catch {
+    return '';
+  }
+}
+
+function isDevtools() {
+  try {
+    return getSystemPlatform() === 'devtools';
+  } catch {
+    // ignore
+  }
+  return getSystemPlatform() === 'devtools';
+}
+
 /**
  * Dynamically select API base URL based on mini program environment
  * @returns {string} API base URL
@@ -29,14 +47,9 @@ function getApiBaseUrl() {
       return enforceApiBaseUrlPolicy(selected, { envVersion, platform: '' });
     }
 
-    try {
-      const systemInfo = wx.getSystemInfoSync ? wx.getSystemInfoSync() : null;
-      const platform = systemInfo && systemInfo.platform ? systemInfo.platform : '';
-      if (platform === 'devtools') {
-        return enforceApiBaseUrlPolicy(urls.develop, { envVersion, platform });
-      }
-    } catch (e) {
-      console.warn('[WARN] Failed to get system info:', e);
+    const platform = isDevtools() ? 'devtools' : getSystemPlatform();
+    if (platform === 'devtools') {
+      return enforceApiBaseUrlPolicy(urls.develop, { envVersion, platform });
     }
     console.warn('[WARN] Device develop build uses trial API (no in-app endpoint switching)');
     return enforceApiBaseUrlPolicy(urls.trial, { envVersion, platform: '' });
@@ -56,5 +69,6 @@ module.exports = {
   get apiBaseUrl() {
     return getApiBaseUrl();
   },
+  isDevtools,
   APP_CONFIG
 };

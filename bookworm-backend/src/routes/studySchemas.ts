@@ -22,6 +22,7 @@ export type FeedbackRatingType = Static<typeof FeedbackRatingSchema>;
 // GET /api/study/courses
 export const GetCoursesQuerySchema = Type.Object({
   enrolled: Type.Optional(Type.Boolean({ description: "只返回已注册课程" })),
+  includeUnpublished: Type.Optional(Type.Boolean({ description: "非生产环境允许返回未发布课程兜底" })),
 });
 
 // GET /api/study/courses/:courseKey

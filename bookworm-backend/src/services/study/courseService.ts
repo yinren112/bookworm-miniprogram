@@ -71,15 +71,28 @@ export interface UnitListItem {
 
 export async function getCourseList(
   dbCtx: DbCtx,
-  options: { publishedOnly?: boolean; userId?: number } = {},
+  options: { publishedOnly?: boolean; userId?: number; includeUnpublishedFallback?: boolean } = {},
 ): Promise<CourseListItem[]> {
-  const { publishedOnly = true, userId } = options;
+  const { publishedOnly = true, userId, includeUnpublishedFallback = false } = options;
 
-  const courses = await dbCtx.studyCourse.findMany({
+  let courses = await dbCtx.studyCourse.findMany({
     where: publishedOnly ? { status: CourseStatus.PUBLISHED } : undefined,
     select: courseSelectPublic,
     orderBy: { updatedAt: "desc" },
   });
+
+  if (publishedOnly && includeUnpublishedFallback && courses.length === 0) {
+    courses = await dbCtx.studyCourse.findMany({
+      where: { status: { not: CourseStatus.ARCHIVED } },
+      select: courseSelectPublic,
+      orderBy: [
+        { courseKey: "asc" },
+        { contentVersion: "desc" },
+        { updatedAt: "desc" },
+      ],
+      distinct: ["courseKey"],
+    });
+  }
   const enrollments = userId
     ? await dbCtx.userCourseEnrollment.findMany({
         where: { userId, isActive: true },

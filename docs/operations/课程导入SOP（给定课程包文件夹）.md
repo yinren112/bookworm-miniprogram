@@ -144,6 +144,20 @@ Invoke-RestMethod -Method Get -Uri "$api/api/study/courses/<courseKey>" -Headers
 动作：
 - 让提供方补齐缺失课程包目录（包含 manifest.json、units.json）
 
+### 6.4 PowerShell 一行脚本被转义导致 foreach 语法错误
+
+现象：
+- 把一整段导入流程塞进 `powershell -Command "..."` / IDE 工具的一行命令里执行时，出现类似：
+  - `foreach 后面缺少变量名称`
+  - `表达式或语句中包含意外的标记`)``
+
+根因：
+- `$d`、`$courseDirs` 这类变量在“被多层引号包裹/转义”的情况下可能被提前展开或吞掉，最终变成 `foreach ( in )` 这种无效语法。
+
+动作（推荐）：
+- 不要把整段流程塞进一行字符串；在 PowerShell 终端里按步骤逐行执行（SOP 的示例本身就是逐行可执行的）。
+- 必须一行跑时：确保不要额外套一层 `powershell -Command`，并避免在双引号里出现 `$xxx`（必要时用单引号包住脚本，或对 `$` 做转义）。
+
 ## 7. 最小化 token 消耗的工作原则（强制）
 
 - 永远先扫 `manifest.json` 决定导入清单；不要靠肉眼翻目录。
@@ -152,4 +166,3 @@ Invoke-RestMethod -Method Get -Uri "$api/api/study/courses/<courseKey>" -Headers
   - `待导入课程/**/manifest.json`
   - `bookworm-backend/scripts/import_course_client.js`
   - `bookworm-backend/upgrade-user-to-staff.ts`
-
