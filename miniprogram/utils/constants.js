@@ -33,6 +33,7 @@ const TERMS_STORAGE_KEY = 'termsAccepted';
 const TERMS_ACCEPTED_AT_KEY = 'termsAcceptedAt';
 const TERMS_VERSION_KEY = 'termsVersion';
 const TERMS_VERSION = 'v1';
+const HOME_TAB_URL = '/pages/review/index';
 
 module.exports = {
   ORDER_STATUS,
@@ -46,4 +47,5 @@ module.exports = {
   TERMS_ACCEPTED_AT_KEY,
   TERMS_VERSION_KEY,
   TERMS_VERSION,
+  HOME_TAB_URL,
 };

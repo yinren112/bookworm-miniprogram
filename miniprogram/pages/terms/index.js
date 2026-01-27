@@ -3,9 +3,9 @@ const {
   TERMS_STORAGE_KEY,
   TERMS_ACCEPTED_AT_KEY,
   TERMS_VERSION_KEY,
-  TERMS_VERSION
+  TERMS_VERSION,
+  HOME_TAB_URL
 } = require('../../utils/constants');
-const appConfig = require('../../app.json');
 
 const TERMS_SECTIONS = [
   {
@@ -81,24 +81,6 @@ const PRIVACY_SECTIONS = [
   }
 ];
 
-function getHomeRoute() {
-  if (appConfig && appConfig.tabBar && Array.isArray(appConfig.tabBar.list) && appConfig.tabBar.list.length > 0) {
-    return {
-      route: appConfig.tabBar.list[0].pagePath,
-      useTab: true
-    };
-  }
-
-  if (appConfig && Array.isArray(appConfig.pages) && appConfig.pages.length > 0) {
-    return {
-      route: appConfig.pages[0],
-      useTab: false
-    };
-  }
-
-  return { route: '', useTab: false };
-}
-
 function createAcceptedAt() {
   return new Date().toISOString();
 }
@@ -129,14 +111,12 @@ Page({
       app.globalData.termsVersion = TERMS_VERSION;
     }
 
-    const { route, useTab } = getHomeRoute();
-    if (!route) return;
-    const url = `/${route}`;
-    if (useTab) {
-      wx.switchTab({ url });
-      return;
-    }
-    wx.reLaunch({ url });
+    wx.switchTab({
+      url: HOME_TAB_URL,
+      fail: () => {
+        wx.reLaunch({ url: HOME_TAB_URL });
+      }
+    });
   },
 
   handleReject() {

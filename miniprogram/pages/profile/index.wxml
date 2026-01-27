@@ -5,90 +5,99 @@
       <image class="user-avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
     </view>
     <text class="username">{{userInfo.nickName || '微信用户'}}</text>
-    <view style="width: 80%; margin-top: 24rpx;">
-      <juicy-button
-        wx:if="{{!isReviewMode && !hasPhoneNumber}}"
-        type="primary"
-        size="sm"
-        full
-        openType="getPhoneNumber"
-        bind:getphonenumber="onGetPhoneNumber"
-      >
+    <view class="phone-auth-container">
+      <juicy-button wx:if="{{!isReviewMode && !hasPhoneNumber}}" type="primary" size="sm" full openType="getPhoneNumber" bind:getphonenumber="onGetPhoneNumber">
         授权手机号（关联卖书记录）
       </juicy-button>
     </view>
   </view>
-
   <view class="profile-content">
     <card-flat clickable custom-class="review-entry-card" bind:tap="goToReview">
-    <view class="review-entry-content">
-      <view class="review-icon-wrapper">
-        <image class="review-icon" src="/images/icons/review/book.svg" />
-      </view>
-      <view class="review-text-wrapper">
-        <text class="review-title">复习助手</text>
-        <text class="review-desc">背卡片、练习题、查资料</text>
-      </view>
-    </view>
-    <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-  </card-flat>
-
-  <card-flat>
-    <view class="reminder-row">
-      <view class="menu-content">
-        <text class="menu-text">复习提醒设置</text>
-        <text class="menu-sub">{{reminderStatusText}}</text>
-        <text class="menu-sub" wx:if="{{nextSendAtText}}">下次提醒 {{nextSendAtText}}</text>
-      </view>
-      <view class="reminder-action">
-        <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" bind:tap="onReminderSubscribe" disabled="{{reminderLoading}}">
-          {{reminderStatus === 'ACCEPT' ? '重新授权' : '开启提醒'}}
-        </juicy-button>
-      </view>
-    </view>
-  </card-flat>
-  <!-- Staff Operations Section - Only visible for STAFF role -->
-  <card-flat wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}">
-    <view class="section-title">
-      <text class="title-text">员工操作</text>
-      <pill-tag variant="neutral" size="sm">STAFF</pill-tag>
-    </view>
-    <navigator url="/pages/acquisition-scan/index" class="menu-item" hover-class="item-hover">
-      <view class="menu-content">
-        <image class="icon-image" src="/images/icons/camera.svg" />
-        <text class="menu-text">按本收购</text>
+      <view class="review-entry-content">
+        <view class="review-icon-wrapper">
+          <image class="review-icon" src="/images/icons/review/book.svg" />
+        </view>
+        <view class="review-text-wrapper">
+          <text class="review-title">复习助手</text>
+          <text class="review-desc">背卡片、练习题、查资料</text>
+        </view>
       </view>
       <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-    </navigator>
-  </card-flat>
-
-  <card-flat>
-    <view class="menu-list">
-      <button class="menu-item share-button" open-type="contact" hover-class="item-hover">
-        <text class="menu-text">联系客服</text>
-        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-      </button>
-      <button class="menu-item share-button" open-type="share" hover-class="item-hover">
-        <text class="menu-text">分享给好友</text>
-        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-      </button>
-      <view class="menu-item" bindtap="showTerms" hover-class="item-hover">
-        <text class="menu-text">用户服务协议</text>
-        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </card-flat>
+    <card-flat>
+      <view class="reminder-row">
+        <view class="menu-content">
+          <text class="menu-text">复习提醒设置</text>
+          <text class="menu-sub">{{reminderStatusText}}</text>
+          <text class="menu-sub" wx:if="{{nextSendAtText}}">下次提醒 {{nextSendAtText}}</text>
+        </view>
+        <view class="reminder-action">
+          <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" bind:tap="onReminderSubscribe" disabled="{{reminderLoading}}">
+            {{reminderStatus === 'ACCEPT' ? '重新授权' : '开启提醒'}}
+          </juicy-button>
+        </view>
       </view>
-      <view class="menu-item" bindtap="showPrivacy" hover-class="item-hover">
-        <text class="menu-text">隐私政策</text>
-        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+    </card-flat>
+    <!-- Staff Operations Section - Only visible for STAFF role -->
+    <card-flat wx:if="{{!isReviewMode && userInfo.role === 'STAFF'}}">
+      <view class="section-title">
+        <text class="title-text">员工操作</text>
+        <pill-tag variant="neutral" size="sm">STAFF</pill-tag>
       </view>
-      <view class="menu-item" bindtap="goToCustomerService" hover-class="item-hover">
-        <text class="menu-text">联系客服与帮助</text>
+      <navigator url="/pages/acquisition-scan/index" class="menu-item" hover-class="item-hover">
+        <view class="menu-content">
+          <image class="icon-image" src="/images/icons/camera.svg" />
+          <text class="menu-text">按本收购</text>
+        </view>
         <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+      </navigator>
+    </card-flat>
+    <card-flat>
+      <view class="menu-list">
+        <button class="menu-item share-button" open-type="contact" hover-class="item-hover">
+          <view class="menu-content-row">
+            <image class="icon-image" src="/images/icons/customer-service.svg" />
+            <text class="menu-text">联系客服</text>
+          </view>
+          <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+        </button>
+        <button class="menu-item share-button" open-type="share" hover-class="item-hover">
+          <view class="menu-content-row">
+            <image class="icon-image" src="/images/icons/share.svg" />
+            <text class="menu-text">分享给好友</text>
+          </view>
+          <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+        </button>
+        <view class="menu-item" bindtap="goToCustomerService" hover-class="item-hover">
+          <view class="menu-content-row">
+            <image class="icon-image" src="/images/icons/question.svg" />
+            <text class="menu-text">联系客服与帮助</text>
+          </view>
+          <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+        </view>
       </view>
+    </card-flat>
+    <card-flat>
+      <view class="menu-list">
+        <view class="menu-item" bindtap="showTerms" hover-class="item-hover">
+          <view class="menu-content-row">
+            <image class="icon-image" src="/images/icons/review/cheatsheet.svg" />
+            <text class="menu-text">用户服务协议</text>
+          </view>
+          <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+        </view>
+        <view class="menu-item" bindtap="showPrivacy" hover-class="item-hover">
+          <view class="menu-content-row">
+            <image class="icon-image" src="/images/icons/review/cheatsheet.svg" />
+            <text class="menu-text">隐私政策</text>
+          </view>
+          <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
+        </view>
+      </view>
+    </card-flat>
+    <view class="support-info">
+      <text>服务时间: {{serviceInfo.time}}</text>
+      <text>如需帮助，请使用上方「联系客服」或查看「联系客服与帮助」。</text>
     </view>
-  </card-flat>
-  <view class="support-info">
-    <text>服务时间: {{serviceInfo.time}}</text>
-    <text>如需帮助，请使用上方「联系客服」或查看「联系客服与帮助」。</text>
   </view>
-</view>
 </view>

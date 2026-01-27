@@ -596,9 +596,6 @@ export async function importCoursePackage(
     let courseId: number;
 
     if (existingCourse) {
-      if (publishOnImport) {
-        await archiveOtherPublishedCourses(db, pkg.manifest.courseKey, existingCourse.id);
-      }
       // 更新现有课程
       await db.studyCourse.update({
         where: { id: existingCourse.id },
@@ -611,9 +608,6 @@ export async function importCoursePackage(
       });
       courseId = existingCourse.id;
     } else {
-      if (publishOnImport) {
-        await archiveOtherPublishedCourses(db, pkg.manifest.courseKey);
-      }
       // 检查是否存在相同 courseKey 的其他版本
       const existingAnyVersion = await db.studyCourse.findFirst({
         where: { courseKey: pkg.manifest.courseKey },
@@ -821,6 +815,10 @@ export async function importCoursePackage(
 
     // 7. 更新课程统计
     await updateCourseTotals(db, courseId);
+
+    if (publishOnImport) {
+      await archiveOtherPublishedCourses(db, pkg.manifest.courseKey, courseId);
+    }
 
     result.success = true;
   } catch (error) {
