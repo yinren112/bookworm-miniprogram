@@ -2,7 +2,6 @@
 const api = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { safeCreateOrderAndPay } = require('../../utils/payment');
-const { extractErrorMessage } = require('../../utils/error');
 
 Page({
   data: {
@@ -52,9 +51,8 @@ Page({
         this.setData({ book: null, error: '该书籍已售出或不可用' });
       }
     } catch (error) {
-      const errorMsg = extractErrorMessage(error, '网络请求失败，无法获取书籍信息');
+      const errorMsg = ui.showError(error, { fallback: '网络请求失败，无法获取书籍信息' });
       this.setData({ book: null, error: errorMsg });
-      ui.showError(errorMsg);
     } finally {
       this.setData({ isLoading: false });
     }

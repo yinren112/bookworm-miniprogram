@@ -32,6 +32,34 @@ const ERROR_MESSAGES = {
 };
 
 /**
+ * 获取错误提示文案（不触发 UI）
+ * @param {string|Object} error - 错误码字符串或错误对象
+ * @param {Object} options - 可选配置
+ * @param {string} options.fallback - 自定义回退消息（当错误码未映射时使用）
+ */
+function getErrorMessage(error = 'UNKNOWN', options = {}) {
+  const { fallback } = options;
+
+  // 处理不同类型的 error 参数
+  if (typeof error === 'string') {
+    return ERROR_MESSAGES[error] || fallback || ERROR_MESSAGES.UNKNOWN;
+  }
+
+  if (error && typeof error === 'object') {
+    const errorCode = error.errorCode || error.code;
+    if (errorCode && ERROR_MESSAGES[errorCode]) {
+      return ERROR_MESSAGES[errorCode];
+    }
+
+    if (error.message && !containsSensitiveInfo(error.message)) {
+      return error.message;
+    }
+  }
+
+  return fallback || ERROR_MESSAGES.UNKNOWN;
+}
+
+/**
  * 显示错误提示（统一错误处理入口）
  * @param {string|Object} error - 错误码字符串或错误对象
  *   - 如果是字符串，将作为错误码从 ERROR_MESSAGES 映射
@@ -51,34 +79,16 @@ const ERROR_MESSAGES = {
  * showError('UNKNOWN_CODE', { fallback: '自定义错误提示' });
  */
 function showError(error = 'UNKNOWN', options = {}) {
-  const { fallback, duration = 2000 } = options;
-
-  let message;
-
-  // 处理不同类型的 error 参数
-  if (typeof error === 'string') {
-    // 直接传入错误码
-    message = ERROR_MESSAGES[error] || fallback || ERROR_MESSAGES.UNKNOWN;
-  } else if (error && typeof error === 'object') {
-    // 错误对象，优先使用 errorCode
-    const errorCode = error.errorCode || error.code;
-    if (errorCode && ERROR_MESSAGES[errorCode]) {
-      message = ERROR_MESSAGES[errorCode];
-    } else if (error.message && !containsSensitiveInfo(error.message)) {
-      // 如果有 message 且不包含敏感信息，使用它
-      message = error.message;
-    } else {
-      message = fallback || ERROR_MESSAGES.UNKNOWN;
-    }
-  } else {
-    message = fallback || ERROR_MESSAGES.UNKNOWN;
-  }
+  const { duration = 2000 } = options;
+  const message = getErrorMessage(error, options);
 
   wx.showToast({
     title: message,
     icon: 'none',
     duration
   });
+
+  return message;
 }
 
 /**
@@ -131,6 +141,7 @@ function formatPrice(value, decimals = 2, fallback = '0.00') {
 }
 
 module.exports = {
+  getErrorMessage,
   showError,
   showSuccess,
   formatPrice,

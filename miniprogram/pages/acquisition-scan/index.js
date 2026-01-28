@@ -1,7 +1,6 @@
 // pages/acquisition-scan/index.js
 const { checkAcquisition, createAcquisition } = require('../../utils/api');
 const ui = require('../../utils/ui');
-const { extractErrorMessage } = require('../../utils/error');
 const logger = require('../../utils/logger');
 const feedback = require('../../utils/ui/feedback');
 const { formatPrice } = ui;
@@ -152,8 +151,7 @@ Page({
       } catch (error) {
         wx.hideLoading();
         logger.error('Check acquisition failed:', error);
-        const errorMsg = extractErrorMessage(error, '查询失败');
-        ui.showError(errorMsg);
+        ui.showError(error, { fallback: '查询失败' });
       }
     } catch (scanError) {
       if (scanError && String(scanError.errMsg || '').includes('auth')) {
@@ -571,8 +569,7 @@ Page({
 
     } catch (error) {
       logger.error('Create acquisition failed:', error);
-      const errorMsg = extractErrorMessage(error, '提交失败');
-      ui.showError(errorMsg);
+      ui.showError(error, { fallback: '提交失败' });
       this.setData({ submitting: false });
     }
   }

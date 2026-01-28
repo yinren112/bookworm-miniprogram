@@ -2,7 +2,6 @@
 const { request } = require('../../utils/api');
 const ui = require('../../utils/ui');
 const { safeCreateOrderAndPay } = require('../../utils/payment');
-const { extractErrorMessage } = require('../../utils/error');
 const logger = require('../../utils/logger');
 const { applyCoverProxy } = require('../../utils/image');
 
@@ -61,9 +60,8 @@ Page({
       }
     } catch (error) {
       logger.error('API request failed', error);
-      const errorMsg = extractErrorMessage(error, '加载失败');
+      const errorMsg = ui.showError(error, { fallback: '加载失败' });
       this.setData({ error: errorMsg, notFound: false });
-      ui.showError(errorMsg);
     } finally {
       this.setData({ isLoading: false });
     }

@@ -3,7 +3,6 @@ const { request } = require('../../utils/api');
 const { ORDER_STATUS } = require('../../utils/constants');
 const tokenUtil = require('../../utils/token');
 const ui = require('../../utils/ui');
-const { extractErrorMessage } = require('../../utils/error');
 const { applyCoverProxy } = require('../../utils/image');
 
 Page({
@@ -65,7 +64,7 @@ Page({
         pageInfo: data.meta
       });
     } catch (error) {
-      const errorMsg = extractErrorMessage(error, '加载订单失败。');
+      const errorMsg = ui.showError(error, { fallback: '加载订单失败。' });
       this.setData({
         state: {
           status: 'error',
@@ -73,7 +72,6 @@ Page({
           error: errorMsg
         }
       });
-      ui.showError(errorMsg);
     }
   },
 

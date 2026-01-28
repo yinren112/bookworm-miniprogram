@@ -1,6 +1,6 @@
 // pages/order-detail/index.js
 const { request } = require('../../utils/api');
-const { extractErrorMessage } = require('../../utils/error');
+const ui = require('../../utils/ui');
 const { applyCoverProxy } = require('../../utils/image');
 
 Page({
@@ -52,7 +52,7 @@ Page({
         isLoading: false 
       });
     } catch (error) {
-      const errorMsg = extractErrorMessage(error, '获取订单详情失败');
+      const errorMsg = ui.getErrorMessage(error, { fallback: '获取订单详情失败' });
       this.setData({ 
         error: errorMsg,
         isLoading: false 

@@ -1,5 +1,5 @@
 const { request } = require('../../utils/api');
-const { extractErrorMessage } = require('../../utils/error');
+const ui = require('../../utils/ui');
 const logger = require('../../utils/logger');
 const { resolveContentWithFallback } = require('../../utils/content-resolver');
 
@@ -68,7 +68,7 @@ Page({
       logger.error('Content load failed', error);
       this.setData({
         isLoading: false,
-        errorMsg: extractErrorMessage(error, '内容加载失败')
+        errorMsg: ui.getErrorMessage(error, { fallback: '内容加载失败' })
       });
     }
   }

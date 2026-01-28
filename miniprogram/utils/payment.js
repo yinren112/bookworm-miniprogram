@@ -1,6 +1,5 @@
 const { request } = require('./api');
 const ui = require('./ui');
-const { extractErrorMessage } = require('./error');
 const { APP_CONFIG } = require('../config');
 const logger = require('./logger');
 
@@ -58,7 +57,7 @@ async function safeCreateOrderAndPay(inventoryItemIds) {
       wx.showToast({ title: '支付已取消', icon: 'none' });
       return { success: false, cancelled: true };
     }
-    ui.showError(extractErrorMessage(error, '网络请求失败'));
+    ui.showError(error, { fallback: '网络请求失败' });
     return { success: false, cancelled: false, error };
   }
 }

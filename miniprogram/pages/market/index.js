@@ -1,7 +1,6 @@
 // pages/market/index.js
 const { request, getRecommendations } = require('../../utils/api');
 const ui = require('../../utils/ui');
-const { extractErrorMessage } = require('../../utils/error');
 const { swrFetch } = require('../../utils/cache');
 const logger = require('../../utils/logger');
 const { applyCoverProxy } = require('../../utils/image');
@@ -103,7 +102,7 @@ Page({
       });
     } catch (error) {
       logger.error('API request failed', error);
-      const errorMsg = extractErrorMessage(error, '加载失败');
+      const errorMsg = ui.showError(error, { fallback: '加载失败' });
       // 失败时不清空旧数据（swrFetch 已降级返回缓存）
       this.setData({
         state: {
@@ -112,7 +111,6 @@ Page({
           error: errorMsg
         }
       });
-      ui.showError(errorMsg);
     }
   },
 
