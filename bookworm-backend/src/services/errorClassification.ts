@@ -1,6 +1,5 @@
 // src/services/errorClassification.ts
 // Unified error classification service for payment notifications
-// Implements Strategy + Chain of Responsibility patterns
 
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError, PaymentQueryError } from "../errors";
@@ -22,54 +21,42 @@ export interface ErrorClassification {
   logLevel: 'warn' | 'error';
 }
 
-/**
- * Error classifier interface
- *
- * Each classifier handles one specific error category.
- * Follows Single Responsibility Principle.
- */
-interface ErrorClassifier {
-  canHandle(error: unknown): boolean;
-  classify(error: unknown): ErrorClassification;
-}
+const SECURITY_ERROR_CODES = new Set([
+  'TIMESTAMP_INVALID',
+  'TIMESTAMP_EXPIRED',
+  'SIGNATURE_INVALID',
+]);
 
-/**
- * Security Validation Error Classifier
- *
- * Handles: TIMESTAMP_INVALID, TIMESTAMP_EXPIRED, SIGNATURE_INVALID
- * Policy: Permanent errors (no retry), but response depends on WXPAY_ACK_STRICT mode
- */
-class SecurityValidationErrorClassifier implements ErrorClassifier {
-  canHandle(error: unknown): boolean {
-    return error instanceof ApiError &&
-           ['TIMESTAMP_INVALID', 'TIMESTAMP_EXPIRED', 'SIGNATURE_INVALID'].includes(error.code);
-  }
+const TRANSIENT_BUSINESS_CODES = new Set([
+  'PAY_TRANSIENT_STATE',
+]);
 
-  classify(_: unknown): ErrorClassification {
+const TRANSIENT_QUERY_CODES = new Set([
+  'WECHAT_QUERY_FAILED_TRANSIENT',
+]);
+
+const DB_TRANSIENT_CODES = new Set([
+  'P1001',
+  'P1002',
+  'P1008',
+]);
+
+function classifyPaymentError(error: unknown): ErrorClassification {
+  if (error instanceof ApiError && SECURITY_ERROR_CODES.has(error.code)) {
     const strictMode = process.env.WXPAY_ACK_STRICT === 'true';
     return {
       httpStatus: strictMode ? 400 : 200,
       responseCode: strictMode ? "BAD_REQUEST" : WECHAT_CONSTANTS.SUCCESS_CODE,
       responseMessage: strictMode ? "Security validation failed" : WECHAT_CONSTANTS.SUCCESS_MESSAGE,
-      shouldRetry: false, // Permanent error
+      shouldRetry: false,
       logLevel: 'warn',
     };
   }
-}
 
-/**
- * Transient Business Error Classifier
- *
- * Handles: PAY_TRANSIENT_STATE, WECHAT_QUERY_FAILED_TRANSIENT
- * Policy: Temporary errors (should retry)
- */
-class TransientBusinessErrorClassifier implements ErrorClassifier {
-  canHandle(error: unknown): boolean {
-    return (error instanceof ApiError && error.code === 'PAY_TRANSIENT_STATE') ||
-           (error instanceof PaymentQueryError && error.code === 'WECHAT_QUERY_FAILED_TRANSIENT');
-  }
-
-  classify(_: unknown): ErrorClassification {
+  if (
+    (error instanceof ApiError && TRANSIENT_BUSINESS_CODES.has(error.code)) ||
+    (error instanceof PaymentQueryError && TRANSIENT_QUERY_CODES.has(error.code))
+  ) {
     return {
       httpStatus: 503,
       responseCode: WECHAT_CONSTANTS.FAIL_CODE,
@@ -78,23 +65,8 @@ class TransientBusinessErrorClassifier implements ErrorClassifier {
       logLevel: 'warn',
     };
   }
-}
 
-/**
- * Database Transient Error Classifier
- *
- * Handles: P1001 (connection failed), P1002 (timeout), P1008 (operation timeout)
- * Policy: Temporary errors (should retry)
- */
-class DatabaseTransientErrorClassifier implements ErrorClassifier {
-  private transientCodes = ['P1001', 'P1002', 'P1008'];
-
-  canHandle(error: unknown): boolean {
-    return error instanceof PrismaClientKnownRequestError &&
-           this.transientCodes.includes(error.code);
-  }
-
-  classify(_: unknown): ErrorClassification {
+  if (error instanceof PrismaClientKnownRequestError && DB_TRANSIENT_CODES.has(error.code)) {
     return {
       httpStatus: 503,
       responseCode: WECHAT_CONSTANTS.FAIL_CODE,
@@ -103,28 +75,14 @@ class DatabaseTransientErrorClassifier implements ErrorClassifier {
       logLevel: 'error',
     };
   }
-}
 
-/**
- * Default Error Classifier (Fallback)
- *
- * Handles: All other errors
- * Policy: Treat as permanent errors, return 200 to prevent infinite retries
- */
-class DefaultErrorClassifier implements ErrorClassifier {
-  canHandle(_: unknown): boolean {
-    return true; // Catch-all
-  }
-
-  classify(_: unknown): ErrorClassification {
-    return {
-      httpStatus: 200,
-      responseCode: WECHAT_CONSTANTS.SUCCESS_CODE,
-      responseMessage: WECHAT_CONSTANTS.SUCCESS_MESSAGE,
-      shouldRetry: false, // Permanent error, avoid retry storm
-      logLevel: 'warn',
-    };
-  }
+  return {
+    httpStatus: 200,
+    responseCode: WECHAT_CONSTANTS.SUCCESS_CODE,
+    responseMessage: WECHAT_CONSTANTS.SUCCESS_MESSAGE,
+    shouldRetry: false,
+    logLevel: 'warn',
+  };
 }
 
 /**
@@ -143,17 +101,6 @@ class DefaultErrorClassifier implements ErrorClassifier {
  * ```
  */
 export class PaymentErrorClassificationService {
-  private classifiers: ErrorClassifier[];
-
-  constructor() {
-    this.classifiers = [
-      new SecurityValidationErrorClassifier(),
-      new TransientBusinessErrorClassifier(),
-      new DatabaseTransientErrorClassifier(),
-      new DefaultErrorClassifier(), // MUST be last (catch-all)
-    ];
-  }
-
   /**
    * Classify an error into HTTP response parameters
    *
@@ -161,14 +108,7 @@ export class PaymentErrorClassificationService {
    * @returns Error classification with HTTP status, response code, and retry policy
    */
   classify(error: unknown): ErrorClassification {
-    for (const classifier of this.classifiers) {
-      if (classifier.canHandle(error)) {
-        return classifier.classify(error);
-      }
-    }
-
-    // Unreachable: DefaultErrorClassifier always handles
-    throw new Error('Unreachable: DefaultErrorClassifier should catch all errors');
+    return classifyPaymentError(error);
   }
 }
 
