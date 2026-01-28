@@ -5,12 +5,12 @@ import crypto from "crypto";
 import { PrismaClient, Prisma, StudyReminderStatus } from "@prisma/client";
 import config from "../../config";
 import { retryAsync } from "../../utils/retry";
-import { getBeijingNow, isSameDayBeijing, toBeijingDate } from "../../utils/timezone";
-import { getUserEnrolledCourses, getCourseByKey } from "./courseService";
+import { isSameDayBeijing, toBeijingDate } from "../../utils/timezone";
+import { getCourseByKey } from "./courseService";
 import { getTodayQueueSummary } from "./cardScheduler";
 import { WECHAT_CONSTANTS } from "../../constants";
 import { log } from "../../lib/logger";
-import { questionAttemptQuestionIdView, reminderSubscriptionWithUserInclude } from "../../db/views";
+import { enrollmentCourseKeyView, questionAttemptQuestionIdView, reminderSubscriptionWithUserInclude } from "../../db/views";
 import { REMINDER_TEMPLATE_KEYS } from "./studyReminderTemplate";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
@@ -54,6 +54,67 @@ interface WxAccessTokenResponse {
 
 let accessTokenCache: { token: string; expiresAt: number } | null = null;
 let accessTokenPromise: Promise<string> | null = null;
+
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getZonedDateParts(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const lookup: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      lookup[part.type] = part.value;
+    }
+  }
+  return {
+    year: Number(lookup.year),
+    month: Number(lookup.month),
+    day: Number(lookup.day),
+    hour: Number(lookup.hour),
+    minute: Number(lookup.minute),
+    second: Number(lookup.second),
+  };
+}
+
+function getTimeZoneOffsetMinutes(timeZone: string, date: Date): number {
+  const zoned = getZonedDateParts(date, timeZone);
+  const utcTimestamp = Date.UTC(
+    zoned.year,
+    zoned.month - 1,
+    zoned.day,
+    zoned.hour,
+    zoned.minute,
+    zoned.second,
+  );
+  return (utcTimestamp - date.getTime()) / 60000;
+}
+
+function zonedTimeToUtcDate(
+  timeZone: string,
+  parts: { year: number; month: number; day: number; hour: number; minute: number; second: number },
+): Date {
+  const utcApprox = new Date(
+    Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second),
+  );
+  const offsetMinutes = getTimeZoneOffsetMinutes(timeZone, utcApprox);
+  return new Date(utcApprox.getTime() - offsetMinutes * 60 * 1000);
+}
 
 export async function upsertStudyReminderSubscription(
   dbCtx: DbCtx,
@@ -260,28 +321,18 @@ export async function sendStudyReminders(dbCtx: PrismaClient): Promise<ReminderS
 }
 
 function getNextSendAt(now: Date, timezone: string): Date {
-  if (timezone !== DEFAULT_TIMEZONE) {
-    return getNextSendAt(now, DEFAULT_TIMEZONE);
-  }
-
-  const beijingNow = getBeijingNow();
-  const targetDate = new Date(
-    Date.UTC(
-      beijingNow.getFullYear(),
-      beijingNow.getMonth(),
-      beijingNow.getDate() + 1,
-      DEFAULT_SEND_HOUR,
-      DEFAULT_SEND_MINUTE,
-      0,
-      0,
-    ) - 8 * 60 * 60 * 1000,
-  );
-
-  if (targetDate <= now) {
-    targetDate.setDate(targetDate.getDate() + 1);
-  }
-
-  return targetDate;
+  const resolvedTimezone = isValidTimeZone(timezone) ? timezone : DEFAULT_TIMEZONE;
+  const nowParts = getZonedDateParts(now, resolvedTimezone);
+  const baseUtc = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day));
+  const nextDayUtc = new Date(baseUtc.getTime() + 24 * 60 * 60 * 1000);
+  return zonedTimeToUtcDate(resolvedTimezone, {
+    year: nextDayUtc.getUTCFullYear(),
+    month: nextDayUtc.getUTCMonth() + 1,
+    day: nextDayUtc.getUTCDate(),
+    hour: DEFAULT_SEND_HOUR,
+    minute: DEFAULT_SEND_MINUTE,
+    second: 0,
+  });
 }
 
 async function updateNextSendAt(
@@ -342,11 +393,24 @@ async function resolveCurrentCourse(
   dbCtx: PrismaClient,
   userId: number,
 ): Promise<{ id: number; courseKey: string; title: string; totalCards: number; totalQuestions: number } | null> {
-  const courses = await getUserEnrolledCourses(dbCtx, userId);
-  const current = courses[0];
-  if (!current) return null;
+  // 明确规则：优先“最近学习”的课程；若从未学习，则取最近注册
+  const enrollment = await dbCtx.userCourseEnrollment.findFirst({
+    where: { userId, isActive: true },
+    orderBy: [
+      { lastStudiedAt: { sort: "desc", nulls: "last" } },
+      { enrolledAt: "desc" },
+    ],
+    select: enrollmentCourseKeyView,
+  });
 
-  const course = await getCourseByKey(dbCtx, current.courseKey, { userId, publishedOnly: true });
+  if (!enrollment?.course?.courseKey) {
+    return null;
+  }
+
+  const course = await getCourseByKey(dbCtx, enrollment.course.courseKey, {
+    userId,
+    publishedOnly: true,
+  });
   if (!course) return null;
 
   return {

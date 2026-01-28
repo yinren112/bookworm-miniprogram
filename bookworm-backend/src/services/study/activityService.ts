@@ -3,7 +3,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { dailyStudyActivityHistoryView } from "../../db/views";
-import { getBeijingNow } from "../../utils/timezone";
+import { getBeijingDateOnlyString } from "../../utils/timezone";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -91,10 +91,7 @@ export async function getActivityHistory(
   userId: number,
   days: number = 35
 ): Promise<ActivityHistory> {
-  const beijingNow = getBeijingNow();
-  const todayDateOnlyUtc = new Date(
-    Date.UTC(beijingNow.getFullYear(), beijingNow.getMonth(), beijingNow.getDate()),
-  );
+  const todayDateOnlyUtc = parseYmdToDateOnlyUtc(getBeijingDateOnlyString());
   const startDateOnlyUtc = new Date(
     todayDateOnlyUtc.getTime() - (days - 1) * 24 * 60 * 60 * 1000,
   );

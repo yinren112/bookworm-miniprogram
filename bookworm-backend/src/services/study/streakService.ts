@@ -4,7 +4,7 @@
 import { PrismaClient } from "@prisma/client";
 import { streakWithUserInclude } from "../../db/views";
 import {
-  getBeijingNow,
+  getBeijingDateOnlyString,
   isSameDayBeijing,
   isYesterdayBeijing,
 } from "../../utils/timezone";
@@ -30,14 +30,9 @@ export interface LeaderboardEntry {
 
 // 使用统一的时区工具函数
 const getBeijingDateOnlyUtc = (): Date => {
-  const beijingNow = getBeijingNow();
-  return new Date(
-    Date.UTC(
-      beijingNow.getFullYear(),
-      beijingNow.getMonth(),
-      beijingNow.getDate(),
-    ),
-  );
+  const ymd = getBeijingDateOnlyString();
+  const [year, month, day] = ymd.split("-").map((value) => Number(value));
+  return new Date(Date.UTC(year, month - 1, day));
 };
 
 const getBeijingWeekStartUtc = (): Date => {

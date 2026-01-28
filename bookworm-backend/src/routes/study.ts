@@ -13,7 +13,7 @@ import {
 } from "../db/views";
 import { ApiError, StudyServiceError, StudyErrorCodes } from "../errors";
 import { CourseStatus } from "@prisma/client";
-import { getBeijingNow } from "../utils/timezone";
+import { getBeijingDateOnlyString } from "../utils/timezone";
 import {
   assertIncludeUnpublishedAllowed,
   shouldIncludeUnpublishedFallback,
@@ -1150,10 +1150,7 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         throw new ApiError(400, "activityDate 无效", "INVALID_ACTIVITY_DATE");
       }
 
-      const beijingNow = getBeijingNow();
-      const todayDateOnlyUtc = new Date(
-        Date.UTC(beijingNow.getFullYear(), beijingNow.getMonth(), beijingNow.getDate()),
-      );
+      const todayDateOnlyUtc = parseYmdToDateOnlyUtc(getBeijingDateOnlyString());
 
       const maxBackfillDays = 7;
       const minDateOnlyUtc = new Date(
