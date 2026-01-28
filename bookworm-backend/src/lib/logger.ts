@@ -28,6 +28,40 @@ export const logger = pino({
   }
 });
 
+const isErrorLike = (value: unknown): value is Error => value instanceof Error;
+
+const formatLogArgs = (args: unknown[], defaultMessage: string) => {
+  if (args.length === 0) {
+    return { payload: {}, message: defaultMessage };
+  }
+
+  if (args.length === 1) {
+    const [first] = args;
+    if (isErrorLike(first)) {
+      return { payload: { err: first }, message: first.message || defaultMessage };
+    }
+    if (typeof first === "object") {
+      return { payload: first };
+    }
+    return { payload: { data: [first] }, message: defaultMessage };
+  }
+
+  if (args.length === 2) {
+    const [first, second] = args;
+    if (isErrorLike(first) && typeof second === "string") {
+      return { payload: { err: first }, message: second };
+    }
+    if (typeof first === "string" && isErrorLike(second)) {
+      return { payload: { err: second }, message: first };
+    }
+    if (typeof first === "object" && typeof second === "string") {
+      return { payload: first, message: second };
+    }
+  }
+
+  return { payload: { data: args }, message: defaultMessage };
+};
+
 /**
  * 便捷日志方法
  */
@@ -38,12 +72,11 @@ export const log = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) => {
     if (enableDebug) {
-      if (args.length === 1 && typeof args[0] === 'object') {
-        logger.debug(args[0]);
-      } else if (args.length === 2 && typeof args[0] === 'object' && typeof args[1] === 'string') {
-        logger.debug(args[0], args[1]);
+      const { payload, message } = formatLogArgs(args, "debug log");
+      if (message) {
+        logger.debug(payload, message);
       } else {
-        logger.debug({ data: args }, 'debug log');
+        logger.debug(payload);
       }
     }
   },
@@ -53,12 +86,11 @@ export const log = {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   info: (...args: any[]) => {
-    if (args.length === 1 && typeof args[0] === 'object') {
-      logger.info(args[0]);
-    } else if (args.length === 2 && typeof args[0] === 'object' && typeof args[1] === 'string') {
-      logger.info(args[0], args[1]);
+    const { payload, message } = formatLogArgs(args, "info log");
+    if (message) {
+      logger.info(payload, message);
     } else {
-      logger.info({ data: args }, 'info log');
+      logger.info(payload);
     }
   },
 
@@ -67,12 +99,11 @@ export const log = {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   warn: (...args: any[]) => {
-    if (args.length === 1 && typeof args[0] === 'object') {
-      logger.warn(args[0]);
-    } else if (args.length === 2 && typeof args[0] === 'object' && typeof args[1] === 'string') {
-      logger.warn(args[0], args[1]);
+    const { payload, message } = formatLogArgs(args, "warn log");
+    if (message) {
+      logger.warn(payload, message);
     } else {
-      logger.warn({ data: args }, 'warn log');
+      logger.warn(payload);
     }
   },
 
@@ -81,12 +112,11 @@ export const log = {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) => {
-    if (args.length === 1 && typeof args[0] === 'object') {
-      logger.error(args[0]);
-    } else if (args.length === 2 && typeof args[0] === 'object' && typeof args[1] === 'string') {
-      logger.error(args[0], args[1]);
+    const { payload, message } = formatLogArgs(args, "error log");
+    if (message) {
+      logger.error(payload, message);
     } else {
-      logger.error({ data: args }, 'error log');
+      logger.error(payload);
     }
   },
 };

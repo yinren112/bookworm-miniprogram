@@ -502,7 +502,7 @@ describe("validateCoursePackage", () => {
 
     const errors = validateCoursePackage(pkg);
 
-    expect(errors.some((e) => e.includes("Missing required field 'contentId'"))).toBe(true);
+    expect(errors.some((e) => e.includes("schema:cards/u1/0/contentId"))).toBe(true);
   });
 
   it("should detect missing front in card", () => {
@@ -513,7 +513,7 @@ describe("validateCoursePackage", () => {
 
     const errors = validateCoursePackage(pkg);
 
-    expect(errors.some((e) => e.includes("Missing required field 'front'"))).toBe(true);
+    expect(errors.some((e) => e.includes("schema:cards/u1/0/front"))).toBe(true);
   });
 
   it("should detect unbalanced LaTeX delimiters", () => {
@@ -619,6 +619,6 @@ describe("validateCoursePackage", () => {
 
     const errors = validateCoursePackage(pkg);
 
-    expect(errors.some((e) => e.includes("Missing required field 'stem'"))).toBe(true);
+    expect(errors.some((e) => e.includes("schema:questions/u1/0/stem"))).toBe(true);
   });
 });

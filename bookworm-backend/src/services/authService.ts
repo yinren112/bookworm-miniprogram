@@ -4,7 +4,7 @@ import { createSigner } from "fast-jwt";
 import { PrismaClient, Prisma, User } from "@prisma/client";
 import config from "../config";
 import { metrics } from "../plugins/metrics";
-import { WECHAT_CONSTANTS } from "../constants";
+import { BUSINESS_LIMITS, WECHAT_CONSTANTS } from "../constants";
 import { findPreRegisteredUserByPhone, findConflictingRegisteredUser, findUserByUnionId as findUserByUnionIdQuery, findUserByOpenId as findUserByOpenIdQuery } from "./auth/userQueries";
 import { upgradePreRegisteredUser, resolveConflictAndMerge, updateUserOpenId as updateUserOpenIdOp, updateUserUnionId as updateUserUnionIdOp, createUser as createUserOp } from "./auth/userOperations";
 import { log } from "../lib/logger";
@@ -14,6 +14,13 @@ type DbCtx = PrismaClient | Prisma.TransactionClient;
 interface WxSession {
   openid: string;
   unionid?: string;
+}
+
+interface WxSessionResponse {
+  openid?: string;
+  unionid?: string;
+  errcode?: number;
+  errmsg?: string;
 }
 
 interface WxAccessTokenResponse {
@@ -31,6 +38,64 @@ interface WxPhoneNumberResponse {
     purePhoneNumber: string;
     countryCode: string;
   };
+}
+
+type WxPhoneNumberResult =
+  | { status: "ok"; phoneNumber: string }
+  | { status: "failed"; retryable: boolean; reason: string; errcode?: number; httpStatus?: number };
+
+const WECHAT_RETRYABLE_ERRCODES = new Set([-1, 40001, 40014, 42001, 45011]);
+const WECHAT_TOKEN_INVALID_ERRCODES = new Set([40001, 40014, 42001]);
+
+class WechatRequestError extends Error {
+  public retryable: boolean;
+  public errcode?: number;
+  public httpStatus?: number;
+  public originalError?: unknown;
+
+  constructor(
+    message: string,
+    options: { retryable: boolean; errcode?: number; httpStatus?: number; originalError?: unknown },
+  ) {
+    super(message);
+    this.name = "WechatRequestError";
+    this.retryable = options.retryable;
+    this.errcode = options.errcode;
+    this.httpStatus = options.httpStatus;
+    this.originalError = options.originalError;
+  }
+}
+
+const isRetryableWechatErrcode = (errcode?: number) =>
+  typeof errcode === "number" && WECHAT_RETRYABLE_ERRCODES.has(errcode);
+
+const isRetryableAxiosError = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return false;
+  if (!error.response) return true;
+  const status = error.response.status;
+  return status >= 500 || status === 408 || status === 429;
+};
+
+async function retryWechatRequest<T>(
+  fn: () => Promise<T>,
+  shouldRetry: (error: unknown) => boolean,
+): Promise<T> {
+  for (let attempt = 0; attempt < BUSINESS_LIMITS.WECHAT_API_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= BUSINESS_LIMITS.WECHAT_API_RETRY_ATTEMPTS - 1 || !shouldRetry(error)) {
+        throw error;
+      }
+      const backoffDelay = BUSINESS_LIMITS.WECHAT_API_RETRY_DELAY_MS * Math.pow(2, attempt);
+      log.debug(
+        { attempt: attempt + 1, attempts: BUSINESS_LIMITS.WECHAT_API_RETRY_ATTEMPTS, backoffDelay },
+        `WeChat request failed, retrying in ${backoffDelay}ms`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+    }
+  }
+  throw new Error("WeChat retry logic failed unexpectedly.");
 }
 
 // Simple in-memory cache for access_token
@@ -143,13 +208,48 @@ export async function requestWxSession(code: string): Promise<WxSession> {
   }
 
   const url = `${WECHAT_CONSTANTS.JSCODE2SESSION_URL}?appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}&js_code=${code}&grant_type=${WECHAT_CONSTANTS.GRANT_TYPE}`;
-  const { data } = await axios.get(url);
+  const session = await retryWechatRequest(
+    async () => {
+      try {
+        const { data } = await axios.get<WxSessionResponse>(url, {
+          timeout: BUSINESS_LIMITS.WECHAT_API_TIMEOUT_MS,
+        });
 
-  if (data.errcode) {
-    throw new Error(`WeChat API Error: ${data.errmsg}`);
-  }
+        if (data.errcode) {
+          throw new WechatRequestError(`WeChat API Error: ${data.errmsg}`, {
+            retryable: isRetryableWechatErrcode(data.errcode),
+            errcode: data.errcode,
+          });
+        }
 
-  return data as WxSession;
+        if (!data.openid) {
+          throw new WechatRequestError("WeChat session response missing openid", {
+            retryable: false,
+          });
+        }
+
+        return data as WxSession;
+      } catch (error) {
+        if (error instanceof WechatRequestError) {
+          throw error;
+        }
+        if (axios.isAxiosError(error)) {
+          throw new WechatRequestError("WeChat session request failed", {
+            retryable: isRetryableAxiosError(error),
+            httpStatus: error.response?.status,
+            originalError: error,
+          });
+        }
+        throw new WechatRequestError("WeChat session request failed", {
+          retryable: false,
+          originalError: error,
+        });
+      }
+    },
+    (error) => error instanceof WechatRequestError && error.retryable,
+  );
+
+  return session;
 }
 
 async function getAccessToken(): Promise<string> {
@@ -169,10 +269,35 @@ async function getAccessToken(): Promise<string> {
     try {
       // Fetch new access_token from WeChat
       const url = `${WECHAT_CONSTANTS.GET_ACCESS_TOKEN_URL}?grant_type=client_credential&appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}`;
-      const { data } = await axios.get<WxAccessTokenResponse>(url);
+      let data: WxAccessTokenResponse;
+
+      try {
+        const response = await axios.get<WxAccessTokenResponse>(url, {
+          timeout: BUSINESS_LIMITS.WECHAT_API_TIMEOUT_MS,
+        });
+        data = response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          throw new WechatRequestError("WeChat access token request failed", {
+            retryable: isRetryableAxiosError(error),
+            httpStatus: error.response?.status,
+            originalError: error,
+          });
+        }
+        throw new WechatRequestError("WeChat access token request failed", {
+          retryable: false,
+          originalError: error,
+        });
+      }
 
       if (data.errcode || !data.access_token || !data.expires_in) {
-        throw new Error(`WeChat Access Token Error: ${data.errmsg || 'Invalid response'}`);
+        throw new WechatRequestError(
+          `WeChat Access Token Error: ${data.errmsg || "Invalid response"}`,
+          {
+            retryable: isRetryableWechatErrcode(data.errcode),
+            errcode: data.errcode,
+          },
+        );
       }
 
       // After validation, we know access_token and expires_in are defined
@@ -196,33 +321,96 @@ async function getAccessToken(): Promise<string> {
   return accessTokenPromise;
 }
 
-export async function requestWxPhoneNumber(phoneCode: string): Promise<string | null> {
+export async function requestWxPhoneNumber(phoneCode: string): Promise<WxPhoneNumberResult> {
   if (
     (config.NODE_ENV !== "production" && config.NODE_ENV !== "staging") ||
     config.WX_APP_ID.startsWith("dummy") ||
     config.WX_APP_SECRET.startsWith("dummy")
   ) {
     // Development: Return mock phone number
-    return "13800138000";
+    return { status: "ok", phoneNumber: "13800138000" };
   }
 
   try {
-    const accessToken = await getAccessToken();
-    const url = `${WECHAT_CONSTANTS.GET_PHONE_NUMBER_URL}?access_token=${accessToken}`;
+    return await retryWechatRequest(
+      async () => {
+        try {
+          const accessToken = await getAccessToken();
+          const url = `${WECHAT_CONSTANTS.GET_PHONE_NUMBER_URL}?access_token=${accessToken}`;
 
-    const { data } = await axios.post<WxPhoneNumberResponse>(url, {
-      code: phoneCode,
-    });
+          const { data } = await axios.post<WxPhoneNumberResponse>(
+            url,
+            { code: phoneCode },
+            { timeout: BUSINESS_LIMITS.WECHAT_API_TIMEOUT_MS },
+          );
 
-    if (data.errcode !== 0) {
-      log.warn(`Failed to get phone number from WeChat: ${data.errmsg}`);
-      return null;
-    }
+          if (data.errcode !== 0) {
+            if (WECHAT_TOKEN_INVALID_ERRCODES.has(data.errcode)) {
+              accessTokenCache = null;
+            }
+            const retryable = isRetryableWechatErrcode(data.errcode);
+            if (retryable) {
+              throw new WechatRequestError(`WeChat phone number error: ${data.errmsg}`, {
+                retryable: true,
+                errcode: data.errcode,
+              });
+            }
+            return {
+              status: "failed",
+              retryable: false,
+              reason: data.errmsg || "WECHAT_PHONE_NUMBER_ERROR",
+              errcode: data.errcode,
+            };
+          }
 
-    return data.phone_info?.purePhoneNumber || null;
+          const phoneNumber = data.phone_info?.purePhoneNumber;
+          if (!phoneNumber) {
+            return {
+              status: "failed",
+              retryable: false,
+              reason: "WECHAT_PHONE_NUMBER_MISSING",
+              errcode: data.errcode,
+            };
+          }
+
+          return { status: "ok", phoneNumber };
+        } catch (error) {
+          if (error instanceof WechatRequestError) {
+            throw error;
+          }
+          if (axios.isAxiosError(error)) {
+            throw new WechatRequestError("WeChat phone number request failed", {
+              retryable: isRetryableAxiosError(error),
+              httpStatus: error.response?.status,
+              originalError: error,
+            });
+          }
+          throw new WechatRequestError("WeChat phone number request failed", {
+            retryable: false,
+            originalError: error,
+          });
+        }
+      },
+      (error) => error instanceof WechatRequestError && error.retryable,
+    );
   } catch (error) {
-    log.error("Error fetching WeChat phone number:", error);
-    return null;
+    if (error instanceof WechatRequestError && !error.retryable) {
+      return {
+        status: "failed",
+        retryable: false,
+        reason: error.message,
+        errcode: error.errcode,
+        httpStatus: error.httpStatus,
+      };
+    }
+    log.warn({ err: error }, "WeChat phone number request failed after retries");
+    return {
+      status: "failed",
+      retryable: true,
+      reason: "WECHAT_PHONE_NUMBER_RETRY_EXHAUSTED",
+      errcode: error instanceof WechatRequestError ? error.errcode : undefined,
+      httpStatus: error instanceof WechatRequestError ? error.httpStatus : undefined,
+    };
   }
 }
 

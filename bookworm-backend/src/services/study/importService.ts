@@ -3,6 +3,7 @@
 
 import { Prisma, PrismaClient, QuestionType, CourseStatus } from "@prisma/client";
 import crypto from "crypto";
+import { Value } from "@sinclair/typebox/value";
 import {
   courseIdStatusView,
   courseIdVersionView,
@@ -13,6 +14,7 @@ import {
   questionIdOnlyView,
   cheatsheetIdView,
 } from "../../db/views";
+import { ImportCourseBodySchema } from "../../routes/studySchemas";
 import { updateCourseTotals, archiveOtherPublishedCourses } from "./courseService";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
@@ -429,6 +431,30 @@ function hasBalancedDelimiters(text: string, delimiter: string): boolean {
   return count % 2 === 0;
 }
 
+function mapToRecord<T>(map: Map<string, T[]>): Record<string, T[]> | undefined {
+  if (map.size === 0) return undefined;
+  const record: Record<string, T[]> = {};
+  for (const [key, value] of map.entries()) {
+    record[key] = value;
+  }
+  return record;
+}
+
+function buildImportBody(pkg: CoursePackage) {
+  return {
+    manifest: pkg.manifest,
+    units: pkg.units,
+    cards: mapToRecord(pkg.cards),
+    questions: mapToRecord(pkg.questions),
+    cheatsheets: pkg.cheatsheets.length > 0 ? pkg.cheatsheets : undefined,
+  };
+}
+
+function formatSchemaError(path: string, message: string) {
+  const normalizedPath = path ? path.replace(/^\//, "") : "(root)";
+  return `schema:${normalizedPath} ${message}`;
+}
+
 /**
  * Dry-run 模式的完整数据验证
  * 返回验证错误列表
@@ -436,6 +462,10 @@ function hasBalancedDelimiters(text: string, delimiter: string): boolean {
  */
 export function validateCoursePackage(pkg: CoursePackage): string[] {
   const errors: string[] = [];
+  const importBody = buildImportBody(pkg);
+  for (const error of Value.Errors(ImportCourseBodySchema, importBody)) {
+    errors.push(formatSchemaError(error.path, error.message));
+  }
 
   // 1. 验证 units 定义
   const definedUnits = new Set(pkg.units.map((u) => u.unitKey));
@@ -449,17 +479,6 @@ export function validateCoursePackage(pkg: CoursePackage): string[] {
 
     for (const card of cards) {
       const prefix = `cards/${unitKey}/${card.contentId || "unknown"}`;
-
-      // 2.2 必填字段检查
-      if (!card.contentId) {
-        errors.push(`${prefix}: Missing required field 'contentId'`);
-      }
-      if (!card.front) {
-        errors.push(`${prefix}: Missing required field 'front'`);
-      }
-      if (!card.back) {
-        errors.push(`${prefix}: Missing required field 'back'`);
-      }
 
       // 2.3 LaTeX 公式平衡检查
       if (card.front && !hasBalancedDelimiters(card.front, "$$")) {
@@ -480,17 +499,6 @@ export function validateCoursePackage(pkg: CoursePackage): string[] {
 
     for (const q of questions) {
       const prefix = `questions/${unitKey}/${q.contentId || "unknown"}`;
-
-      // 3.2 必填字段检查
-      if (!q.contentId) {
-        errors.push(`${prefix}: Missing required field 'contentId'`);
-      }
-      if (!q.stem) {
-        errors.push(`${prefix}: Missing required field 'stem'`);
-      }
-      if (!q.answer) {
-        errors.push(`${prefix}: Missing required field 'answer'`);
-      }
 
       // 3.3 选择题选项数量检查
       if (

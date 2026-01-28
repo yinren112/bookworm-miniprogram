@@ -236,6 +236,7 @@ fastify.setErrorHandler(
       const statusCodeMap: Record<string, number> = {
         // External service errors
         'METADATA_SERVICE_UNAVAILABLE': 503,
+        'WECHAT_PHONE_NUMBER_UNAVAILABLE': 503,
         // Image proxy errors
         'IMAGE_PROXY_INVALID_URL': 400,
         'IMAGE_PROXY_HOST_NOT_ALLOWED': 403,
