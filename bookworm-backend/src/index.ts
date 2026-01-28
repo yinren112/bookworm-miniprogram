@@ -232,9 +232,21 @@ fastify.setErrorHandler(
     // Layer 4a: Service layer errors (ServiceError) - map to HTTP status codes
     if (error instanceof ServiceError) {
       // Map service error codes to HTTP status codes
+      // NOTE: All new ServiceError codes MUST be added here with explicit HTTP status
       const statusCodeMap: Record<string, number> = {
+        // External service errors
         'METADATA_SERVICE_UNAVAILABLE': 503,
-        // Add more mappings as needed
+        // Image proxy errors
+        'IMAGE_PROXY_INVALID_URL': 400,
+        'IMAGE_PROXY_HOST_NOT_ALLOWED': 403,
+        'IMAGE_PROXY_FETCH_FAILED': 502,
+        // Study module errors (StudyServiceError)
+        'COURSE_NOT_FOUND': 404,
+        'COURSE_NOT_PUBLISHED': 400,
+        'CARD_NOT_FOUND': 404,
+        'CARD_DAILY_LIMIT_REACHED': 429,
+        'QUESTION_NOT_FOUND': 404,
+        'FEEDBACK_TARGET_REQUIRED': 400,
       };
       const statusCode = statusCodeMap[error.code] || 500;
 

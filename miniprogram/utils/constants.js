@@ -35,6 +35,10 @@ const TERMS_VERSION_KEY = 'termsVersion';
 const TERMS_VERSION = 'v1';
 const HOME_TAB_URL = '/pages/review/index';
 
+// ETA 计算常量（与后端 dashboardService.ts 保持一致）
+const CARD_SECONDS_PER_ITEM = 8;
+const QUIZ_SECONDS_PER_ITEM = 30;
+
 module.exports = {
   ORDER_STATUS,
   ORDER_STATUS_COLOR,
@@ -48,4 +52,6 @@ module.exports = {
   TERMS_VERSION_KEY,
   TERMS_VERSION,
   HOME_TAB_URL,
+  CARD_SECONDS_PER_ITEM,
+  QUIZ_SECONDS_PER_ITEM,
 };

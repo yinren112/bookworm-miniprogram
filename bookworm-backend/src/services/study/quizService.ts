@@ -13,6 +13,7 @@ import {
 import { recordActivity } from "./streakService";
 import { log } from "../../lib/logger";
 import { isPrismaUniqueConstraintError } from "../../utils/typeGuards";
+import { StudyServiceError, StudyErrorCodes } from "../../errors";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -173,35 +174,22 @@ export async function submitQuizAnswer(
   });
 
   if (!question) {
-    throw new Error("QUESTION_NOT_FOUND");
+    throw new StudyServiceError(StudyErrorCodes.QUESTION_NOT_FOUND, "Question not found");
   }
+
+  const correctOptionIndices = extractCorrectOptionIndices(
+    question.questionType,
+    question.optionsJson,
+    question.answerJson,
+  );
 
   // 幂等性检查：查询是否已存在提交记录
   const existingAttempt = await db.userQuestionAttempt.findUnique({
-    where: {
-      sessionId_userId_questionId: { sessionId, userId, questionId },
-    },
+    where: { sessionId_userId_questionId: { sessionId, userId, questionId } },
   });
 
   if (existingAttempt) {
-    // 幂等返回：查询已有结果，不重复处理
-    const wrongItem = await db.userWrongItem.findUnique({
-      where: { userId_questionId: { userId, questionId } },
-    });
-    const correctOptionIndices = extractCorrectOptionIndices(
-      question.questionType,
-      question.optionsJson,
-      question.answerJson,
-    );
-
-    return {
-      questionId,
-      isCorrect: existingAttempt.isCorrect,
-      correctAnswer: question.answerJson,
-      correctOptionIndices,
-      explanation: question.explanationShort,
-      wrongCount: wrongItem?.wrongCount ?? 0,
-    };
+    return buildIdempotentResult(db, userId, questionId, question, existingAttempt.isCorrect, correctOptionIndices);
   }
 
   // 判断答案是否正确
@@ -211,12 +199,61 @@ export async function submitQuizAnswer(
     chosenAnswer,
     question.optionsJson,
   );
-  const correctOptionIndices = extractCorrectOptionIndices(
-    question.questionType,
-    question.optionsJson,
-    question.answerJson,
-  );
 
+  logDebugIfEnabled(questionId, question, chosenAnswer, isCorrect);
+
+  // 创建答题记录（处理并发冲突）
+  const attemptResult = await createAttemptRecord(db, userId, questionId, sessionId, chosenAnswer, isCorrect, durationMs);
+  if (attemptResult.idempotent) {
+    return buildIdempotentResult(db, userId, questionId, question, attemptResult.isCorrect, correctOptionIndices);
+  }
+
+  // 更新错题本
+  const wrongCount = isCorrect
+    ? await handleCorrectAnswer(db, userId, questionId)
+    : await handleWrongAnswer(db, userId, questionId);
+
+  // 记录学习活动
+  await recordActivity(db, userId, 1);
+
+  return {
+    questionId,
+    isCorrect,
+    correctAnswer: question.answerJson,
+    correctOptionIndices,
+    explanation: question.explanationShort,
+    wrongCount,
+  };
+}
+
+async function buildIdempotentResult(
+  db: DbCtx,
+  userId: number,
+  questionId: number,
+  question: { answerJson: string; explanationShort: string | null },
+  isCorrect: boolean,
+  correctOptionIndices: number[],
+): Promise<SubmitAnswerResult> {
+  const wrongItem = await db.userWrongItem.findUnique({
+    where: { userId_questionId: { userId, questionId } },
+  });
+
+  return {
+    questionId,
+    isCorrect,
+    correctAnswer: question.answerJson,
+    correctOptionIndices,
+    explanation: question.explanationShort,
+    wrongCount: wrongItem?.wrongCount ?? 0,
+  };
+}
+
+function logDebugIfEnabled(
+  questionId: number,
+  question: { questionType: QuestionType; answerJson: string; optionsJson: unknown },
+  chosenAnswer: string,
+  isCorrect: boolean,
+): void {
   if (QUIZ_DEBUG) {
     log.debug({
       tag: "QUIZ_DEBUG",
@@ -228,8 +265,17 @@ export async function submitQuizAnswer(
       isCorrect,
     });
   }
+}
 
-  // 记录答题尝试（首次提交）
+async function createAttemptRecord(
+  db: DbCtx,
+  userId: number,
+  questionId: number,
+  sessionId: string,
+  chosenAnswer: string,
+  isCorrect: boolean,
+  durationMs?: number,
+): Promise<{ idempotent: false } | { idempotent: true; isCorrect: boolean }> {
   try {
     await db.userQuestionAttempt.create({
       data: {
@@ -241,105 +287,77 @@ export async function submitQuizAnswer(
         durationMs,
       },
     });
+    return { idempotent: false };
   } catch (error) {
     if (isPrismaUniqueConstraintError(error)) {
       const attempt = await db.userQuestionAttempt.findUnique({
-        where: {
-          sessionId_userId_questionId: { sessionId, userId, questionId },
-        },
+        where: { sessionId_userId_questionId: { sessionId, userId, questionId } },
       });
-
       if (attempt) {
-        const wrongItem = await db.userWrongItem.findUnique({
-          where: { userId_questionId: { userId, questionId } },
-        });
-        const correctOptionIndices = extractCorrectOptionIndices(
-          question.questionType,
-          question.optionsJson,
-          question.answerJson,
-        );
-
-        return {
-          questionId,
-          isCorrect: attempt.isCorrect,
-          correctAnswer: question.answerJson,
-          correctOptionIndices,
-          explanation: question.explanationShort,
-          wrongCount: wrongItem?.wrongCount ?? 0,
-        };
+        return { idempotent: true, isCorrect: attempt.isCorrect };
       }
     }
-
     throw error;
   }
+}
 
-  let wrongCount = 0;
+async function handleCorrectAnswer(
+  db: DbCtx,
+  userId: number,
+  questionId: number,
+): Promise<number> {
+  const wrongItem = await db.userWrongItem.findUnique({
+    where: { userId_questionId: { userId, questionId } },
+  });
 
-  if (isCorrect) {
-    // 正确答案：检查是否需要更新错题本
-    const wrongItem = await db.userWrongItem.findUnique({
-      where: {
-        userId_questionId: { userId, questionId },
-      },
-    });
-
-    if (wrongItem && !wrongItem.clearedAt) {
-      // 获取最近连续正确次数
-      const recentAttempts = await db.userQuestionAttempt.findMany({
-        where: {
-          userId,
-          questionId,
-          attemptedAt: { gt: wrongItem.lastWrongAt },
-        },
-        orderBy: { attemptedAt: "desc" },
-        take: WRONG_ITEM_CLEAR_THRESHOLD,
-      });
-
-      const consecutiveCorrect = recentAttempts.filter((a) => a.isCorrect).length;
-
-      if (consecutiveCorrect >= WRONG_ITEM_CLEAR_THRESHOLD) {
-        // 连续正确达标，清除错题
-        await db.userWrongItem.update({
-          where: { id: wrongItem.id },
-          data: { clearedAt: new Date() },
-        });
-      }
-
-      wrongCount = wrongItem.wrongCount;
-    }
-  } else {
-    // 错误答案：更新错题本
-    const wrongItem = await db.userWrongItem.upsert({
-      where: {
-        userId_questionId: { userId, questionId },
-      },
-      update: {
-        wrongCount: { increment: 1 },
-        lastWrongAt: new Date(),
-        clearedAt: null, // 重新激活
-      },
-      create: {
-        userId,
-        questionId,
-        wrongCount: 1,
-        lastWrongAt: new Date(),
-      },
-    });
-
-    wrongCount = wrongItem.wrongCount;
+  if (!wrongItem || wrongItem.clearedAt) {
+    return wrongItem?.wrongCount ?? 0;
   }
 
-  // 记录学习活动，更新连续天数和周积分
-  await recordActivity(db, userId, 1);
+  // 检查连续正确次数
+  const recentAttempts = await db.userQuestionAttempt.findMany({
+    where: {
+      userId,
+      questionId,
+      attemptedAt: { gt: wrongItem.lastWrongAt },
+    },
+    orderBy: { attemptedAt: "desc" },
+    take: WRONG_ITEM_CLEAR_THRESHOLD,
+  });
 
-  return {
-    questionId,
-    isCorrect,
-    correctAnswer: question.answerJson,
-    correctOptionIndices,
-    explanation: question.explanationShort,
-    wrongCount,
-  };
+  const consecutiveCorrect = recentAttempts.filter((a) => a.isCorrect).length;
+
+  if (consecutiveCorrect >= WRONG_ITEM_CLEAR_THRESHOLD) {
+    await db.userWrongItem.update({
+      where: { id: wrongItem.id },
+      data: { clearedAt: new Date() },
+    });
+  }
+
+  return wrongItem.wrongCount;
+}
+
+async function handleWrongAnswer(
+  db: DbCtx,
+  userId: number,
+  questionId: number,
+): Promise<number> {
+  const wrongItem = await db.userWrongItem.upsert({
+    where: { userId_questionId: { userId, questionId } },
+    update: {
+      wrongCount: { increment: 1 },
+      lastWrongAt: new Date(),
+      clearedAt: null,
+    },
+    create: {
+      userId,
+      questionId,
+      wrongCount: 1,
+      lastWrongAt: new Date(),
+    },
+  });
+
+  return wrongItem.wrongCount;
 }
 
 /**

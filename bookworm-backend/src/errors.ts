@@ -52,3 +52,27 @@ export class ServiceError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 }
+
+// ============================================
+// Study Domain Errors
+// ============================================
+
+/** Error codes for study module */
+export const StudyErrorCodes = {
+  COURSE_NOT_FOUND: 'COURSE_NOT_FOUND',
+  COURSE_NOT_PUBLISHED: 'COURSE_NOT_PUBLISHED',
+  CARD_NOT_FOUND: 'CARD_NOT_FOUND',
+  CARD_DAILY_LIMIT_REACHED: 'CARD_DAILY_LIMIT_REACHED',
+  QUESTION_NOT_FOUND: 'QUESTION_NOT_FOUND',
+  FEEDBACK_TARGET_REQUIRED: 'FEEDBACK_TARGET_REQUIRED',
+} as const;
+
+export type StudyErrorCode = typeof StudyErrorCodes[keyof typeof StudyErrorCodes];
+
+/** Study module specific ServiceError */
+export class StudyServiceError extends ServiceError {
+  constructor(code: StudyErrorCode, message: string, originalError?: unknown) {
+    super(code, message, originalError);
+    this.name = 'StudyServiceError';
+  }
+}

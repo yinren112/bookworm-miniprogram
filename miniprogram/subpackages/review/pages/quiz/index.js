@@ -7,6 +7,8 @@ const studyTimer = require("../../utils/study-timer");
 const logger = require("../../../../utils/logger");
 const { track } = require("../../../../utils/track");
 const feedback = require("../../../../utils/ui/feedback");
+const { createFatigueChecker } = require("../../../../utils/fatigue");
+const { QUIZ_SECONDS_PER_ITEM } = require("../../../../utils/constants");
 
 Page({
   data: {
@@ -67,7 +69,7 @@ Page({
   onLoad(options) {
     this.sessionStartTime = Date.now();
     this.elapsedOffset = 0;
-    this.fatigueWarned = false;
+    this.fatigueChecker = createFatigueChecker();
     this.abortTracked = false;
 
     const { courseKey, unitId, wrongItemsOnly, resume, nextType } = options || {};
@@ -250,18 +252,7 @@ Page({
   },
   
   checkFatigue() {
-      if (this.fatigueWarned) return;
-      
-      const elapsed = Date.now() - this.sessionStartTime;
-      if (elapsed > 15 * 60 * 1000) { // 15 mins
-          this.fatigueWarned = true;
-          wx.showModal({
-              title: '休息一下',
-              content: '已经学习很久了，休息一下眼睛吧，我会帮你保存进度。',
-              showCancel: false,
-              confirmText: '我知道了'
-          });
-      }
+    this.fatigueChecker.check(this.sessionStartTime);
   },
 
   selectOption(e) {
@@ -345,22 +336,10 @@ Page({
         durationMs,
       );
 
-      const optionsLength = Array.isArray(currentQuestion.options)
-        ? currentQuestion.options.length
-        : 0;
-      const serverIndices = normalizeIndices(
-        result.correctOptionIndices,
-        optionsLength,
-      );
-      const localIndices = normalizeIndices(
-        getCorrectIndices(currentQuestion, result.correctAnswer),
-        optionsLength,
-      );
-      const correctIndices = pickCorrectIndices(
-        currentQuestion.questionType,
-        localIndices,
-        serverIndices,
-      );
+      // 直接使用后端返回的 correctOptionIndices（已标准化为 number[]）
+      const correctIndices = Array.isArray(result.correctOptionIndices)
+        ? result.correctOptionIndices
+        : [];
       const correctAnswerText = formatCorrectAnswer(
         currentQuestion,
         result.correctAnswer,
@@ -509,7 +488,7 @@ Page({
   updateProgress(currentIndex) {
     const total = this.data.questionsLength || 0;
     const remaining = Math.max(0, total - currentIndex);
-    const remainingMinutes = Math.ceil((remaining * 30) / 60);
+    const remainingMinutes = Math.ceil((remaining * QUIZ_SECONDS_PER_ITEM) / 60);
     this.setData({
       progressPercent: total > 0 ? Math.round((currentIndex / total) * 100) : 0,
       remainingMinutes,
@@ -562,126 +541,33 @@ Page({
   },
 });
 
-function getCorrectIndices(question, correctAnswer) {
-  if (
-    !question ||
-    !question.options ||
-    question.questionType === "FILL_BLANK"
-  ) {
-    return [];
-  }
-
-  const options = question.options;
-  const correctAnswers =
-    question.questionType === "MULTI_CHOICE"
-      ? parseAnswerList(correctAnswer)
-      : [correctAnswer];
-
-  const indices = [];
-  correctAnswers.forEach((answer) => {
-    const normalizedAnswer = normalizeAnswerToken(answer);
-    const idx = options.findIndex(
-      (option) => normalizeAnswerToken(String(option)) === normalizedAnswer,
-    );
-    if (idx >= 0) indices.push(idx);
-  });
-
-  return Array.from(new Set(indices));
-}
-
 function formatCorrectAnswer(question, correctAnswer) {
   if (!question || question.questionType !== "MULTI_CHOICE") {
     return correctAnswer;
   }
 
-  const answers = parseAnswerList(correctAnswer);
-  return answers.join(", ");
-}
+  // 多选题：尝试解析并格式化答案
+  const trimmed = String(correctAnswer || "").trim();
+  if (!trimmed) return "";
 
-function parseAnswerList(answer) {
-  const trimmed = String(answer || "").trim();
-  if (!trimmed) return [];
-
+  // 尝试 JSON 数组格式
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed
-          .map((item) => String(item).trim())
-          .filter((item) => item.length > 0);
+        return parsed.map((item) => String(item).trim()).join(", ");
       }
     } catch {
-      // Fall back to pipe parsing.
+      // Fall back
     }
   }
 
+  // 尝试管道符分隔格式
   if (trimmed.includes("|")) {
-    return trimmed
-      .split("|")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
+    return trimmed.split("|").map((item) => item.trim()).join(", ");
   }
 
-  return [trimmed];
-}
-
-function normalizeAnswerToken(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
-function normalizeIndices(indices, maxLength) {
-  if (maxLength <= 0) return [];
-  let source = indices;
-  if (typeof source === "string") {
-    const trimmed = source.trim();
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          source = parsed;
-        }
-      } catch {
-        source = trimmed;
-      }
-    }
-    if (typeof source === "string") {
-      if (trimmed.includes(",")) {
-        source = trimmed.split(",");
-      } else if (trimmed.includes("|")) {
-        source = trimmed.split("|");
-      } else {
-        source = [trimmed];
-      }
-    }
-  }
-  if (!Array.isArray(source)) return [];
-  const normalized = source
-    .map((value) => Number(value))
-    .filter(
-      (value) => Number.isInteger(value) && value >= 0 && value < maxLength,
-    );
-  return Array.from(new Set(normalized));
-}
-
-function pickCorrectIndices(questionType, localIndices, serverIndices) {
-  if (questionType === "MULTI_CHOICE") {
-    return serverIndices.length > 0 ? serverIndices : localIndices;
-  }
-
-  if (serverIndices.length > 0) {
-    if (serverIndices.length > 1) {
-      return [Math.min(...serverIndices)];
-    }
-    return serverIndices;
-  }
-
-  if (localIndices.length > 1) {
-    return [Math.min(...localIndices)];
-  }
-
-  return localIndices;
+  return trimmed;
 }
 
 /**

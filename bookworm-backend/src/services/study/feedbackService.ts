@@ -3,6 +3,7 @@
 
 import { PrismaClient, FeedbackReasonType, StudyFeedbackStatus } from "@prisma/client";
 import { feedbackWithCourseInclude } from "../../db/views";
+import { StudyServiceError, StudyErrorCodes } from "../../errors";
 
 type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -37,7 +38,7 @@ export async function createFeedback(
 
   // 验证至少有一个目标
   if (!cardId && !questionId) {
-    throw new Error("FEEDBACK_TARGET_REQUIRED");
+    throw new StudyServiceError(StudyErrorCodes.FEEDBACK_TARGET_REQUIRED, "Either cardId or questionId is required");
   }
 
   const feedback = await db.studyFeedback.create({

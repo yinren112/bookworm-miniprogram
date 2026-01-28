@@ -8,6 +8,8 @@ const logger = require('../../../../utils/logger');
 const haptic = require('../../../../utils/haptic');
 const soundManager = require('../../../../utils/sound-manager');
 const { track } = require('../../../../utils/track');
+const { createFatigueChecker } = require('../../../../utils/fatigue');
+const { CARD_SECONDS_PER_ITEM } = require('../../../../utils/constants');
 // Swipe thresholds - kept for reference (actual logic in WXS)
 // const T1_RATIO = 0.22;  // Light threshold
 // const T2_RATIO = 0.42;  // Heavy threshold
@@ -43,7 +45,7 @@ Page({
   onLoad(options) {
     this.startTime = Date.now();
     this.elapsedOffset = 0;
-    this.fatigueWarned = false;
+    this.fatigueChecker = createFatigueChecker();
     this.abortTracked = false;
 
     const sysInfo = wx.getSystemInfoSync();
@@ -332,18 +334,7 @@ Page({
   },
   
   checkFatigue() {
-      if (this.fatigueWarned) return;
-      
-      const elased = Date.now() - this.startTime;
-      if (elased > 15 * 60 * 1000) { // 15 mins
-          this.fatigueWarned = true;
-          wx.showModal({
-              title: '休息一下',
-              content: '已经学习很久了，休息一下眼睛吧，我会帮你保存进度。',
-              showCancel: false,
-              confirmText: '我知道了'
-          });
-      }
+    this.fatigueChecker.check(this.startTime);
   },
 
   // --- Interaction: Star ---
@@ -419,7 +410,7 @@ Page({
   updateProgress(currentIndex) {
     const total = this.data.cardsLength || 0;
     const remaining = Math.max(0, total - currentIndex);
-    const remainingMinutes = Math.ceil((remaining * 8) / 60);
+    const remainingMinutes = Math.ceil((remaining * CARD_SECONDS_PER_ITEM) / 60);
     this.setData({
       progressPercent: total > 0 ? Math.round((currentIndex / total) * 100) : 0,
       remainingMinutes,

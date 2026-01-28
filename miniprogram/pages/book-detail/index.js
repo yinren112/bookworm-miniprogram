@@ -87,7 +87,7 @@ Page({
     const confirmResult = await new Promise((resolve) => {
       wx.showModal({
         title: '确认购买',
-        content: `确定要购买《${bookDetail.bookSku.bookMaster.title}》吗？\n支付金额：¥${bookDetail.selling_price}`,
+        content: `确定要购买《${bookDetail.bookSku.bookMaster.title}》吗？\n支付金额：¥${(bookDetail.selling_price / 100).toFixed(2)}`,
         confirmText: '立即支付',
         cancelText: '再看看',
         success: (res) => resolve(res.confirm),

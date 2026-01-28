@@ -11,7 +11,7 @@ import {
   questionIdOnlyView,
   enrollmentCourseIdView,
 } from "../db/views";
-import { ApiError } from "../errors";
+import { ApiError, StudyServiceError, StudyErrorCodes } from "../errors";
 import { CourseStatus } from "@prisma/client";
 import { getBeijingNow } from "../utils/timezone";
 import {
@@ -134,48 +134,73 @@ import {
 } from "./studySchemas";
 
 const studyRoutes: FastifyPluginAsync = async function (fastify) {
-  const resolveCardByContentId = async (
+  // ============================================
+  // 课程范围解析共享逻辑
+  // ============================================
+
+  interface ResolveCourseIdsOptions {
+    courseKey?: string;
+    courseId?: number;
+    requireCourseKey?: boolean;
+  }
+
+  /**
+   * 解析用户的课程范围（courseIds 列表）
+   * - 如果提供了 courseId，验证用户已注册并返回该 ID
+   * - 如果提供了 courseKey，查找课程并返回其 ID
+   * - 如果 requireCourseKey=true 但未提供，抛出 400 错误
+   * - 否则返回用户所有活跃注册的课程 ID
+   */
+  const resolveCourseIds = async (
     userId: number,
-    contentId: string,
-    options: { courseKey?: string; courseId?: number; requireCourseKey?: boolean } = {},
-  ) => {
+    options: ResolveCourseIdsOptions = {},
+  ): Promise<number[]> => {
     const { courseKey, courseId, requireCourseKey = false } = options;
-    let courseIds: number[] = [];
+
     if (courseId) {
       const enrollment = await prisma.userCourseEnrollment.findUnique({
         where: { userId_courseId: { userId, courseId } },
         select: enrollmentCourseIdView,
       });
       if (!enrollment) {
-        throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
+        return [];
       }
-      courseIds = [courseId];
-    } else if (courseKey) {
+      return [courseId];
+    }
+
+    if (courseKey) {
       const course = await getCourseByKey(prisma, courseKey, { userId });
       if (!course) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
       }
-      courseIds = [course.id];
-    } else if (requireCourseKey) {
+      return [course.id];
+    }
+
+    if (requireCourseKey) {
       metrics.courseScopeRequiredTotal.inc();
       throw new ApiError(400, "Course scope is required", "COURSE_SCOPE_REQUIRED");
-    } else {
-      const enrollments = await prisma.userCourseEnrollment.findMany({
-        where: { userId, isActive: true },
-        select: enrollmentCourseIdView,
-      });
-      courseIds = enrollments.map((enrollment) => enrollment.courseId);
     }
+
+    const enrollments = await prisma.userCourseEnrollment.findMany({
+      where: { userId, isActive: true },
+      select: enrollmentCourseIdView,
+    });
+    return enrollments.map((e) => e.courseId);
+  };
+
+  const resolveCardByContentId = async (
+    userId: number,
+    contentId: string,
+    options: ResolveCourseIdsOptions = {},
+  ) => {
+    const courseIds = await resolveCourseIds(userId, options);
 
     if (courseIds.length === 0) {
       throw new ApiError(404, "Card not found", "CARD_NOT_FOUND");
     }
 
     const cards = await prisma.studyCard.findMany({
-      where: {
-        contentId,
-        courseId: { in: courseIds },
-      },
+      where: { contentId, courseId: { in: courseIds } },
       select: cardIdOnlyView,
       take: 2,
     });
@@ -194,36 +219,16 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
   const resolveQuestionById = async (
     userId: number,
     questionId: number,
-    options: { courseKey?: string; requireCourseKey?: boolean } = {},
+    options: Omit<ResolveCourseIdsOptions, "courseId"> = {},
   ) => {
-    const { courseKey, requireCourseKey = false } = options;
-    let courseIds: number[] = [];
-    if (courseKey) {
-      const course = await getCourseByKey(prisma, courseKey, { userId });
-      if (!course) {
-        throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
-      }
-      courseIds = [course.id];
-    } else if (requireCourseKey) {
-      metrics.courseScopeRequiredTotal.inc();
-      throw new ApiError(400, "Course scope is required", "COURSE_SCOPE_REQUIRED");
-    } else {
-      const enrollments = await prisma.userCourseEnrollment.findMany({
-        where: { userId, isActive: true },
-        select: enrollmentCourseIdView,
-      });
-      courseIds = enrollments.map((enrollment) => enrollment.courseId);
-    }
+    const courseIds = await resolveCourseIds(userId, options);
 
     if (courseIds.length === 0) {
       throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
     }
 
     const question = await prisma.studyQuestion.findFirst({
-      where: {
-        id: questionId,
-        courseId: { in: courseIds },
-      },
+      where: { id: questionId, courseId: { in: courseIds } },
       select: questionIdOnlyView,
     });
 
@@ -319,12 +324,12 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
         const result = await enrollCourse(prisma, userId, course.id, sourceScene);
         reply.send(result);
       } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === "COURSE_NOT_FOUND") {
-            throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");
+        if (error instanceof StudyServiceError) {
+          if (error.code === StudyErrorCodes.COURSE_NOT_FOUND) {
+            throw new ApiError(404, "Course not found", StudyErrorCodes.COURSE_NOT_FOUND);
           }
-          if (error.message === "COURSE_NOT_PUBLISHED") {
-            throw new ApiError(400, "Course is not published", "COURSE_NOT_PUBLISHED");
+          if (error.code === StudyErrorCodes.COURSE_NOT_PUBLISHED) {
+            throw new ApiError(400, "Course is not published", StudyErrorCodes.COURSE_NOT_PUBLISHED);
           }
         }
         throw error;
@@ -512,8 +517,8 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
           ratingEnum,
         );
       } catch (error) {
-        if (error instanceof Error && error.message === "CARD_DAILY_LIMIT_REACHED") {
-          throw new ApiError(429, "Card daily limit reached", "CARD_DAILY_LIMIT_REACHED");
+        if (error instanceof StudyServiceError && error.code === StudyErrorCodes.CARD_DAILY_LIMIT_REACHED) {
+          throw new ApiError(429, "Card daily limit reached", StudyErrorCodes.CARD_DAILY_LIMIT_REACHED);
         }
         throw error;
       }
@@ -590,8 +595,8 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
 
         reply.send(result);
       } catch (error) {
-        if (error instanceof Error && error.message === "QUESTION_NOT_FOUND") {
-          throw new ApiError(404, "Question not found", "QUESTION_NOT_FOUND");
+        if (error instanceof StudyServiceError && error.code === StudyErrorCodes.QUESTION_NOT_FOUND) {
+          throw new ApiError(404, "Question not found", StudyErrorCodes.QUESTION_NOT_FOUND);
         }
         throw error;
       }
@@ -806,8 +811,8 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
           },
         });
       } catch (error) {
-        if (error instanceof Error && error.message === "FEEDBACK_TARGET_REQUIRED") {
-          throw new ApiError(400, "Either cardId or questionId is required", "FEEDBACK_TARGET_REQUIRED");
+        if (error instanceof StudyServiceError && error.code === StudyErrorCodes.FEEDBACK_TARGET_REQUIRED) {
+          throw new ApiError(400, "Either cardId or questionId is required", StudyErrorCodes.FEEDBACK_TARGET_REQUIRED);
         }
         throw error;
       }

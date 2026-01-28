@@ -13,6 +13,7 @@ import {
 } from "../../db/views";
 import { log } from "../../lib/logger";
 import { metrics } from "../../plugins/metrics";
+import { StudyServiceError, StudyErrorCodes } from "../../errors";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -100,18 +101,15 @@ export async function getCourseList(
       })
     : [];
 
-  const enrollmentByCourseKey = new Map<string, Date | null>();
-  for (const enrollment of enrollments) {
-    const courseKey = enrollment.course.courseKey;
-    const current = enrollmentByCourseKey.get(courseKey);
-    if (!current) {
-      enrollmentByCourseKey.set(courseKey, enrollment.lastStudiedAt ?? null);
-      continue;
+  const enrollmentByCourseKey = enrollments.reduce((map, enrollment) => {
+    const key = enrollment.course.courseKey;
+    const current = map.get(key);
+    const lastStudied = enrollment.lastStudiedAt ?? null;
+    if (!current || (lastStudied && lastStudied > current)) {
+      map.set(key, lastStudied);
     }
-    if (enrollment.lastStudiedAt && enrollment.lastStudiedAt > current) {
-      enrollmentByCourseKey.set(courseKey, enrollment.lastStudiedAt);
-    }
-  }
+    return map;
+  }, new Map<string, Date | null>());
 
   return courses.map((course) => ({
     id: course.id,
@@ -296,11 +294,11 @@ export async function enrollCourse(
   });
 
   if (!course) {
-    throw new Error("COURSE_NOT_FOUND");
+    throw new StudyServiceError(StudyErrorCodes.COURSE_NOT_FOUND, "Course not found");
   }
 
   if (course.status !== CourseStatus.PUBLISHED) {
-    throw new Error("COURSE_NOT_PUBLISHED");
+    throw new StudyServiceError(StudyErrorCodes.COURSE_NOT_PUBLISHED, "Course is not published");
   }
 
   const enrollInTransaction = async (tx: Prisma.TransactionClient) => {

@@ -12,6 +12,7 @@ import {
 } from "../../db/views";
 import { recordActivity } from "./streakService";
 import { getBeijingTodayStart, getBeijingDateStart } from "../../utils/timezone";
+import { StudyServiceError, StudyErrorCodes } from "../../errors";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -312,6 +313,18 @@ export async function startCardSession(
 // 提交卡片反馈
 // ============================================
 
+interface CardFeedbackContext {
+  tx: Prisma.TransactionClient;
+  userId: number;
+  cardId: number;
+  sessionId: string;
+  rating: FeedbackRating;
+  now: Date;
+  todayStart: Date;
+  courseId: number;
+  examDate: Date | null;
+}
+
 /**
  * 提交卡片学习反馈，更新排程
  */
@@ -323,212 +336,201 @@ export async function submitCardFeedback(
   rating: FeedbackRating,
 ): Promise<CardStateUpdate> {
   return withTransaction(dbCtx, async (tx) => {
-    const now = new Date();
-    const todayStart = getBeijingTodayStart();
-    const card = await tx.studyCard.findUnique({
-      where: { id: cardId },
-      select: cardCourseIdView,
+    const ctx = await buildFeedbackContext(tx, userId, cardId, sessionId, rating);
+
+    // 幂等性检查：查找现有状态
+    const existingState = await tx.userCardState.findUnique({
+      where: { userId_cardId: { userId, cardId } },
     });
 
-    if (!card) {
-      throw new Error("CARD_NOT_FOUND");
+    // 幂等返回：同一 session 已处理
+    if (existingState?.lastSessionId === sessionId) {
+      return toCardStateUpdate(cardId, existingState);
     }
 
-    const enrollment = await tx.userCourseEnrollment.findUnique({
-      where: { userId_courseId: { userId, courseId: card.courseId } },
-      select: enrollmentSelectPublic,
-    });
+    // 每日限制检查
+    checkDailyLimit(existingState, ctx.todayStart);
 
-    const examDate = enrollment?.examDate ?? null;
+    // 处理卡片状态更新
+    const cardState = existingState
+      ? await updateExistingCardState(ctx, existingState)
+      : await createNewCardState(ctx);
 
-    let cardState = await tx.userCardState.findUnique({
-      where: {
-        userId_cardId: { userId, cardId },
-      },
-    });
+    // 更新课程学习时间和记录活动
+    await updateCourseAndActivity(ctx);
 
-    if (cardState?.lastSessionId === sessionId) {
-      return {
+    return toCardStateUpdate(cardId, cardState);
+  });
+}
+
+async function buildFeedbackContext(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  cardId: number,
+  sessionId: string,
+  rating: FeedbackRating,
+): Promise<CardFeedbackContext> {
+  const now = new Date();
+  const todayStart = getBeijingTodayStart();
+
+  const card = await tx.studyCard.findUnique({
+    where: { id: cardId },
+    select: cardCourseIdView,
+  });
+
+  if (!card) {
+    throw new StudyServiceError(StudyErrorCodes.CARD_NOT_FOUND, "Card not found");
+  }
+
+  const enrollment = await tx.userCourseEnrollment.findUnique({
+    where: { userId_courseId: { userId, courseId: card.courseId } },
+    select: enrollmentSelectPublic,
+  });
+
+  return {
+    tx,
+    userId,
+    cardId,
+    sessionId,
+    rating,
+    now,
+    todayStart,
+    courseId: card.courseId,
+    examDate: enrollment?.examDate ?? null,
+  };
+}
+
+function checkDailyLimit(
+  cardState: { lastAnsweredAt: Date | null; todayShownCount: number } | null,
+  todayStart: Date,
+): void {
+  if (
+    cardState &&
+    cardState.lastAnsweredAt &&
+    cardState.lastAnsweredAt >= todayStart &&
+    cardState.todayShownCount >= MAX_DAILY_ATTEMPTS
+  ) {
+    throw new StudyServiceError(StudyErrorCodes.CARD_DAILY_LIMIT_REACHED, "Card daily limit reached");
+  }
+}
+
+async function createNewCardState(ctx: CardFeedbackContext) {
+  const { tx, userId, cardId, sessionId, rating, examDate, now, todayStart } = ctx;
+  const { newBoxLevel, nextDueAt } = calculateNextSchedule(1, rating, {
+    examDate,
+    now,
+    todayStart,
+  });
+
+  try {
+    return await tx.userCardState.create({
+      data: {
+        userId,
         cardId,
-        newBoxLevel: cardState.boxLevel,
-        nextDueAt: cardState.nextDueAt,
-        todayShownCount: cardState.todayShownCount,
-      };
-    }
-
-    if (
-      cardState &&
-      cardState.lastAnsweredAt &&
-      cardState.lastAnsweredAt >= todayStart &&
-      cardState.todayShownCount >= MAX_DAILY_ATTEMPTS
-    ) {
-      throw new Error("CARD_DAILY_LIMIT_REACHED");
-    }
-
-    let created = false;
-
-    if (!cardState) {
-      const { newBoxLevel, nextDueAt } = calculateNextSchedule(1, rating, {
-        examDate,
-        now,
-        todayStart,
-      });
-
-      try {
-        cardState = await tx.userCardState.create({
-          data: {
-            userId,
-            cardId,
-            boxLevel: newBoxLevel,
-            nextDueAt,
-            lastAnsweredAt: now,
-            lastSessionId: sessionId,
-            todayShownCount: 1,
-            totalAttempts: 1,
-          },
-        });
-        created = true;
-      } catch (error) {
-        if (
-          error instanceof PrismaClientKnownRequestError &&
-          error.code === "P2002"
-        ) {
-          cardState = await tx.userCardState.findUnique({
-            where: { userId_cardId: { userId, cardId } },
-          });
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    if (!cardState) {
-      throw new Error("CARD_STATE_NOT_FOUND");
-    }
-
-    if (!created) {
-      if (cardState.lastSessionId === sessionId) {
-        return {
-          cardId,
-          newBoxLevel: cardState.boxLevel,
-          nextDueAt: cardState.nextDueAt,
-          todayShownCount: cardState.todayShownCount,
-        };
-      }
-
-      const { newBoxLevel, nextDueAt } = calculateNextSchedule(
-        cardState.boxLevel ?? 1,
-        rating,
-        {
-          examDate,
-          now,
-          todayStart,
-        },
-      );
-
-      const updateBase = {
         boxLevel: newBoxLevel,
         nextDueAt,
         lastAnsweredAt: now,
         lastSessionId: sessionId,
-        totalAttempts: { increment: 1 },
-      };
-
-      const resetResult = await tx.userCardState.updateMany({
-        where: {
-          userId,
-          cardId,
-          AND: [
-            {
-              OR: [
-                { lastSessionId: null },
-                { lastSessionId: { not: sessionId } },
-              ],
-            },
-            {
-              OR: [
-                { lastAnsweredAt: null },
-                { lastAnsweredAt: { lt: todayStart } },
-              ],
-            },
-          ],
-        },
-        data: {
-          ...updateBase,
-          todayShownCount: 1,
-        },
+        todayShownCount: 1,
+        totalAttempts: 1,
+      },
+    });
+  } catch (error) {
+    // 并发创建冲突：返回已存在的记录
+    if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+      const existing = await tx.userCardState.findUnique({
+        where: { userId_cardId: { userId, cardId } },
       });
+      if (existing) return existing;
+    }
+    throw error;
+  }
+}
 
-      let updatedCount = resetResult.count;
+async function updateExistingCardState(
+  ctx: CardFeedbackContext,
+  cardState: { boxLevel: number; lastSessionId: string | null },
+) {
+  const { tx, userId, cardId, sessionId, rating, examDate, now, todayStart } = ctx;
 
-      if (updatedCount === 0) {
-        const incrementResult = await tx.userCardState.updateMany({
-          where: {
-            userId,
-            cardId,
-            AND: [
-              {
-                OR: [
-                  { lastSessionId: null },
-                  { lastSessionId: { not: sessionId } },
-                ],
-              },
-              { lastAnsweredAt: { gte: todayStart } },
-            ],
-          },
-          data: {
-            ...updateBase,
-            todayShownCount: { increment: 1 },
-          },
-        });
-        updatedCount = incrementResult.count;
-      }
+  // 再次幂等检查（处理并发场景）
+  if (cardState.lastSessionId === sessionId) {
+    return tx.userCardState.findUniqueOrThrow({
+      where: { userId_cardId: { userId, cardId } },
+    });
+  }
 
-      if (updatedCount === 0) {
-        const latestState = await tx.userCardState.findUnique({
-          where: { userId_cardId: { userId, cardId } },
-        });
+  const { newBoxLevel, nextDueAt } = calculateNextSchedule(
+    cardState.boxLevel ?? 1,
+    rating,
+    { examDate, now, todayStart },
+  );
 
-        if (latestState) {
-          return {
-            cardId,
-            newBoxLevel: latestState.boxLevel,
-            nextDueAt: latestState.nextDueAt,
-            todayShownCount: latestState.todayShownCount,
-          };
-        }
-      }
+  const updateBase = {
+    boxLevel: newBoxLevel,
+    nextDueAt,
+    lastAnsweredAt: now,
+    lastSessionId: sessionId,
+    totalAttempts: { increment: 1 },
+  };
 
-      cardState = await tx.userCardState.findUnique({
+  // 尝试重置今日计数（跨天场景）
+  const resetResult = await tx.userCardState.updateMany({
+    where: {
+      userId,
+      cardId,
+      OR: [{ lastSessionId: null }, { lastSessionId: { not: sessionId } }],
+      AND: { OR: [{ lastAnsweredAt: null }, { lastAnsweredAt: { lt: todayStart } }] },
+    },
+    data: { ...updateBase, todayShownCount: 1 },
+  });
+
+  if (resetResult.count === 0) {
+    // 尝试增加今日计数（当天场景）
+    const incrementResult = await tx.userCardState.updateMany({
+      where: {
+        userId,
+        cardId,
+        OR: [{ lastSessionId: null }, { lastSessionId: { not: sessionId } }],
+        lastAnsweredAt: { gte: todayStart },
+      },
+      data: { ...updateBase, todayShownCount: { increment: 1 } },
+    });
+
+    // 并发更新失败：返回当前状态（幂等）
+    if (incrementResult.count === 0) {
+      return tx.userCardState.findUniqueOrThrow({
         where: { userId_cardId: { userId, cardId } },
       });
     }
+  }
 
-    if (!cardState) {
-      throw new Error("CARD_STATE_NOT_FOUND");
-    }
-
-    if (card) {
-      await tx.userCourseEnrollment.updateMany({
-        where: {
-          userId,
-          courseId: card.courseId,
-        },
-        data: {
-          lastStudiedAt: now,
-        },
-      });
-    }
-
-    await recordActivity(tx, userId, 1);
-
-    return {
-      cardId,
-      newBoxLevel: cardState.boxLevel,
-      nextDueAt: cardState.nextDueAt,
-      todayShownCount: cardState.todayShownCount,
-    };
+  return tx.userCardState.findUniqueOrThrow({
+    where: { userId_cardId: { userId, cardId } },
   });
+}
+
+async function updateCourseAndActivity(ctx: CardFeedbackContext): Promise<void> {
+  const { tx, userId, courseId, now } = ctx;
+
+  await tx.userCourseEnrollment.updateMany({
+    where: { userId, courseId },
+    data: { lastStudiedAt: now },
+  });
+
+  await recordActivity(tx, userId, 1);
+}
+
+function toCardStateUpdate(
+  cardId: number,
+  state: { boxLevel: number; nextDueAt: Date; todayShownCount: number },
+): CardStateUpdate {
+  return {
+    cardId,
+    newBoxLevel: state.boxLevel,
+    nextDueAt: state.nextDueAt,
+    todayShownCount: state.todayShownCount,
+  };
 }
 
 function getExamPhase(
