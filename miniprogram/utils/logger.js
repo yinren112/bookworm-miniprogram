@@ -1,5 +1,4 @@
 // miniprogram/utils/logger.js - Unified logging utility
-/* eslint-disable no-console */
 const config = (() => {
   try {
     return require('../config');
@@ -14,10 +13,11 @@ const DEBUG = typeof config.DEBUG_MODE === 'boolean'
 
 const noop = () => {};
 const withTag = (tag, fn) => (...args) => fn(`[${tag}]`, ...args);
+const logManager = typeof wx !== 'undefined' && wx.getLogManager ? wx.getLogManager() : null;
 
 module.exports = {
-  debug: DEBUG ? withTag('DEBUG', console.log) : noop,
-  info:  withTag('INFO', console.log),
-  warn:  withTag('WARN', console.warn),
-  error: withTag('ERROR', console.error),
+  debug: DEBUG && logManager ? withTag('DEBUG', logManager.debug.bind(logManager)) : noop,
+  info:  DEBUG && logManager ? withTag('INFO', logManager.info.bind(logManager)) : noop,
+  warn:  DEBUG && logManager ? withTag('WARN', logManager.warn.bind(logManager)) : noop,
+  error: logManager ? withTag('ERROR', logManager.error.bind(logManager)) : withTag('ERROR', console.error),
 };
