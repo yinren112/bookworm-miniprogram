@@ -15,10 +15,10 @@
 | ✅ | TBC-Audit-20260128-GPT52-01 | 价格单位不一致（分/元） | `book-detail/index.js` 修正为 `/100` |
 | ✅ | SF-New-01 | 前端重复硬编码 ETA 公式 | 提取到 `constants.js` |
 | ✅ | GDE-Supp-20260128-01 | ServiceError 状态码映射不完整 | 扩展 `statusCodeMap` |
-| ⏳ | 核心发现-2 | 版本"逻辑锁" - StudyDashboard 缺少 upgradeAvailable | 待处理 |
-| ⏳ | TBC-New-01 | ETA 计算隐含排除 wrongCount | 待明确口径 |
-| ⏳ | TBC-Audit-20260128-01 | 今日日期时区假设 | 待处理 |
-| ⏳ | 其他 P1/P2 | 见下方详细列表 | 待处理 |
+| ✅ | 核心发现-2 | 版本"逻辑锁" - StudyDashboard 缺少 upgradeAvailable | DTO 增加 upgradeAvailable |
+| ✅ | TBC-New-01 | ETA 计算隐含排除 wrongCount | ETA 纳入 wrongCount |
+| ✅ | TBC-Audit-20260128-01 | 今日日期时区假设 | 首页日期统一北京时间语义 |
+| ✅ | 其他 P1/P2 | 见下方详细列表 | 已完成 |
 
 ---
 
@@ -208,6 +208,7 @@
 **问题**: 为了解决 `config.js` (含 DEBUG_MODE) 与 `logger.js` (依赖 DEBUG_MODE) 的循环依赖，引入了运行时 `try-catch` 与内联 `console.warn` 的复杂性。
 **影响**: 代码结构脆弱，依赖关系不直观；`config.js` 无法享受统一日志能力。
 **建议**: 将无依赖的基础配置（如 `DEBUG_MODE`, `APP_CONFIG`）提取到独立的 `env.js` 或 `constants.js`，让 `config.js` 和 `logger.js` 均作为上层消费者，打破循环。
+✅ 已完成（2026-01-29）：logger 不再依赖 config，config 使用 logger 输出，APP_CONFIG 迁移到 constants。
 
 #### SF-New-04: API Base URL 归一与校验分散为三套逻辑，形成双源规则【核查:真实】
 **文件**: `miniprogram/utils/url.js`；`miniprogram/config.js`；`miniprogram/utils/request.js`  

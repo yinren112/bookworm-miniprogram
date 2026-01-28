@@ -1,6 +1,59 @@
 // miniprogram/utils/cache.js - SWR (stale-while-revalidate) 缓存工具
 const logger = require('./logger');
 
+// ============================================
+// 事件系统（替代不可靠的回调机制）
+// ============================================
+
+/**
+ * 缓存更新事件订阅者
+ * @type {Map<string, Set<Function>>}
+ */
+const subscribers = new Map();
+
+/**
+ * 订阅缓存更新事件
+ * @param {string} key - 缓存键
+ * @param {Function} callback - 更新回调 (data) => void
+ * @returns {Function} 取消订阅函数（页面 onUnload 时调用）
+ */
+function subscribe(key, callback) {
+  if (!subscribers.has(key)) {
+    subscribers.set(key, new Set());
+  }
+  subscribers.get(key).add(callback);
+  return () => {
+    const subs = subscribers.get(key);
+    if (subs) {
+      subs.delete(callback);
+      if (subs.size === 0) {
+        subscribers.delete(key);
+      }
+    }
+  };
+}
+
+/**
+ * 发布缓存更新事件（内部使用）
+ * @param {string} key - 缓存键
+ * @param {*} data - 更新后的数据
+ */
+function publish(key, data) {
+  const subs = subscribers.get(key);
+  if (!subs) return;
+  for (const callback of subs) {
+    try {
+      callback(data);
+    } catch (err) {
+      logger.error('[cache] subscriber callback error', key, err);
+    }
+  }
+}
+
+// ============================================
+// 缓存存取
+// ============================================
+
 /**
  * 从本地存储获取缓存项（同步版本）
  * @param {string} key - 缓存键
@@ -78,15 +131,18 @@ function isExpired(cachedItem) {
 
 /**
  * SWR 缓存策略：先返回缓存（如果未过期），并行后台刷新
+ *
+ * 后台刷新完成后通过事件系统通知订阅者，而非直接回调。
+ * 调用方应使用 subscribe(key, callback) 订阅更新，并在页面 onUnload 时取消订阅。
+ *
  * @param {string} key - 缓存键
  * @param {Function} fetcher - 数据获取函数（返回 Promise）
  * @param {Object} options - 选项
  * @param {number} options.ttlMs - 缓存 TTL（默认 30 秒）
  * @param {boolean} options.forceRefresh - 强制刷新（忽略缓存）
- * @param {Function} options.onBackgroundUpdate - 后台刷新成功回调
  * @returns {Promise<*>} - 返回数据（缓存或新数据）
  */
-async function swrFetch(key, fetcher, { ttlMs = 30000, forceRefresh = false, onBackgroundUpdate = null } = {}) {
+async function swrFetch(key, fetcher, { ttlMs = 30000, forceRefresh = false } = {}) {
   const cached = await getAsync(key);
 
   // 如果强制刷新，直接拉新数据
@@ -94,6 +150,7 @@ async function swrFetch(key, fetcher, { ttlMs = 30000, forceRefresh = false, onB
     try {
       const freshData = await fetcher();
       setWithTTL(key, freshData, ttlMs);
+      publish(key, freshData);
       return freshData;
     } catch (error) {
       // 强制刷新失败，如果有缓存就返回缓存
@@ -110,10 +167,7 @@ async function swrFetch(key, fetcher, { ttlMs = 30000, forceRefresh = false, onB
     fetcher()
       .then(freshData => {
         setWithTTL(key, freshData, ttlMs);
-        // 通知调用方后台更新完成
-        if (onBackgroundUpdate && typeof onBackgroundUpdate === 'function') {
-          onBackgroundUpdate(freshData);
-        }
+        publish(key, freshData);
       })
       .catch(() => {
         // 后台刷新失败，静默处理
@@ -164,6 +218,7 @@ module.exports = {
   getAsync,
   setWithTTL,
   swrFetch,
+  subscribe,
   remove,
   clear
 };

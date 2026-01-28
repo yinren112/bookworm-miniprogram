@@ -6,7 +6,7 @@ const logger = require('../../utils/logger');
 const privacy = require('../../utils/privacy');
 const { getStudyReminderStatus, subscribeStudyReminder, getStudyReminderConfig } = require('../../utils/study-api');
 const { track } = require('../../utils/track');
-const { APP_CONFIG } = require('../../config');
+const { APP_CONFIG } = require('../../utils/constants');
 
 Page({
   data: {

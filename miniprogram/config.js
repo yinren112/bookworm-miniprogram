@@ -1,8 +1,4 @@
-// miniprogram/config.js
-// NOTE: Cannot require('./utils/logger') here to avoid circular dependency
-// config.js is loaded by logger.js, so we use inline logging
-/* eslint-disable no-console */
-
+const logger = require('./utils/logger');
 const { enforceApiBaseUrlPolicy } = require('./utils/url');
 
 function getSystemPlatform() {
@@ -39,7 +35,7 @@ function getApiBaseUrl() {
     const envVersion = accountInfo.miniProgram.envVersion;
 
     if (!urls[envVersion]) {
-      console.warn('[WARN] Unknown envVersion, fallback to release:', envVersion);
+      logger.warn('[WARN] Unknown envVersion, fallback to release:', envVersion);
     }
 
     if (envVersion !== 'develop') {
@@ -51,24 +47,18 @@ function getApiBaseUrl() {
     if (platform === 'devtools') {
       return enforceApiBaseUrlPolicy(urls.develop, { envVersion, platform });
     }
-    console.warn('[WARN] Device develop build uses trial API (no in-app endpoint switching)');
+    logger.warn('[WARN] Device develop build uses trial API (no in-app endpoint switching)');
     return enforceApiBaseUrlPolicy(urls.trial, { envVersion, platform: '' });
   } catch (e) {
-    // Inline warn to avoid circular dependency with logger.js
-    console.warn('[WARN] Failed to get environment, fallback to release:', e);
+    logger.warn('[WARN] Failed to get environment, fallback to release:', e);
     return enforceApiBaseUrlPolicy(urls.release, { envVersion: 'unknown', platform: '' });
   }
 }
-
-const APP_CONFIG = {
-  REVIEW_ONLY_MODE: true
-};
 
 module.exports = {
   getApiBaseUrl,
   get apiBaseUrl() {
     return getApiBaseUrl();
   },
-  isDevtools,
-  APP_CONFIG
+  isDevtools
 };
