@@ -9,10 +9,15 @@ import { getTodayQueueSummary } from "./cardScheduler";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
+// ============================================
+// 类型定义
+// ============================================
+
 export interface StudyDashboardCourse {
   courseKey: string;
   title: string;
   progress: number;
+  upgradeAvailable: boolean;
 }
 
 export interface ResumeSessionSnapshot {
@@ -32,12 +37,29 @@ export interface StudyDashboard {
   resumeSession: ResumeSessionSnapshot | null;
 }
 
-const CARD_SECONDS_PER_ITEM = 8;
-const QUIZ_SECONDS_PER_ITEM = 30;
-
 export interface GetStudyDashboardOptions {
   includeUnpublished?: boolean;
 }
+
+export interface ResolvedCourse {
+  id: number;
+  courseKey: string;
+  title: string;
+  totalCards: number;
+  totalQuestions: number;
+  upgradeAvailable: boolean;
+}
+
+// ============================================
+// 常量
+// ============================================
+
+const CARD_SECONDS_PER_ITEM = 8;
+const QUIZ_SECONDS_PER_ITEM = 30;
+
+// ============================================
+// 主函数
+// ============================================
 
 export async function getStudyDashboard(
   dbCtx: DbCtx,
@@ -46,27 +68,17 @@ export async function getStudyDashboard(
   options: GetStudyDashboardOptions = {},
 ): Promise<StudyDashboard> {
   const { includeUnpublished = false } = options;
+
   const [streakInfo, activityHistory, course] = await Promise.all([
     getStreakInfo(dbCtx, userId),
     getActivityHistory(dbCtx, userId, 35),
     resolveCurrentCourse(dbCtx, userId, courseKey, { includeUnpublished }),
   ]);
 
+  const heatmap = mapActivityToHeatmap(activityHistory.days);
+
   if (!course) {
-    return {
-      dueCardCount: 0,
-      dueQuizCount: 0,
-      wrongCount: 0,
-      etaMinutes: 0,
-      streakDays: streakInfo.currentStreak,
-      activeHeatmap: activityHistory.days.map((day) => ({
-        date: day.date,
-        totalDurationSeconds: day.totalDurationSeconds,
-        level: day.level,
-      })),
-      currentCourse: null,
-      resumeSession: null,
-    };
+    return buildEmptyDashboard(streakInfo.currentStreak, heatmap);
   }
 
   const [todaySummary, quizStats, wrongCount, progress] = await Promise.all([
@@ -76,68 +88,69 @@ export async function getStudyDashboard(
     getCourseProgress(dbCtx, userId, course.id, course.totalCards),
   ]);
 
-  const dueCardCount = todaySummary.dueCards;
-  const dueQuizCount = quizStats.pendingCount;
-  const etaMinutes = estimateMinutes(dueCardCount, dueQuizCount);
-
   return {
-    dueCardCount,
-    dueQuizCount,
+    dueCardCount: todaySummary.dueCards,
+    dueQuizCount: quizStats.pendingCount,
     wrongCount,
-    etaMinutes,
+    etaMinutes: estimateMinutes(todaySummary.dueCards, quizStats.pendingCount),
     streakDays: streakInfo.currentStreak,
-    activeHeatmap: activityHistory.days.map((day) => ({
-      date: day.date,
-      totalDurationSeconds: day.totalDurationSeconds,
-      level: day.level,
-    })),
+    activeHeatmap: heatmap,
     currentCourse: {
       courseKey: course.courseKey,
       title: course.title,
       progress,
+      upgradeAvailable: course.upgradeAvailable,
     },
     resumeSession: null,
   };
 }
 
-interface ResolveCurrentCourseOptions {
+// ============================================
+// 可测试的子函数（已导出）
+// ============================================
+
+export interface ResolveCurrentCourseOptions {
   includeUnpublished?: boolean;
 }
 
-async function resolveCurrentCourse(
+/**
+ * 解析当前课程
+ * - 如果提供了 courseKey，按 key 查找
+ * - 否则返回用户第一个已注册的课程
+ */
+export async function resolveCurrentCourse(
   dbCtx: DbCtx,
   userId: number,
   courseKey?: string,
   options: ResolveCurrentCourseOptions = {},
-): Promise<{ id: number; courseKey: string; title: string; totalCards: number; totalQuestions: number } | null> {
+): Promise<ResolvedCourse | null> {
   const { includeUnpublished = false } = options;
+
   if (courseKey) {
-    const course = await getCourseByKey(dbCtx, courseKey, { userId, publishedOnly: !includeUnpublished });
-    return course
-      ? {
-          id: course.id,
-          courseKey: course.courseKey,
-          title: course.title,
-          totalCards: course.totalCards,
-          totalQuestions: course.totalQuestions,
-        }
-      : null;
+    const course = await getCourseByKey(dbCtx, courseKey, {
+      userId,
+      publishedOnly: !includeUnpublished,
+    });
+    return course ? toResolvedCourse(course) : null;
   }
 
   const courses = await getUserEnrolledCourses(dbCtx, userId);
-  const current = courses[0];
-  if (!current) return null;
+  if (!courses[0]) {
+    return null;
+  }
 
-  return {
-    id: current.id,
-    courseKey: current.courseKey,
-    title: current.title,
-    totalCards: current.totalCards,
-    totalQuestions: current.totalQuestions,
-  };
+  const course = await getCourseByKey(dbCtx, courses[0].courseKey, {
+    userId,
+    publishedOnly: !includeUnpublished,
+  });
+
+  return course ? toResolvedCourse(course) : toResolvedCourse(courses[0]);
 }
 
-async function getQuizPendingStats(
+/**
+ * 获取待做题目统计
+ */
+export async function getQuizPendingStats(
   dbCtx: DbCtx,
   userId: number,
   courseId: number,
@@ -150,36 +163,33 @@ async function getQuizPendingStats(
   const [questionCount, answered] = await Promise.all([
     dbCtx.studyQuestion.count({ where: { courseId } }),
     dbCtx.userQuestionAttempt.findMany({
-    where: {
-      userId,
-      question: { courseId },
-    },
-    distinct: ["questionId"],
+      where: { userId, question: { courseId } },
+      distinct: ["questionId"],
       select: questionAttemptQuestionIdView,
     }),
   ]);
-  const effectiveTotalQuestions = questionCount > 0 ? questionCount : totalQuestions;
 
-  return {
-    pendingCount: Math.max(0, effectiveTotalQuestions - answered.length),
-  };
+  const effectiveTotal = questionCount > 0 ? questionCount : totalQuestions;
+  return { pendingCount: Math.max(0, effectiveTotal - answered.length) };
 }
 
-async function getWrongCount(
+/**
+ * 获取错题数
+ */
+export async function getWrongCount(
   dbCtx: DbCtx,
   userId: number,
   courseId: number,
 ): Promise<number> {
   return dbCtx.userWrongItem.count({
-    where: {
-      userId,
-      clearedAt: null,
-      question: { courseId },
-    },
+    where: { userId, clearedAt: null, question: { courseId } },
   });
 }
 
-async function getCourseProgress(
+/**
+ * 获取课程进度（0-1）
+ */
+export async function getCourseProgress(
   dbCtx: DbCtx,
   userId: number,
   courseId: number,
@@ -188,17 +198,64 @@ async function getCourseProgress(
   if (totalCards <= 0) return 0;
 
   const completedCards = await dbCtx.userCardState.count({
-    where: {
-      userId,
-      card: { courseId },
-    },
+    where: { userId, card: { courseId } },
   });
 
   return Math.min(1, completedCards / totalCards);
 }
 
-function estimateMinutes(dueCardCount: number, dueQuizCount: number): number {
+/**
+ * 估算学习时间（分钟）
+ */
+export function estimateMinutes(dueCardCount: number, dueQuizCount: number): number {
   const seconds = dueCardCount * CARD_SECONDS_PER_ITEM + dueQuizCount * QUIZ_SECONDS_PER_ITEM;
-  if (seconds <= 0) return 0;
-  return Math.ceil(seconds / 60);
+  return seconds <= 0 ? 0 : Math.ceil(seconds / 60);
+}
+
+// ============================================
+// 辅助函数
+// ============================================
+
+function toResolvedCourse(course: {
+  id: number;
+  courseKey: string;
+  title: string;
+  totalCards: number;
+  totalQuestions: number;
+  upgradeAvailable?: boolean;
+}): ResolvedCourse {
+  return {
+    id: course.id,
+    courseKey: course.courseKey,
+    title: course.title,
+    totalCards: course.totalCards,
+    totalQuestions: course.totalQuestions,
+    upgradeAvailable: course.upgradeAvailable ?? false,
+  };
+}
+
+function mapActivityToHeatmap(
+  days: Array<{ date: string; totalDurationSeconds: number; level: number }>,
+): Array<{ date: string; totalDurationSeconds: number; level: number }> {
+  return days.map((day) => ({
+    date: day.date,
+    totalDurationSeconds: day.totalDurationSeconds,
+    level: day.level,
+  }));
+}
+
+function buildEmptyDashboard(
+  streakDays: number,
+  heatmap: Array<{ date: string; totalDurationSeconds: number; level: number }>,
+): StudyDashboard {
+  return {
+    dueCardCount: 0,
+    dueQuizCount: 0,
+    wrongCount: 0,
+    etaMinutes: 0,
+    streakDays,
+    activeHeatmap: heatmap,
+    currentCourse: null,
+    resumeSession: null,
+  };
 }

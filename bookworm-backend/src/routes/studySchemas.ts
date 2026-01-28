@@ -164,6 +164,7 @@ export const StudyDashboardCourseSchema = Type.Object({
   courseKey: Type.String(),
   title: Type.String(),
   progress: Type.Number({ minimum: 0, maximum: 1 }),
+  upgradeAvailable: Type.Boolean(),
 });
 
 export const StudyDashboardHeatmapSchema = Type.Object({
