@@ -20,6 +20,21 @@ function ymdToWeekdayLabel(ymd) {
   return days[weekday];
 }
 
+/**
+ * 获取北京时间"今天"的 YYYY-MM-DD 字符串
+ * @param {Date} [date] - 可选，默认当前时间
+ * @returns {string} YYYY-MM-DD
+ */
+function getBeijingDateOnlyString(date = new Date()) {
+  const beijingTimestamp = date.getTime() + 8 * 60 * 60 * 1000 + date.getTimezoneOffset() * 60 * 1000;
+  const beijingDate = new Date(beijingTimestamp);
+  const year = beijingDate.getFullYear();
+  const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
+  const day = String(beijingDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 module.exports = {
   ymdToWeekdayLabel,
+  getBeijingDateOnlyString,
 };

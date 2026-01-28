@@ -10,7 +10,7 @@ const { track } = require('../../utils/track');
 const feedback = require('../../utils/ui/feedback');
 const soundManager = require('../../utils/sound-manager');
 const config = require('../../config');
-const { ymdToWeekdayLabel } = require('../../utils/date');
+const { ymdToWeekdayLabel, getBeijingDateOnlyString } = require('../../utils/date');
 
 Page({
   data: {
@@ -64,11 +64,11 @@ Page({
   },
 
   setTodayDate() {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-    const weekDay = weekDays[now.getDay()];
+    const ymd = getBeijingDateOnlyString();
+    const parts = ymd.split('-');
+    const month = Number(parts[1]) || 0;
+    const day = Number(parts[2]) || 0;
+    const weekDay = ymdToWeekdayLabel(ymd);
     this.setData({
       todayDate: `${month}月${day}日 周${weekDay}`,
     });
