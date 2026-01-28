@@ -12,6 +12,7 @@ import {
 } from "../services/orderService";
 import config from "../config";
 import prisma from "../db";
+import { ApiError } from "../errors";
 import { PickupCodeSchema } from "./sharedSchemas";
 
 const CreateOrderBodySchema = Type.Object({
@@ -35,18 +36,47 @@ const OrderListQuerySchema = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const presentOrderAmount = (order: any) => {
-  const rest = { ...order };
-  delete rest.web_staff_id;
-  return {
-    ...rest,
-    total_amount: formatCentsToYuanString(order.total_amount),
-  };
+const ORDER_PUBLIC_FIELDS = [
+  "id",
+  "user_id",
+  "status",
+  "total_amount",
+  "pickup_code",
+  "paymentExpiresAt",
+  "pickupExpiresAt",
+  "paid_at",
+  "completed_at",
+  "cancelled_at",
+  "createdAt",
+  "type",
+  "totalWeightKg",
+  "unitPrice",
+  "settlementType",
+  "voucherFaceValue",
+  "notes",
+  "orderItem",
+  "sellDetails",
+] as const;
+
+type OrderPublicField = typeof ORDER_PUBLIC_FIELDS[number];
+type OrderAmountInput = Record<string, unknown> & { total_amount: number };
+type OrderResponse = Partial<Record<OrderPublicField, unknown>> & { total_amount: string };
+
+const presentOrderAmount = (order: OrderAmountInput): OrderResponse => {
+  const output: Record<string, unknown> = {};
+  for (const key of ORDER_PUBLIC_FIELDS) {
+    if (key === "total_amount") {
+      output.total_amount = formatCentsToYuanString(order.total_amount);
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(order, key)) {
+      output[key] = order[key];
+    }
+  }
+  return output as OrderResponse;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const presentOrderList = (orders: any[]) => orders.map(presentOrderAmount);
+const presentOrderList = (orders: OrderAmountInput[]) => orders.map(presentOrderAmount);
 
 const ordersRoutes: FastifyPluginAsync = async function (fastify) {
   fastify.post<{ Body: Static<typeof CreateOrderBodySchema> }>(
@@ -135,7 +165,11 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
     async (request, reply) => {
       const { pickupCode } = request.body;
       const order = await fulfillOrder(prisma, pickupCode.toUpperCase());
-      reply.send(order ? presentOrderAmount(order) : order);
+      if (!order) {
+        reply.send(order);
+        return;
+      }
+      reply.send(presentOrderAmount(order));
     },
   );
 
@@ -175,6 +209,9 @@ const ordersRoutes: FastifyPluginAsync = async function (fastify) {
         userId: request.user!.userId,
         role: request.user!.role!,
       });
+      if (!updatedOrder) {
+        throw new ApiError(404, "订单不存在", "ORDER_NOT_FOUND");
+      }
       reply.send(presentOrderAmount(updatedOrder));
     },
   );
