@@ -7,7 +7,8 @@ const LOCK_NAMESPACE_JOBS = 100;
 const LOCK_JOB_CANCEL_EXPIRED = 1;
 
 async function main() {
-  console.log("Starting cancelExpiredOrders job with advisory lock...");
+  const jobName = "cancelExpiredOrders";
+  log.info({ jobName }, "Starting cancelExpiredOrders job with advisory lock...");
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -16,22 +17,25 @@ async function main() {
       );
 
       if (!lockResult.pg_try_advisory_xact_lock) {
-        console.log("Another instance is already running the job. Skipping.");
+        log.warn({ jobName }, "Another instance is already running the job. Skipping.");
         return null;
       }
 
-      console.log("Lock acquired. Running cancelExpiredOrders job...");
+      log.info({ jobName }, "Lock acquired. Running cancelExpiredOrders job...");
       return await cancelExpiredOrders(tx);
     });
 
     if (result && result.cancelledCount > 0) {
-      console.log(`Job completed successfully. Cancelled ${result.cancelledCount} expired orders.`);
+      log.info(
+        { jobName, cancelledCount: result.cancelledCount },
+        "Job completed successfully",
+      );
     } else if (result) {
-      console.log("Job completed successfully. No expired orders found.");
+      log.info({ jobName }, "Job completed successfully. No expired orders found.");
     }
 
   } catch (error) {
-    log.error("Job failed:", error);
+    log.error({ jobName, err: error }, "Job failed");
     process.exit(1);
   } finally {
     await prisma.$disconnect();

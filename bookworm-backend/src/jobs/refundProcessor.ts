@@ -12,12 +12,13 @@ import * as path from 'path';
  * This job runs periodically to handle refunds for cancelled orders
  */
 export async function processRefundQueue(): Promise<void> {
+  const jobName = "refundProcessor";
   try {
-    console.log('Starting refund processing job...');
+    log.info({ jobName }, "Starting refund processing job...");
 
     // Skip if WeChat Pay is not configured
     if (!config.WXPAY_MCHID || !config.WXPAY_PRIVATE_KEY_PATH) {
-      console.log('WeChat Pay not configured, skipping refund processing');
+      log.warn({ jobName }, "WeChat Pay not configured, skipping refund processing");
       return;
     }
 
@@ -27,7 +28,7 @@ export async function processRefundQueue(): Promise<void> {
       const keyPath = path.resolve(config.WXPAY_PRIVATE_KEY_PATH);
       privateKeyBuffer = fs.readFileSync(keyPath);
     } catch (error) {
-      log.error('Failed to read WeChat Pay private key file:', error);
+      log.error({ jobName, err: error }, "Failed to read WeChat Pay private key file");
       return;
     }
 
@@ -42,17 +43,25 @@ export async function processRefundQueue(): Promise<void> {
     // Process refunds
     const result = await processPendingRefunds(db, wechatPayAdapter);
 
-    console.log(`Refund processing completed: ` +
-      `Processed ${result.processedCount} records, ` +
-      `${result.successCount} successful, ` +
-      `${result.failureCount} failed`);
+    log.info(
+      {
+        jobName,
+        processedCount: result.processedCount,
+        successCount: result.successCount,
+        failureCount: result.failureCount,
+      },
+      "Refund processing completed",
+    );
 
     if (result.failureCount > 0) {
-      log.warn(`${result.failureCount} refunds failed. Reasons:`, result.failures);
+      log.warn(
+        { jobName, failureCount: result.failureCount, failures: result.failures },
+        "Some refunds failed",
+      );
     }
 
   } catch (error) {
-    log.error('Refund processing job failed:', error);
+    log.error({ jobName, err: error }, "Refund processing job failed");
     // Don't re-throw to prevent job scheduler from crashing
   }
 }
