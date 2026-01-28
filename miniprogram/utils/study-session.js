@@ -8,6 +8,7 @@ const {
 } = require('./constants');
 
 const RESUME_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_RESUME_SESSION_BYTES = 200 * 1024;
 
 function getResumeSession() {
   try {
@@ -30,15 +31,27 @@ function getResumeSession() {
 }
 
 function saveResumeSession(session) {
-  if (!session) return;
+  if (!session) return false;
   const payload = {
     ...session,
     updatedAt: Date.now(),
   };
   try {
-    wx.setStorageSync(RESUME_SESSION_STORAGE_KEY, JSON.stringify(payload));
+    const serialized = JSON.stringify(payload);
+    if (serialized.length > MAX_RESUME_SESSION_BYTES) {
+      logger.warn('[study-session] payload too large, skip saving', {
+        size: serialized.length,
+        limit: MAX_RESUME_SESSION_BYTES,
+        type: payload.type,
+      });
+      clearResumeSession();
+      return false;
+    }
+    wx.setStorageSync(RESUME_SESSION_STORAGE_KEY, serialized);
+    return true;
   } catch (error) {
     logger.error('[study-session] save failed', error);
+    return false;
   }
 }
 

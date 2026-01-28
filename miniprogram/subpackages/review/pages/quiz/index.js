@@ -71,6 +71,7 @@ Page({
     this.elapsedOffset = 0;
     this.fatigueChecker = createFatigueChecker();
     this.abortTracked = false;
+    this.resumeSaveFailed = false;
 
     const { courseKey, unitId, wrongItemsOnly, resume, nextType } = options || {};
     if (courseKey) {
@@ -496,8 +497,8 @@ Page({
   },
 
   saveSnapshot() {
-    if (!this.data.sessionId) return;
-    saveResumeSession({
+    if (!this.data.sessionId || this.resumeSaveFailed) return;
+    const saved = saveResumeSession({
       type: "quiz",
       courseKey: this.data.courseKey,
       unitId: this.data.unitId,
@@ -511,6 +512,10 @@ Page({
       wrongItemsOnly: this.data.wrongItemsOnly,
       elapsedSeconds: this.getElapsedSeconds(),
     });
+    if (!saved) {
+      this.resumeSaveFailed = true;
+      logger.warn("[study-session] quiz snapshot save skipped");
+    }
   },
 
   getElapsedSeconds() {

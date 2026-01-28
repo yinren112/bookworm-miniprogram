@@ -47,6 +47,7 @@ Page({
     this.elapsedOffset = 0;
     this.fatigueChecker = createFatigueChecker();
     this.abortTracked = false;
+    this.resumeSaveFailed = false;
 
     const sysInfo = wx.getSystemInfoSync();
     this.setData({ screenWidth: sysInfo.windowWidth });
@@ -418,8 +419,8 @@ Page({
   },
 
   saveSnapshot() {
-    if (!this.data.sessionId || this.data.completed) return;
-    saveResumeSession({
+    if (!this.data.sessionId || this.data.completed || this.resumeSaveFailed) return;
+    const saved = saveResumeSession({
       type: 'flashcard',
       courseKey: this.data.courseKey,
       unitId: this.data.unitId,
@@ -430,6 +431,10 @@ Page({
       starredItems: this.data.starredItems,
       elapsedSeconds: this.getElapsedSeconds(),
     });
+    if (!saved) {
+      this.resumeSaveFailed = true;
+      logger.warn('[study-session] flashcard snapshot save skipped');
+    }
   },
 
   getElapsedSeconds() {
