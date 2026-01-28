@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import config from "../config";
 import { metrics } from "../plugins/metrics";
+import { RETRYABLE_PG_CODES, RETRYABLE_PG_MESSAGES, RETRYABLE_PRISMA_CODES } from "../utils/prismaRetryPolicy";
 
 export interface TxRetryOptions {
   maxRetries?: number;
@@ -18,13 +19,10 @@ export interface TxRetryOptions {
 const DEFAULT_OPTIONS: Required<Omit<TxRetryOptions, "transactionOptions">> = {
   maxRetries: config.DB_TRANSACTION_RETRY_COUNT,
   baseDelayMs: config.DB_TRANSACTION_RETRY_BASE_DELAY_MS,
-  jitter: true,
+  jitter: process.env.NODE_ENV !== "test",
   jitterMs: config.DB_TRANSACTION_RETRY_JITTER_MS,
   isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
 };
-
-const RETRYABLE_PRISMA_CODES = new Set(["P2034"]);
-const RETRYABLE_PG_CODES = new Set(["40001", "40P01", "55P03"]);
 
 function getPgCodeFromError(error: unknown): string | undefined {
   if (error instanceof PrismaClientKnownRequestError) {
@@ -71,11 +69,7 @@ export function isRetryableTxError(error: unknown): boolean {
 
   if (typeof error === "object" && error !== null) {
     const message = (error as { message?: string }).message?.toLowerCase() ?? "";
-    if (
-      message.includes("deadlock detected") ||
-      message.includes("could not serialize access due to") ||
-      message.includes("could not serialize transaction")
-    ) {
+    if (RETRYABLE_PG_MESSAGES.some((fragment) => message.includes(fragment))) {
       return true;
     }
   }

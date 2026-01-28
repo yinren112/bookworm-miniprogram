@@ -2,6 +2,7 @@
 
 ## 可重试错误集合
 - Prisma `P2034`：序列化冲突/死锁
+- Prisma `P1008`：操作超时（可能为瞬时故障）
 - PostgreSQL `40001` (`serialization_failure`)
 - PostgreSQL `40P01` (`deadlock_detected`)
 - PostgreSQL `55P03` (`lock_not_available`)
