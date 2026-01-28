@@ -131,7 +131,7 @@ describe("Study Dashboard Integration", () => {
     expect(payload.dueCardCount).toBe(1);
     expect(payload.dueQuizCount).toBe(1);
     expect(payload.wrongCount).toBe(1);
-    expect(payload.etaMinutes).toBe(1);
+    expect(payload.etaMinutes).toBe(2);
     expect(payload.currentCourse.courseKey).toBe(courseKey);
   });
 });

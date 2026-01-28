@@ -56,6 +56,7 @@ export interface ResolvedCourse {
 
 const CARD_SECONDS_PER_ITEM = 8;
 const QUIZ_SECONDS_PER_ITEM = 30;
+const WRONG_SECONDS_PER_ITEM = QUIZ_SECONDS_PER_ITEM;
 
 // ============================================
 // 主函数
@@ -92,7 +93,7 @@ export async function getStudyDashboard(
     dueCardCount: todaySummary.dueCards,
     dueQuizCount: quizStats.pendingCount,
     wrongCount,
-    etaMinutes: estimateMinutes(todaySummary.dueCards, quizStats.pendingCount),
+    etaMinutes: estimateMinutes(todaySummary.dueCards, quizStats.pendingCount, wrongCount),
     streakDays: streakInfo.currentStreak,
     activeHeatmap: heatmap,
     currentCourse: {
@@ -207,8 +208,15 @@ export async function getCourseProgress(
 /**
  * 估算学习时间（分钟）
  */
-export function estimateMinutes(dueCardCount: number, dueQuizCount: number): number {
-  const seconds = dueCardCount * CARD_SECONDS_PER_ITEM + dueQuizCount * QUIZ_SECONDS_PER_ITEM;
+export function estimateMinutes(
+  dueCardCount: number,
+  dueQuizCount: number,
+  wrongCount: number,
+): number {
+  const seconds =
+    dueCardCount * CARD_SECONDS_PER_ITEM +
+    dueQuizCount * QUIZ_SECONDS_PER_ITEM +
+    wrongCount * WRONG_SECONDS_PER_ITEM;
   return seconds <= 0 ? 0 : Math.ceil(seconds / 60);
 }
 
