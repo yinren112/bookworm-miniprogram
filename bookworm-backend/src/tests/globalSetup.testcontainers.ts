@@ -2,6 +2,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'path';
+import { URL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { resetDatabase } from './utils/resetDb';
 
@@ -74,6 +75,7 @@ export async function teardown() {
 // Helper to get the Prisma Client for the current worker
 export function getPrismaClientForWorker(): PrismaClient {
   const workerId = parseInt(process.env.VITEST_WORKER_ID || '1', 10);
+  let availableEnvWorkers: string[] = [];
 
   // Try to get the stored client first
   let client = prismaClients[workerId];
@@ -83,10 +85,11 @@ export function getPrismaClientForWorker(): PrismaClient {
     const testContainers = process.env.TEST_CONTAINERS;
     if (testContainers) {
       const containers = JSON.parse(testContainers);
+      availableEnvWorkers = Object.keys(containers);
       const databaseUrl = containers[workerId] || containers['1']; // Fallback to worker 1 if current worker not found
 
       if (databaseUrl) {
-        console.log(`Creating new Prisma client for worker ${workerId} with URL: ${databaseUrl.substring(0, 30)}...`);
+        console.log(`Creating new Prisma client for worker ${workerId} with URL: ${redactDatabaseUrl(databaseUrl)}...`);
         client = new PrismaClient({
           datasources: {
             db: {
@@ -102,9 +105,21 @@ export function getPrismaClientForWorker(): PrismaClient {
   }
 
   if (!client) {
-    throw new Error(`No Prisma client available for worker ${workerId}. Available workers: ${Object.keys(prismaClients).join(', ')}, TEST_CONTAINERS: ${process.env.TEST_CONTAINERS}`);
+    const availableClients = Object.keys(prismaClients);
+    const availableFromEnv = availableEnvWorkers.length ? availableEnvWorkers.join(', ') : 'none';
+    throw new Error(`No Prisma client available for worker ${workerId}. Available workers: ${availableClients.join(', ') || 'none'}. Env workers: ${availableFromEnv}.`);
   }
   return client;
+}
+
+function redactDatabaseUrl(databaseUrl: string): string {
+  try {
+    const url = new URL(databaseUrl);
+    const port = url.port ? `:${url.port}` : "";
+    return `${url.protocol}//${url.hostname}${port}${url.pathname}`;
+  } catch {
+    return "<redacted>";
+  }
 }
 
 async function truncateAllTables(prisma: PrismaClient) {
