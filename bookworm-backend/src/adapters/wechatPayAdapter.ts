@@ -5,6 +5,24 @@ import WechatPay from "wechatpay-node-v3";
 import { WechatPayError } from "../errors";
 import { isAxiosError } from "../utils/typeGuards";
 
+function getAxiosErrorMessage(error: unknown): string {
+  if (!isAxiosError(error)) {
+    return error instanceof Error ? error.message : "Unknown error";
+  }
+
+  const data = error.response?.data;
+  if (typeof data === "string" && data.trim()) {
+    return data;
+  }
+  if (data && typeof data === "object" && "message" in data) {
+    const message = (data as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+  return error.message;
+}
+
 // --- STRICT INPUT/OUTPUT INTERFACES ---
 
 export interface WechatPayConfig {
@@ -130,7 +148,35 @@ export class WechatPayAdapter {
         prepay_id: response.prepay_id,
       };
     } catch (error) {
-      throw new Error(`Failed to create payment order: ${(error as Error).message}`);
+      if (isAxiosError(error)) {
+        const status = error.response?.status;
+        const message = getAxiosErrorMessage(error);
+
+        if (status && status >= 400 && status < 500) {
+          throw new WechatPayError(
+            "INVALID_REQUEST",
+            false,
+            `Invalid request to WeChat Pay: ${message}`,
+            error,
+          );
+        }
+        if (status && status >= 500) {
+          throw new WechatPayError(
+            "WECHAT_SERVER_ERROR",
+            true,
+            `WeChat Pay server error: ${message}`,
+            error,
+          );
+        }
+      }
+
+      const message = getAxiosErrorMessage(error);
+      throw new WechatPayError(
+        "CREATE_ORDER_FAILED",
+        true,
+        `Failed to create payment order: ${message}`,
+        error,
+      );
     }
   }
 
@@ -167,7 +213,7 @@ export class WechatPayAdapter {
     } catch (error) {
       if (isAxiosError(error)) {
         const status = error.response?.status;
-        const message = error.response?.data?.message || error.message;
+        const message = getAxiosErrorMessage(error);
 
         if (status === 404 || message.includes('ORDER_NOT_EXIST')) {
           throw new WechatPayError('ORDER_NOT_FOUND', false, `Order not found on WeChat's side: ${message}`, error);
@@ -275,7 +321,7 @@ export class WechatPayAdapter {
     } catch (error) {
       if (isAxiosError(error)) {
         const status = error.response?.status;
-        const message = error.response?.data?.message || error.message;
+        const message = getAxiosErrorMessage(error);
 
         if (status && status >= 400 && status < 500) {
           throw new WechatPayError('INVALID_REFUND_REQUEST', false, `Invalid refund request: ${message}`, error);

@@ -1,10 +1,12 @@
 // src/utils/typeGuards.ts
 // Type guards for safe error handling without 'as any'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ApiError } from "../errors";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 /**
  * Type guard for Fastify HTTP errors with statusCode
@@ -13,15 +15,15 @@ export interface FastifyHttpError {
   statusCode: number;
   code?: string;
   message?: string;
-  validation?: any[];
+  validation?: unknown[];
 }
 
 export function isFastifyHttpError(error: unknown): error is FastifyHttpError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    typeof (error as any).statusCode === 'number'
-  );
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return typeof error.statusCode === "number";
 }
 
 /**
@@ -29,15 +31,11 @@ export function isFastifyHttpError(error: unknown): error is FastifyHttpError {
  */
 export interface FastifyValidationError extends FastifyHttpError {
   statusCode: 400;
-  validation: any[];
+  validation: unknown[];
 }
 
 export function isFastifyValidationError(error: unknown): error is FastifyValidationError {
-  return (
-    isFastifyHttpError(error) &&
-    error.statusCode === 400 &&
-    Array.isArray((error as any).validation)
-  );
+  return isFastifyHttpError(error) && error.statusCode === 400 && Array.isArray(error.validation);
 }
 
 /**
@@ -149,18 +147,17 @@ export interface AxiosError {
   isAxiosError: true;
   response?: {
     status: number;
-    data?: any;
+    data?: unknown;
   };
   message: string;
 }
 
 export function isAxiosError(error: unknown): error is AxiosError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as any).isAxiosError === true &&
-    typeof (error as any).message === 'string'
-  );
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return error.isAxiosError === true && typeof error.message === "string";
 }
 
 /**
@@ -173,8 +170,8 @@ export function getErrorMessage(error: unknown): string {
   if (typeof error === 'string') {
     return error;
   }
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    return String((error as any).message);
+  if (isRecord(error) && "message" in error) {
+    return String(error.message);
   }
   return 'Unknown error';
 }
