@@ -91,7 +91,7 @@ function performRequest(options, attempt = 0) {
   const RETRY_DELAYS = [100, 300, 900];
   const MAX_RETRIES = RETRY_DELAYS.length;
 
-  const requestId = generateRequestId();
+  const requestId = typeof options.requestId === 'string' ? options.requestId : generateRequestId();
   const token = requireAuth ? tokenUtil.getToken() : null;
 
   return new Promise((resolve, reject) => {
@@ -135,7 +135,7 @@ function performRequest(options, attempt = 0) {
           const delayMs = RETRY_DELAYS[attempt];
           await sleep(delayMs);
           try {
-            const retryResult = await performRequest(options, attempt + 1);
+            const retryResult = await performRequest({ ...options, requestId }, attempt + 1);
             resolve(retryResult);
           } catch (retryError) {
             reject(retryError);
@@ -158,7 +158,7 @@ function performRequest(options, attempt = 0) {
           const delayMs = RETRY_DELAYS[attempt];
           await sleep(delayMs);
           try {
-            const retryResult = await performRequest(options, attempt + 1);
+            const retryResult = await performRequest({ ...options, requestId }, attempt + 1);
             resolve(retryResult);
           } catch (retryError) {
             reject(retryError);
