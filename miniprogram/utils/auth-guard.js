@@ -46,10 +46,16 @@ async function exchangeCodeForToken(code, phoneCode) {
     if (data && data.token) {
       return data;
     } else {
-      throw new Error((data && data.message) || '登录失败');
+      throw baseRequest.normalizeError(
+        {
+          message: (data && data.message) || '登录失败',
+          errorCode: data && (data.errorCode || data.code),
+        },
+        { errorCode: 'AUTH_FAILED', message: '登录失败' },
+      );
     }
   } catch (error) {
-    throw new Error((error && error.message) || '登录请求失败');
+    throw baseRequest.normalizeError(error, { errorCode: 'AUTH_FAILED', message: '登录请求失败' });
   }
 }
 
@@ -97,11 +103,15 @@ async function ensureLoggedIn({ silent = false } = {}) {
       }
       return data;
     } catch (error) {
+      const normalizedError = baseRequest.normalizeError(error, {
+        errorCode: 'AUTH_FAILED',
+        message: '登录失败，请稍后再试',
+      });
       if (!silent) {
         // 使用统一的错误处理，避免泄露敏感信息
-        ui.showError(error.errorCode ? error : 'AUTH_FAILED');
+        ui.showError(normalizedError);
       }
-      throw error;
+      throw normalizedError;
     } finally {
       loginInFlight = null;
     }
@@ -134,8 +144,12 @@ async function loginWithPhoneNumber(phoneCode) {
     }
     return data;
   } catch (error) {
-    logger.error('Login with authorization failed:', error);
-    throw error;
+    const normalizedError = baseRequest.normalizeError(error, {
+      errorCode: 'AUTH_FAILED',
+      message: '登录失败，请稍后再试',
+    });
+    logger.error('Login with authorization failed:', normalizedError);
+    throw normalizedError;
   }
 }
 

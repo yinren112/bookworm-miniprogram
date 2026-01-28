@@ -13,6 +13,38 @@ function generateRequestId() {
 }
 
 /**
+ * 统一错误对象形状，确保上层可依赖字段稳定存在
+ * @param {unknown} error - 原始错误
+ * @param {Object} fallback - 回退字段
+ * @returns {Object} 规范化后的错误对象
+ */
+function normalizeError(error, fallback = {}) {
+  const base = error instanceof Error
+    ? { message: error.message, stack: error.stack }
+    : (error && typeof error === 'object' ? error : {});
+
+  const fallbackMessage = typeof fallback.message === 'string' && fallback.message.trim()
+    ? fallback.message
+    : '请求失败';
+
+  const message = typeof base.message === 'string' && base.message.trim()
+    ? base.message
+    : fallbackMessage;
+  const errorCode = base.errorCode || base.code || fallback.errorCode;
+  const statusCode = typeof base.statusCode === 'number' ? base.statusCode : fallback.statusCode;
+  const requestId = typeof base.requestId === 'string' ? base.requestId : fallback.requestId;
+
+  return {
+    ...base,
+    ...fallback,
+    message,
+    errorCode,
+    statusCode,
+    requestId,
+  };
+}
+
+/**
  * 延迟函数
  * @param {number} ms - 延迟毫秒数
  */
@@ -112,13 +144,12 @@ function performRequest(options, attempt = 0) {
         }
 
         // 非重试情况，返回错误
-        const errorPayload = res.data && typeof res.data === 'object'
-          ? { ...res.data, statusCode: res.statusCode, requestId }
-          : {
-              message: `请求失败 (${res.statusCode})`,
-              statusCode: res.statusCode,
-              requestId
-            };
+        const errorPayload = normalizeError(
+          res.data && typeof res.data === 'object'
+            ? { ...res.data, statusCode: res.statusCode, requestId }
+            : { statusCode: res.statusCode, requestId },
+          { message: `请求失败 (${res.statusCode})` },
+        );
         reject(errorPayload);
       },
       fail: async (error) => {
@@ -136,14 +167,14 @@ function performRequest(options, attempt = 0) {
         }
 
         // 非重试情况或重试次数用尽，返回网络错误
-        reject({
+        reject(normalizeError({
           message: '网络请求失败',
           errorCode: 'NETWORK_ERROR',
           requestId,
           url: finalUrl,
           errMsg: error && error.errMsg ? error.errMsg : '',
           detail: error,
-        });
+        }));
       },
     });
   });
@@ -165,4 +196,5 @@ function request(options) {
 
 module.exports = {
   request,
+  normalizeError,
 };
