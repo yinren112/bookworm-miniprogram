@@ -26,8 +26,14 @@
       <pill-tag variant="neutral" size="sm" wx:if="{{remainingMinutes > 0}}">剩余约 {{remainingMinutes}} 分钟</pill-tag>
     </view>
   </view>
-  <card-flat wx:if="{{!loading && !error && !empty && currentQuestion}}">
-    <view class="question-head">
+  <enter-transition
+    wx:if="{{!loading && !error && !empty && currentQuestion}}"
+    refreshKey="{{currentQuestion.id}}"
+    translateY="40rpx"
+    inactiveScale="{{0.9}}"
+  >
+    <card-flat>
+      <view class="question-head">
       <view class="question-type">
         <pill-tag variant="neutral" size="sm">{{questionTypeLabels[currentQuestion.questionType]}}</pill-tag>
       </view>
@@ -102,9 +108,10 @@
     </view>
 
     <view class="report-btn-wrapper">
-      <view class="report-btn" bindtap="openReportModal"><text>发现问题？帮我们改进</text></view>
-    </view>
-  </card-flat>
+        <view class="report-btn" bindtap="openReportModal"><text>发现问题？帮我们改进</text></view>
+      </view>
+    </card-flat>
+  </enter-transition>
   <view class="action-section" wx:if="{{showResult && !loading && !error && !empty}}">
     <juicy-button type="primary" full hapticEnabled="{{false}}" bind:tap="nextQuestion">
       {{currentIndex < questionsLength - 1 ? '下一题' : '查看结果'}}

@@ -19,7 +19,15 @@
   />
 
   <view class="cheatsheet-list" wx:if="{{!loading && !error && cheatSheets.length > 0}}">
-    <card-flat wx:for="{{cheatSheets}}" wx:key="id" clickable custom-class="cheatsheet-item" bind:tap="previewCheatSheet" data-index="{{index}}">
+    <card-flat
+      wx:for="{{cheatSheets}}"
+      wx:key="id"
+      clickable
+      custom-class="cheatsheet-item anim-pop"
+      style="--anim-delay: {{index * 40}}ms;"
+      bind:tap="previewCheatSheet"
+      data-index="{{index}}"
+    >
       <view class="item-row">
         <view class="item-icon item-icon--{{item.assetTypeNormalized}}">
           <text>{{assetTypeIcons[item.assetTypeNormalized]}}</text>

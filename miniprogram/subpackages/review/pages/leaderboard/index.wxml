@@ -3,7 +3,7 @@
 <view class="container">
   <loading-state wx:if="{{loading}}" variant="page" text="正在加载排行榜..." />
   <error-state wx:elif="{{error}}" title="加载失败" desc="{{errorMsg || '请重试'}}" bind:retry="loadLeaderboard" />
-  <card-flat wx:if="{{!loading && !error && myStreak}}">
+  <card-flat wx:if="{{!loading && !error && myStreak}}" custom-class="anim-pop">
     <view class="my-head">
       <pill-tag variant="neutral" size="sm">我的排名 {{myRank || '-'}}</pill-tag>
       <pill-tag variant="{{myStreak.isStudiedToday ? 'green' : 'red'}}" size="sm">{{myStreak.isStudiedToday ? '今日已打卡' : '今日未学习'}}</pill-tag>
@@ -27,7 +27,8 @@
     <card-flat
       wx:for="{{items}}"
       wx:key="userId"
-      custom-class="rank-item {{item.userId === myStreak.userId ? 'is-me' : ''}}"
+      custom-class="rank-item anim-pop {{item.userId === myStreak.userId ? 'is-me' : ''}}"
+      style="--anim-delay: {{index * 40}}ms;"
     >
       <view class="rank-row">
         <pill-tag variant="{{index < 3 ? 'yellow' : 'neutral'}}" size="sm">{{item.rank}}</pill-tag>

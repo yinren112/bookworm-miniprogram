@@ -1,0 +1,45 @@
+.ss {
+  position: relative;
+  width: 100%;
+}
+
+.ss-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transform: scale(var(--ss-scale)) translateY(var(--ss-translate));
+  transition: transform var(--ss-duration) var(--ease-standard), opacity var(--ss-duration) var(--ease-standard);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ss-item.is-active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+/* Depth Mode */
+.ss.mode-depth .ss-item {
+  transition: transform var(--ss-duration) var(--ease-in-out-cubic), opacity var(--ss-duration) var(--ease-in-out-cubic);
+}
+
+.ss.mode-depth .ss-item.is-inactive {
+  transform: scale(0.95) translateY(-20rpx);
+  opacity: 0;
+}
+
+.ss.mode-depth .ss-item.is-active {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-item, .ss.mode-depth .ss-item {
+    transition: opacity 0.1s linear;
+    transform: none !important;
+  }
+}

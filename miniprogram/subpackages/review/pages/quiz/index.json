@@ -9,6 +9,7 @@
     "progress-chunky": "/components/ui/progress-chunky/index",
     "pill-tag": "/components/ui/pill-tag/index",
     "loading-state": "/components/ui/loading-state/index",
-    "error-state": "/components/ui/error-state/index"
+    "error-state": "/components/ui/error-state/index",
+    "enter-transition": "/components/ui/enter-transition/index"
   }
 }

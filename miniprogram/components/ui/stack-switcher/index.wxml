@@ -1,0 +1,11 @@
+<view
+  class="ss mode-{{mode}}"
+  style="height: {{height}}; --ss-duration: {{duration}}; --ss-translate: {{translateY}}; --ss-scale: {{inactiveScale}};"
+>
+  <view class="ss-item {{active === 'a' ? 'is-active' : 'is-inactive'}}" style="z-index: {{active === 'a' ? 2 : 1}}">
+    <slot name="a" />
+  </view>
+  <view class="ss-item {{active === 'b' ? 'is-active' : 'is-inactive'}}" style="z-index: {{active === 'b' ? 2 : 1}}">
+    <slot name="b" />
+  </view>
+</view>

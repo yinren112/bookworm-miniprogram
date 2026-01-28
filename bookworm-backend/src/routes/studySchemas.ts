@@ -55,6 +55,7 @@ export const TodayQueueQuerySchema = Type.Object({
 // GET /api/study/dashboard
 export const StudyDashboardQuerySchema = Type.Object({
   courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+  includeUnpublished: Type.Optional(Type.Boolean()),
 });
 
 // POST /api/study/start

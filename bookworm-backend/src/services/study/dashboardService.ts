@@ -35,15 +35,21 @@ export interface StudyDashboard {
 const CARD_SECONDS_PER_ITEM = 8;
 const QUIZ_SECONDS_PER_ITEM = 30;
 
+export interface GetStudyDashboardOptions {
+  includeUnpublished?: boolean;
+}
+
 export async function getStudyDashboard(
   dbCtx: DbCtx,
   userId: number,
   courseKey?: string,
+  options: GetStudyDashboardOptions = {},
 ): Promise<StudyDashboard> {
+  const { includeUnpublished = false } = options;
   const [streakInfo, activityHistory, course] = await Promise.all([
     getStreakInfo(dbCtx, userId),
     getActivityHistory(dbCtx, userId, 35),
-    resolveCurrentCourse(dbCtx, userId, courseKey),
+    resolveCurrentCourse(dbCtx, userId, courseKey, { includeUnpublished }),
   ]);
 
   if (!course) {
@@ -94,13 +100,19 @@ export async function getStudyDashboard(
   };
 }
 
+interface ResolveCurrentCourseOptions {
+  includeUnpublished?: boolean;
+}
+
 async function resolveCurrentCourse(
   dbCtx: DbCtx,
   userId: number,
   courseKey?: string,
+  options: ResolveCurrentCourseOptions = {},
 ): Promise<{ id: number; courseKey: string; title: string; totalCards: number; totalQuestions: number } | null> {
+  const { includeUnpublished = false } = options;
   if (courseKey) {
-    const course = await getCourseByKey(dbCtx, courseKey, { userId, publishedOnly: true });
+    const course = await getCourseByKey(dbCtx, courseKey, { userId, publishedOnly: !includeUnpublished });
     return course
       ? {
           id: course.id,

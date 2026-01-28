@@ -10,6 +10,7 @@ const { track } = require('../../utils/track');
 const feedback = require('../../utils/ui/feedback');
 const soundManager = require('../../utils/sound-manager');
 const config = require('../../config');
+const { ymdToWeekdayLabel } = require('../../utils/date');
 
 Page({
   data: {
@@ -34,6 +35,7 @@ Page({
     primaryCtaText: '开始今日挑战', // Updated Tone
     isDevtools: false,
     debugApiBaseUrl: '',
+    isPageActive: false, // For Tab Switch Animation
   },
 
   onLoad(options) {
@@ -53,7 +55,12 @@ Page({
   },
 
   onShow() {
+    this.setData({ isPageActive: true });
     this.loadData();
+  },
+
+  onHide() {
+    this.setData({ isPageActive: false });
   },
 
   setTodayDate() {
@@ -77,9 +84,10 @@ Page({
 
     try {
       const selectedCourseKey = this.data.selectedCourseKey || undefined;
+      const dashboardCacheKey = `review:dashboard:${REVIEW_DASHBOARD_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}:${selectedCourseKey || 'auto'}`;
       const dashboard = await swrFetch(
-        `review:dashboard:${REVIEW_DASHBOARD_CACHE_VERSION}`,
-        () => getDashboard({ courseKey: selectedCourseKey }),
+        dashboardCacheKey,
+        () => getDashboard({ courseKey: selectedCourseKey, includeUnpublished }),
         { ttlMs: 600000, forceRefresh }
       );
 
@@ -92,17 +100,12 @@ Page({
       
       const heatmapData = (dashboard?.activeHeatmap || [])
         .slice(-7) // Limit to last 7 days to prevent overflow
-        .map((item) => {
-        const dateObj = new Date(item.date);
-        const days = ['日', '一', '二', '三', '四', '五', '六'];
-        const dayLabel = days[dateObj.getDay()];
-        return {
+        .map((item) => ({
           date: item.date,
           totalDurationSeconds: item.totalDurationSeconds || 0,
           level: item.level || 0,
-          dayLabel,
-        };
-      });
+          dayLabel: ymdToWeekdayLabel(item.date),
+        }));
 
       let courses = [];
       let recommendedCourses = [];

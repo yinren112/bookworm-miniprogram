@@ -47,9 +47,19 @@ page {
   
   --ease-bouncy: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out-cubic: cubic-bezier(0.65, 0, 0.35, 1);
   --duration-fast: 120ms;
   --duration-normal: 180ms;
-  --duration-slow: 240ms;
+  --duration-slow: 300ms;
+  --duration-page: 300ms;
+  --duration-overlay: 300ms;
+  --duration-list: 240ms;
+  --motion-translate-sm: 12rpx;
+  --motion-translate-md: 20rpx;
+  --motion-scale-inactive: 0.92;
+  --motion-scale-active: 1;
+  --motion-scale-press: 0.98;
 
   --space-2: 8rpx;
   --space-1: 4rpx;
@@ -121,8 +131,54 @@ page {
 
 .anim-shake {
   animation: uiShake var(--duration-normal) var(--ease-standard);
+  animation-delay: var(--anim-delay, 0ms);
 }
 
 .anim-pop {
   animation: uiPop var(--duration-normal) var(--ease-bouncy);
+  animation-delay: var(--anim-delay, 0ms);
+  animation-fill-mode: both;
+}
+
+.hover-pressed {
+  transform: scale(var(--motion-scale-press));
+}
+
+.item-hover {
+  transform: scale(var(--motion-scale-press));
+}
+
+.pressable {
+  transition: transform var(--duration-fast) var(--ease-out-expo);
+  will-change: transform;
+}
+
+.anim-pulse {
+  animation: uiPulse 2s infinite;
+}
+
+@keyframes uiPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Page Activation Animation (for Tab Switch) */
+.page-active .content-wrapper,
+.page-active .profile-content,
+.page-active .header {
+  animation: pageActivate 0.4s var(--ease-out-expo) both;
+}
+
+@keyframes pageActivate {
+  0% { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-active .content-wrapper,
+  .page-active .profile-content,
+  .page-active .header {
+    animation: none;
+  }
 }

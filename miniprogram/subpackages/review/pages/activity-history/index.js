@@ -3,6 +3,7 @@
 
 const { getActivityHistory, getDashboard } = require('../../utils/study-api');
 const logger = require('../../../../utils/logger');
+const { ymdToWeekdayLabel } = require('../../../../utils/date');
 
 Page({
   data: {
@@ -105,26 +106,13 @@ function buildChartDays(days, range) {
     const cheatsheetHeight = Math.round((barHeightRpx * (d.cheatsheetDurationSeconds || 0)) / maxTotalSeconds);
     return {
       date: d.date,
-      dayLabel: getWeekdayLabel(d.date),
+      dayLabel: ymdToWeekdayLabel(d.date),
       cardHeight,
       quizHeight,
       cheatsheetHeight,
       totalDurationSeconds: d.totalDurationSeconds,
     };
   });
-}
-
-function getWeekdayLabel(ymd) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  if (!match) return '';
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const utc = new Date(Date.UTC(year, month - 1, day));
-  const beijingTimestamp = utc.getTime() + 8 * 60 * 60 * 1000;
-  const weekday = new Date(beijingTimestamp).getUTCDay();
-  const days = ['日', '一', '二', '三', '四', '五', '六'];
-  return days[weekday];
 }
 
 function formatDuration(totalSeconds) {

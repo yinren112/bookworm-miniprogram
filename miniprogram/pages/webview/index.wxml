@@ -10,12 +10,14 @@
   </view>
 
   <!-- Content (Paper Style) -->
-  <card-flat wx:else>
-    <view class="content-body">
-      <view class="doc-title">{{content.title}}</view>
-      <view class="doc-divider"></view>
-      <rich-text nodes="{{content.body}}" class="rich-content"></rich-text>
-    </view>
-  </card-flat>
+  <enter-transition wx:else>
+    <card-flat>
+      <view class="content-body">
+        <view class="doc-title">{{content.title}}</view>
+        <view class="doc-divider"></view>
+        <rich-text nodes="{{content.body}}" class="rich-content"></rich-text>
+      </view>
+    </card-flat>
+  </enter-transition>
 
 </view>

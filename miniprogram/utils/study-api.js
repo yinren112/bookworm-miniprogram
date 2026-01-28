@@ -96,10 +96,12 @@ const getTodayQueue = (courseKey) => {
  * 获取复习首页聚合数据
  * @param {Object} options - 查询选项
  * @param {string} [options.courseKey] - 课程标识
+ * @param {boolean} [options.includeUnpublished] - 是否包含未发布课程（仅开发者工具）
  */
 const getDashboard = (options = {}) => {
   const queryString = buildQueryString({
     courseKey: options.courseKey,
+    includeUnpublished: options.includeUnpublished ? 'true' : undefined,
   });
   return request({
     url: `/study/dashboard${queryString}`,

@@ -25,11 +25,17 @@ Page({
     reminderStatusText: '未开启',
     nextSendAtText: '',
     reminderLoading: false,
+    isPageActive: false, // For Tab Switch Animation
   },
 
   onShow() {
+    this.setData({ isPageActive: true });
     this.fetchUserInfo();
     this.loadReminderStatus();
+  },
+
+  onHide() {
+    this.setData({ isPageActive: false });
   },
 
   async fetchUserInfo() {

@@ -1,0 +1,6 @@
+<view
+  class="et {{visible ? 'is-visible' : 'is-hidden'}} {{play ? 'play' : ''}}"
+  style="--et-duration: {{duration}}; --et-translate: {{translateY}}; --et-scale: {{inactiveScale}}; --et-delay: {{staggerIndex * 50}}ms; animation-name: etScaleFade-{{keyCounter}}"
+>
+  <slot />
+</view>

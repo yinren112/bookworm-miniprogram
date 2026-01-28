@@ -47,6 +47,21 @@ Page({
     showReportModal: false,
     questionTypeClass: "",
     accuracyPercent: 0,
+    questionEnter: true,
+  },
+
+  playQuestionEnter() {
+    if (this._questionEnterTimer) {
+      clearTimeout(this._questionEnterTimer);
+      this._questionEnterTimer = null;
+    }
+
+    this.setData({ questionEnter: false }, () => {
+      this._questionEnterTimer = setTimeout(() => {
+        this.setData({ questionEnter: true });
+        this._questionEnterTimer = null;
+      }, 0);
+    });
   },
 
   onLoad(options) {
@@ -191,6 +206,8 @@ Page({
         optionStates: buildOptionStates(questions[0]?.options || [], [], []),
         questionTypeClass: getQuestionTypeClass(questions[0]),
         accuracyPercent: 0,
+      }, () => {
+        this.playQuestionEnter();
       });
 
       this.updateProgress(0);
@@ -435,6 +452,8 @@ Page({
       progressPercent: Math.round((nextIndex / this.data.questionsLength) * 100),
       startTime: Date.now(),
       questionTypeClass: getQuestionTypeClass(nextQ),
+    }, () => {
+      this.playQuestionEnter();
     });
 
     this.updateProgress(nextIndex);

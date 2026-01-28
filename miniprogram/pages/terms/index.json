@@ -1,5 +1,8 @@
 {
   "navigationBarTitleText": "服务协议与隐私政策",
   "navigationBarTextStyle": "black",
-  "navigationBarBackgroundColor": "#FFFFFF"
+  "navigationBarBackgroundColor": "#FFFFFF",
+  "usingComponents": {
+    "stack-switcher": "/components/ui/stack-switcher/index"
+  }
 }

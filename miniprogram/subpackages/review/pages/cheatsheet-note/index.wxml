@@ -21,11 +21,13 @@
       </view>
     </view>
 
-    <card-flat>
-      <view class="note-body">
-        <mp-html content="{{content}}" markdown="{{contentFormat === 'markdown'}}" />
-      </view>
-    </card-flat>
+    <enter-transition>
+      <card-flat>
+        <view class="note-body">
+          <mp-html content="{{content}}" markdown="{{contentFormat === 'markdown'}}" />
+        </view>
+      </card-flat>
+    </enter-transition>
 
     <view class="actions">
       <juicy-button type="secondary" full bind:tap="goBack">返回</juicy-button>

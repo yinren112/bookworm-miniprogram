@@ -421,9 +421,13 @@ const studyRoutes: FastifyPluginAsync = async function (fastify) {
     },
     async (request, reply) => {
       const userId = request.user!.userId;
-      const { courseKey } = request.query;
+      const { courseKey, includeUnpublished } = request.query;
+      const includeUnpublishedFlag = includeUnpublished === true;
+      assertIncludeUnpublishedAllowed(includeUnpublishedFlag, config.NODE_ENV);
 
-      const dashboard = await getStudyDashboard(prisma, userId, courseKey);
+      const dashboard = await getStudyDashboard(prisma, userId, courseKey, {
+        includeUnpublished: includeUnpublishedFlag,
+      });
 
       if (courseKey && !dashboard.currentCourse) {
         throw new ApiError(404, "Course not found", "COURSE_NOT_FOUND");

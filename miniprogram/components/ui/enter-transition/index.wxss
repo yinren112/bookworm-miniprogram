@@ -1,0 +1,45 @@
+.et {
+  width: 100%;
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  will-change: transform, opacity;
+}
+
+.et.is-hidden {
+  opacity: 0;
+  transform: scale(var(--et-scale)) translateY(var(--et-translate));
+  pointer-events: none;
+}
+
+.et.is-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.et.play.is-visible {
+  /* Use a base animation name that can be overridden by style inline */
+  animation: etScaleFade var(--et-duration) var(--ease-out-expo) var(--et-delay, 0ms) both;
+}
+
+/* Define multiple identical keyframes to support key-based re-triggering */
+@keyframes etScaleFade { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-0 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-1 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-2 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-3 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-4 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-5 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-6 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-7 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-8 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-9 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes etScaleFade-10 { from { opacity: 0; transform: scale(var(--et-scale)) translateY(var(--et-translate)); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .et.play.is-visible {
+    animation: etFadeIn 0.1s linear both;
+    transform: none !important;
+  }
+}
+
+@keyframes etFadeIn { from { opacity: 0; } to { opacity: 1; } }

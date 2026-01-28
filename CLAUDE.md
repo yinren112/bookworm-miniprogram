@@ -753,6 +753,16 @@ Host lailinkeji
 4. 验证只做两步：`GET /api/study/courses`（只返回 PUBLISHED）与 `GET /api/study/courses/:courseKey`（核对 units/cards/questions 数量）。
 5. 详细操作手册见：`docs/operations/课程导入SOP（给定课程包文件夹）.md`。
 
+### SOP-开发者工具首页课程为空排查与恢复
+0. 先查环境再查数据：课程“为空”最常见的根因不是接口坏了，而是请求打到空库/错库（环境指向错误会把“空”伪装成“正常返回但没数据”）。
+1. Step1：确认小程序实际请求的 baseURL/host（devtools vs 真机 develop 回落 trial 的差异），以 `miniprogram/config.js` 的运行时选择为准。
+2. Step2：确认后端当前 `DATABASE_URL` 指向的库名与端口（你看到的数据=这个库里的数据；不要靠“我以为我连的是 X”）。
+3. Step3：用 Prisma Studio/SQL 查看 `study_course` 行数与 `status` 分布（至少要给出 `PUBLISHED` 计数）。
+4. Step4：若 `study_course` 为 0 或 `PUBLISHED=0`，按导入 SOP 走：先 `--dry-run`，通过后再 `--force --publish`。
+5. Step5：处理前端缓存 TTL：清理缓存/强制重启开发者工具/重启小程序进程，避免读到旧的空结果。
+6. 验收：`GET /api/study/courses` 返回非空，且 DB 内 `study_course` 的 `PUBLISHED > 0`。
+7. 报告硬性要求：每次遇到“课程为空”，必须同时给出：请求的 baseURL/host 与 DB 的 `study_course` 总行数、`PUBLISHED` 行数。
+
 ### SOP-单测不依赖 .env（避免 import 阶段炸）
 1. 一旦 `src/config.ts` 在 import 阶段强校验 env，测试框架的 setupFiles 不一定救得回来；主修复必须在 `config.ts` 内做 test 分支。
 2. test 模式硬要求禁用 dotenv 自动加载：避免“本地 .env 偷跑绿，CI 仍红”和不可复现。

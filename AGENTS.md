@@ -35,6 +35,15 @@
 - `docker-compose.yml`与`docker-compose.monitoring.yml`默认使用 3000、5432、8080 端口，如需调整请使用 override 文件。
  - `/metrics` 默认应受保护：生产环境通过 `METRICS_AUTH_TOKEN`（Bearer）或反向代理白名单限制访问；避免公开暴露。
 
+## 环境与数据库速查
+- devtools 下 `envVersion=develop`：应请求 `http://localhost:8080/api`。
+- 真机下 `envVersion=develop`：可能回落走 `trial`（不提供应用内切换入口），因此“课程为空”首先怀疑环境指向，而不是接口逻辑。
+- `envVersion=trial/release`：固定走 staging/prod 域名。
+- 每次遇到“课程为空”，报告必须同时给出：
+  - 请求的 baseURL/host（含 envVersion 与平台：devtools/ios/android）。
+  - DB 侧 `DATABASE_URL` 的 host/port/dbname 以及 `study_course` 总行数与 `PUBLISHED` 行数。
+- 排障顺序固定：先查环境指向（baseURL 与 DATABASE_URL）再查数据（表行数与状态），最后才考虑导入与缓存。
+
 ## 当前复习模式（上线优先）
 - TabBar 仅包含“复习/我的”，对应 `pages/review/index` 与 `pages/profile/index`。
 - TabBar 页面必须在主包，复习首页不可放在分包。

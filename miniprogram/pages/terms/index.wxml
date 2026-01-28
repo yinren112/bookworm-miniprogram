@@ -6,35 +6,56 @@
   </view>
 
   <view class="tab-bar">
-    <view class="tab {{activeTab === 'terms' ? 'active' : ''}}" data-tab="terms" bindtap="onTabChange">
+    <view
+      class="tab pressable {{activeTab === 'terms' ? 'active' : ''}}"
+      data-tab="terms"
+      bindtap="onTabChange"
+      hover-class="hover-pressed"
+      hover-stay-time="80"
+    >
       用户服务协议
     </view>
-    <view class="tab {{activeTab === 'privacy' ? 'active' : ''}}" data-tab="privacy" bindtap="onTabChange">
+    <view
+      class="tab pressable {{activeTab === 'privacy' ? 'active' : ''}}"
+      data-tab="privacy"
+      bindtap="onTabChange"
+      hover-class="hover-pressed"
+      hover-stay-time="80"
+    >
       隐私政策
     </view>
   </view>
 
-  <scroll-view class="content" scroll-y>
-    <block wx:if="{{activeTab === 'terms'}}">
-      <view class="section" wx:for="{{termsSections}}" wx:for-item="section" wx:key="title">
-        <text class="section-title">{{section.title}}</text>
-        <view class="paragraph" wx:for="{{section.paragraphs}}" wx:for-item="paragraph" wx:key="*this">
-          <text>{{paragraph}}</text>
+  <view class="content-stack">
+    <stack-switcher
+      active="{{activeTab === 'terms' ? 'a' : 'b'}}"
+      height="100%"
+      duration="var(--duration-page)"
+      translateY="var(--motion-translate-md)"
+      inactiveScale="{{0.92}}"
+      mode="depth"
+    >
+      <scroll-view slot="a" class="content-scroll" scroll-y>
+        <view class="section" wx:for="{{termsSections}}" wx:for-item="section" wx:key="title">
+          <text class="section-title">{{section.title}}</text>
+          <view class="paragraph" wx:for="{{section.paragraphs}}" wx:for-item="paragraph" wx:key="*this">
+            <text>{{paragraph}}</text>
+          </view>
         </view>
-      </view>
-    </block>
-    <block wx:elif="{{activeTab === 'privacy'}}">
-      <view class="section" wx:for="{{privacySections}}" wx:for-item="section" wx:key="title">
-        <text class="section-title">{{section.title}}</text>
-        <view class="paragraph" wx:for="{{section.paragraphs}}" wx:for-item="paragraph" wx:key="*this">
-          <text>{{paragraph}}</text>
+      </scroll-view>
+      <scroll-view slot="b" class="content-scroll" scroll-y>
+        <view class="section" wx:for="{{privacySections}}" wx:for-item="section" wx:key="title">
+          <text class="section-title">{{section.title}}</text>
+          <view class="paragraph" wx:for="{{section.paragraphs}}" wx:for-item="paragraph" wx:key="*this">
+            <text>{{paragraph}}</text>
+          </view>
         </view>
-      </view>
-    </block>
-  </scroll-view>
+      </scroll-view>
+    </stack-switcher>
+  </view>
 
   <view class="actions">
-    <button class="primary" bindtap="handleAccept">同意并继续</button>
-    <button class="secondary" bindtap="handleReject">拒绝并退出</button>
+    <button class="primary" bindtap="handleAccept" hover-class="hover-pressed" hover-stay-time="100">同意并继续</button>
+    <button class="secondary" bindtap="handleReject" hover-class="hover-pressed" hover-stay-time="100">拒绝并退出</button>
   </view>
 </view>
