@@ -1,6 +1,7 @@
 // miniprogram/utils/request.js - 统一的底层HTTP请求客户端
 const config = require('../config');
 const tokenUtil = require('./token');
+const { buildFinalApiUrl } = require('./url');
 
 /**
  * 生成简易的请求ID（用于追踪）
@@ -104,15 +105,17 @@ function performRequest(options, attempt = 0) {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const finalUrl = `${config.apiBaseUrl}${url}`;
-    if (!/^https?:\/\//i.test(finalUrl) || /[：／]/.test(finalUrl) || /[`"'“”‘’]/.test(finalUrl) || /\s/.test(finalUrl)) {
-      reject({
+    let finalUrl;
+    try {
+      finalUrl = buildFinalApiUrl(config.apiBaseUrl, url);
+    } catch (error) {
+      reject(normalizeError(error, {
         message: '请求地址非法，请检查 API 地址配置是否包含全角冒号/反引号/空格',
         errorCode: 'INVALID_URL',
         requestId,
-        url: finalUrl,
+        url: `${config.apiBaseUrl}${url}`,
         errMsg: 'net::ERR_INVALID_URL',
-      });
+      }));
       return;
     }
 

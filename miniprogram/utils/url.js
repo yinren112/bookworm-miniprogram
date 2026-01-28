@@ -44,8 +44,23 @@ function enforceApiBaseUrlPolicy(url, options = {}) {
   return url;
 }
 
+function buildFinalApiUrl(baseUrl, path) {
+  const finalUrl = `${baseUrl}${path}`;
+  const hasIllegalChars = /[：／]/.test(finalUrl) || /[`"'“”‘’]/.test(finalUrl) || /\s/.test(finalUrl);
+
+  if (!/^https?:\/\//i.test(finalUrl) || hasIllegalChars) {
+    const error = new Error('请求地址非法，请检查 API 地址配置是否包含全角冒号/反引号/空格');
+    error.errorCode = 'INVALID_URL';
+    error.url = finalUrl;
+    throw error;
+  }
+
+  return finalUrl;
+}
+
 module.exports = {
   normalizeApiBaseUrl,
   sanitizeUrlInput,
   enforceApiBaseUrlPolicy,
+  buildFinalApiUrl,
 };
