@@ -1,7 +1,7 @@
 :host {
   --card-border-color: var(--color-border);
   --card-radius: var(--radius-card);
-  --card-lip-height: var(--lip-md);
+  --card-lip-height: 0rpx;
 }
 
 .card-flat {
@@ -10,33 +10,24 @@
   border-radius: var(--card-radius);
   background: transparent;
   box-sizing: border-box;
-  padding-bottom: var(--card-lip-height);
+  padding-bottom: 0;
   transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .card-face {
   position: relative;
   background: var(--color-bg-card);
-  border: var(--border-thick) solid var(--card-border-color);
+  border: none;
   border-radius: var(--card-radius);
   z-index: 2;
   box-sizing: border-box;
-  /* Add subtle shadow for better depth on off-white background */
-  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03); 
+  box-shadow: var(--shadow-card);
 }
 
 .card-lip {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background: var(--color-border-shade);
-  border-radius: var(--card-radius);
-  z-index: 1;
-  transform: none;
+  display: none;
 }
 
 .card-flat.is-pressed {
-  transform: translateY(4rpx);
+  transform: scale(var(--motion-scale-press));
 }

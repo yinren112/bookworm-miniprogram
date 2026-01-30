@@ -14,7 +14,7 @@
 .pt--sm { font-size: var(--font-size-xs); padding: 6rpx 16rpx; }
 .pt--md { font-size: var(--font-size-sm); }
 
-.pt--neutral { border-color: var(--color-border); color: var(--color-text-light); }
+.pt--neutral { border-color: var(--color-border); color: var(--color-text-light); background: var(--color-bg-soft); }
 .pt--green { border-color: var(--color-juicy-green); color: var(--color-juicy-green); background: var(--color-bg-success); }
 .pt--blue { border-color: var(--color-juicy-blue); color: var(--color-juicy-blue); background: var(--color-bg-info); }
 .pt--yellow { border-color: var(--color-juicy-yellow-shade); color: var(--color-juicy-yellow-shade); background: var(--color-bg-warn); }

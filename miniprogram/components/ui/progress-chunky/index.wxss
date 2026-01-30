@@ -1,13 +1,13 @@
 .pc__track {
-  height: 32rpx;
-  border-radius: 16rpx;
-  background: var(--color-border);
+  height: 28rpx;
+  border-radius: 14rpx;
+  background: var(--color-border-shade);
   overflow: hidden;
 }
 
 .pc__fill {
   height: 100%;
-  border-radius: 16rpx;
+  border-radius: 14rpx;
   transition: width var(--duration-normal) var(--ease-standard);
   position: relative;
 }

@@ -254,13 +254,13 @@ The system follows a strict "books as atomic inventory items" model where each i
 - **Additional Utility Modules**:
   - `ui.js`: UI helpers (showError, showSuccess, formatPrice)
   - `logger.js`: Unified logging helper (avoid direct `console.*` in miniprogram code)
-  - `error.js`: Error message extraction
+  - `error.js`: Deprecated，统一改用 `ui.getErrorMessage`/`ui.showError`
   - `payment.js`: Payment workflow (createOrderAndPay, safeCreateOrderAndPay)
-  - `constants.js`: Business constants (ORDER_STATUS enums)
-  - `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
+  - `constants.js`: Business constants（ORDER_STATUS/APP_CONFIG/复习缓存键/ETA 常量）
+  - `config.js`: API configuration（apiBaseUrl，APP_CONFIG 已迁至 `constants.js`）
   - `study-api.js`: Review system API wrapper
   - `study-session.js`: Review session state helpers
-  - `url.js`: Normalize API base URL (anti fullwidth-colon/backticks)
+  - `url.js`: URL 归一化与校验（`normalizeApiBaseUrl`/`enforceApiBaseUrlPolicy`/`buildFinalApiUrl`）
   - `track.js`: Lightweight analytics tracking
   - `haptic.js`/`sound-manager.js`/`confetti.js`/`theme.js`: Interaction and theme helpers
 
@@ -563,7 +563,7 @@ WX_APP_SECRET=test-app-secret
 - 小程序网络请求必须走 `miniprogram/utils/request.js`，不要直接调用 `wx.request`。
 
 **复习模式（前端）:**
-- `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 保持 `true`
+- `miniprogram/utils/constants.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 保持 `true`（`config.js` 不再承载 APP_CONFIG）
 - `miniprogram/app.json` 仅注册 `pages/review/index` 与 `pages/profile/index` 作为 TabBar
 - TabBar 页面必须在主包，复习首页不要放分包
 - `pages/profile/index` 隐藏手机号授权与员工入口，分享文案指向复习首页
@@ -621,7 +621,7 @@ npm run test:integration    # Run integration tests with Testcontainers
 - Structured JSON logging via Fastify
 - Request/response logging with redacted auth headers
 - Error tracking with stack traces
-- RequestId 策略：小程序发送 `X-Request-ID`，后端回写 `x-request-id` 响应头；访问日志与错误日志统一输出同一个 requestId（字段：`reqId`/`requestId`），用于端到端排障
+- RequestId 策略：小程序发送 `X-Request-ID`，重试链路复用同一 requestId；后端回写 `x-request-id` 响应头；访问日志与错误日志统一输出同一个 requestId（字段：`reqId`/`requestId`），用于端到端排障
 
 ## Background Jobs & Scheduled Tasks
 

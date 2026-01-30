@@ -9,5 +9,4 @@
   style="{{customStyle}}"
 >
   <view class="jb__face"><slot /></view>
-  <view class="jb__lip"></view>
 </button>

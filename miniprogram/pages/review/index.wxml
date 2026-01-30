@@ -1,5 +1,14 @@
 <view class="container {{isPageActive ? 'page-active' : ''}}">
-  <topbar title="复习" back="{{false}}" color="var(--color-text-main)" background="var(--color-bg-card)"></topbar>
+  <topbar title="复习" back="{{false}}" color="var(--color-text-main)" background="var(--color-bg-card)">
+    <view slot="right" class="header-actions">
+      <view class="header-icon-wrapper" bindtap="onHistoryTap">
+        <image src="/images/icons/review/clock.svg" class="header-icon" mode="aspectFit" />
+      </view>
+      <view class="header-icon-wrapper" bindtap="onSettingsTap">
+        <image src="/images/icons/setting.svg" class="header-icon" mode="aspectFit" />
+      </view>
+    </view>
+  </topbar>
   <scroll-view scroll-y class="main-scroll {{showCoursePicker ? 'scale-down' : ''}}" enable-flex>
     <loading-state wx:if="{{loading}}" variant="page" text="加载中..." />
     <block wx:elif="{{error}}">
@@ -9,53 +18,41 @@
       </view>
     </block>
     <enter-transition wx:else class="content-wrapper" visible="{{!loading && !error}}" staggerIndex="0">
-      <card-flat>
-        <view
-          class="course-header pressable"
-          bindtap="navigateToCourse"
-          data-course-key="{{currentCourse ? currentCourse.courseKey : ''}}"
-          hover-class="course-header--pressed"
-          hover-stay-time="80"
-        >
+      <view class="study-card">
+        <view class="course-header pressable" bindtap="navigateToCourse" data-course-key="{{currentCourse ? currentCourse.courseKey : ''}}" hover-class="course-header--pressed" hover-stay-time="80">
           <view class="course-info">
             <text class="course-name">{{currentCourse ? currentCourse.title : '选择课程'}}</text>
-            <stat-split
-              leftValue="{{dashboard ? (dashboard.dueCardCount || 0) : 0}}"
-              leftLabel="待复习"
-              leftTone="green"
-              rightValue="{{dashboard ? (dashboard.dueQuizCount || 0) : 0}}"
-              rightLabel="待测验"
-              rightTone="blue"
-            />
+            <stat-split leftValue="{{dashboard ? (dashboard.dueCardCount || 0) : 0}}" leftLabel="待复习" leftTone="green" rightValue="{{dashboard ? (dashboard.dueQuizCount || 0) : 0}}" rightLabel="待测验" rightTone="blue" />
           </view>
           <view class="course-right">
+            <view class="book-spine-decoration">
+              <view class="spine-bar spine-red"></view>
+              <view class="spine-bar spine-blue"></view>
+              <view class="spine-bar spine-green"></view>
+            </view>
             <view class="course-icon">
               <image class="course-icon-img" src="/images/icons/review/book.svg" mode="aspectFit"></image>
             </view>
             <image class="course-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
           </view>
         </view>
-
         <view class="progress-section">
-          <progress-chunky
-            percent="{{currentCourse ? currentCourse.progressPercent : 0}}"
-            color="yellow"
-            label="进度"
-            showLabel
-          />
+          <progress-chunky percent="{{currentCourse ? currentCourse.progressPercent : 0}}" color="yellow" label="进度" showLabel />
         </view>
-
         <view class="action-area">
-          <juicy-button type="primary" full bind:tap="startPrimaryCta">{{primaryCtaText}}</juicy-button>
+          <juicy-button type="primary" full bind:tap="startPrimaryCta">
+            {{primaryCtaText}}
+          </juicy-button>
           <juicy-button type="outline" full wx:if="{{dashboard && dashboard.wrongCount > 0}}" bind:tap="startWrongReview">
             错题强化 ({{dashboard.wrongCount}})
           </juicy-button>
-          <juicy-button type="secondary" full wx:if="{{resumeSession}}" bind:tap="continueSession">继续上次</juicy-button>
+          <juicy-button type="secondary" full wx:if="{{resumeSession}}" bind:tap="continueSession">
+            继续上次
+          </juicy-button>
         </view>
-      </card-flat>
-
+      </view>
       <enter-transition visible="{{!loading && !error}}" staggerIndex="1">
-        <card-flat wx:if="{{courses && courses.length > 0}}">
+        <view class="study-card" wx:if="{{courses && courses.length > 0}}">
           <view class="section-header">
             <text class="section-title">课程</text>
             <view class="section-link pressable" bindtap="openCoursePicker" hover-class="hover-pressed" hover-stay-time="80">
@@ -63,53 +60,40 @@
               <image class="section-link-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
             </view>
           </view>
-
           <scroll-view scroll-x class="course-chip-scroll" show-scrollbar="{{false}}">
             <view class="course-chip-row">
               <block wx:for="{{enrolledCourses}}" wx:key="courseKey">
-                <view
-                  class="course-chip pressable {{selectedCourseKey === item.courseKey ? 'active' : ''}}"
-                  bindtap="selectEnrolledCourse"
-                  data-course-key="{{item.courseKey}}"
-                  hover-class="course-chip--pressed"
-                  hover-stay-time="80"
-                >
+                <view class="course-chip pressable {{selectedCourseKey === item.courseKey ? 'active' : ''}}" bindtap="selectEnrolledCourse" data-course-key="{{item.courseKey}}" hover-class="course-chip--pressed" hover-stay-time="80">
                   <view class="course-chip-title-row">
                     <text class="course-chip-title">{{item.title}}</text>
-                    <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+                    <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">
+                      未发布
+                    </pill-tag>
                   </view>
-                  <text class="course-chip-sub">{{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
+                  <text class="course-chip-sub">
+                    {{item.totalCards}}卡 · {{item.totalQuestions}}题
+                  </text>
                 </view>
               </block>
-              <view
-                class="course-chip add"
-                bindtap="openCoursePicker"
-                hover-class="course-chip--pressed"
-                hover-stay-time="80"
-              >
+              <view class="course-chip add" bindtap="openCoursePicker" hover-class="course-chip--pressed" hover-stay-time="80">
                 <text class="course-chip-title">添加课程</text>
                 <text class="course-chip-sub">浏览全部</text>
               </view>
             </view>
           </scroll-view>
-
           <view class="discover-block" wx:if="{{discoverCourses && discoverCourses.length > 0}}">
             <view class="discover-header">
               <text class="discover-title">发现</text>
               <text class="discover-sub">点进去注册</text>
             </view>
             <block wx:for="{{discoverCourses}}" wx:key="courseKey">
-              <view
-                class="discover-item pressable"
-                bindtap="viewCourseDetail"
-                data-course-key="{{item.courseKey}}"
-                hover-class="discover-item--pressed"
-                hover-stay-time="80"
-              >
+              <view class="discover-item pressable" bindtap="viewCourseDetail" data-course-key="{{item.courseKey}}" hover-class="discover-item--pressed" hover-stay-time="80">
                 <view class="discover-left">
                   <view class="discover-title-row">
                     <text class="discover-item-title">{{item.title}}</text>
-                    <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+                    <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">
+                      未发布
+                    </pill-tag>
                   </view>
                   <text class="discover-item-desc">{{item.description}}</text>
                 </view>
@@ -117,11 +101,10 @@
               </view>
             </block>
           </view>
-        </card-flat>
+        </view>
       </enter-transition>
-
       <enter-transition visible="{{!loading && !error}}" staggerIndex="2">
-        <card-flat wx:if="{{heatmapData && heatmapData.length > 0}}">
+        <view class="study-card" wx:if="{{heatmapData && heatmapData.length > 0}}">
           <view class="section-header">
             <text class="section-title">学习热力图</text>
             <pill-tag variant="neutral" size="sm">最近7天</pill-tag>
@@ -134,15 +117,13 @@
               </view>
             </block>
           </view>
-        </card-flat>
+        </view>
       </enter-transition>
-
       <view class="footer-slogan">
         <text>KEEP LEARNING, KEEP GROWING.</text>
       </view>
     </enter-transition>
   </scroll-view>
-
   <view class="course-picker-overlay {{showCoursePicker ? 'visible' : ''}}" catchtap="closeCoursePicker">
     <view class="course-picker-modal" catchtap="noop">
       <view class="modal-header">
@@ -151,16 +132,7 @@
           <text>✕</text>
         </view>
       </view>
-
-      <input
-        class="course-search"
-        placeholder="搜索课程名 / courseKey"
-        placeholder-class="course-search__placeholder"
-        value="{{courseSearch}}"
-        bindinput="onCourseSearchInput"
-        confirm-type="search"
-      />
-
+      <input class="course-search" placeholder="搜索课程名 / courseKey" placeholder-class="course-search__placeholder" value="{{courseSearch}}" bindinput="onCourseSearchInput" confirm-type="search" />
       <view class="picker-section">
         <view class="picker-section-header">
           <text class="picker-section-title">我的课程</text>
@@ -169,25 +141,22 @@
           </view>
         </view>
         <block wx:for="{{filteredEnrolledCourses}}" wx:key="courseKey">
-          <view
-            class="picker-item {{selectedCourseKey === item.courseKey ? 'selected' : ''}}"
-            bindtap="selectEnrolledCourse"
-            data-course-key="{{item.courseKey}}"
-            hover-class="hover-pressed"
-            hover-stay-time="80"
-          >
+          <view class="picker-item {{selectedCourseKey === item.courseKey ? 'selected' : ''}}" bindtap="selectEnrolledCourse" data-course-key="{{item.courseKey}}" hover-class="hover-pressed" hover-stay-time="80">
             <view class="picker-item-title-row">
               <text class="picker-item-title">{{item.title}}</text>
-              <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+              <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">
+                未发布
+              </pill-tag>
             </view>
-            <text class="picker-item-sub">{{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
+            <text class="picker-item-sub">
+              {{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题
+            </text>
           </view>
         </block>
         <view class="picker-empty" wx:if="{{filteredEnrolledCourses.length === 0}}">
           <text>还没有注册课程</text>
         </view>
       </view>
-
       <view class="picker-section">
         <view class="picker-section-header">
           <text class="picker-section-title">发现课程</text>
@@ -196,9 +165,13 @@
           <view class="picker-item" bindtap="viewCourseDetail" data-course-key="{{item.courseKey}}">
             <view class="picker-item-title-row">
               <text class="picker-item-title">{{item.title}}</text>
-              <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">未发布</pill-tag>
+              <pill-tag wx:if="{{isDevtools && item.status === 'DRAFT'}}" variant="yellow" size="sm">
+                未发布
+              </pill-tag>
             </view>
-            <text class="picker-item-sub">{{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题</text>
+            <text class="picker-item-sub">
+              {{item.courseKey}} · {{item.totalCards}}卡 · {{item.totalQuestions}}题
+            </text>
           </view>
         </block>
         <view class="picker-empty" wx:if="{{filteredDiscoverCourses.length === 0}}">

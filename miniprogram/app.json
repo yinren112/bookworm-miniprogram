@@ -11,7 +11,7 @@
   ],
   "tabBar": {
     "color": "#999999",
-    "selectedColor": "#58CC02",
+    "selectedColor": "#46B065",
     "list": [
       {
         "pagePath": "pages/review/index",

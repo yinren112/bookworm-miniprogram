@@ -3,12 +3,13 @@ page {
 }
 
 .container {
-  padding: var(--space-8);
+  padding: var(--space-6);
   min-height: 100vh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  animation: pageFadeIn 0.3s var(--ease-out-expo) both;
 }
 
 .progress-header {
@@ -49,12 +50,13 @@ page {
   width: 88rpx;
   height: 88rpx;
   border-radius: 44rpx;
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-bg-card);
   box-sizing: border-box;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
 }
 
 .star-hit.starred {
@@ -84,13 +86,14 @@ page {
   width: 64rpx;
   height: 64rpx;
   border-radius: 32rpx;
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-heavy);
   color: var(--color-text-light);
+  background: var(--color-bg-soft);
 }
 
 .card-content {
@@ -170,28 +173,28 @@ page {
   right: var(--space-10);
   color: var(--color-juicy-yellow-shade);
   background: var(--color-bg-warn);
-  border: var(--border-thick) solid var(--color-juicy-yellow);
+  border: 2rpx solid var(--color-juicy-yellow);
 }
 
 .forgot-overlay {
   right: var(--space-10);
   color: var(--color-juicy-red-shade);
   background: var(--color-bg-danger);
-  border: var(--border-thick) solid var(--color-juicy-red);
+  border: 2rpx solid var(--color-juicy-red);
 }
 
 .knew-overlay {
   left: var(--space-10);
   color: var(--color-juicy-green-shade);
   background: var(--color-bg-success);
-  border: var(--border-thick) solid var(--color-juicy-green);
+  border: 2rpx solid var(--color-juicy-green);
 }
 
 .perfect-overlay {
   left: var(--space-10);
   color: var(--color-juicy-blue-shade);
   background: var(--color-bg-info);
-  border: var(--border-thick) solid var(--color-juicy-blue);
+  border: 2rpx solid var(--color-juicy-blue);
 }
 
 .feedback-zone {
@@ -232,9 +235,9 @@ page {
 
 .report-btn {
   border-radius: var(--radius-pill);
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   padding: 12rpx 24rpx;
-  background: var(--color-bg-card);
+  background: var(--color-bg-soft);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-heavy);
   color: var(--color-text-light);

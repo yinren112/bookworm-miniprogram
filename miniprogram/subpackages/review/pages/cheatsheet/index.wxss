@@ -9,6 +9,7 @@ page {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  animation: pageFadeIn 0.3s var(--ease-out-expo) both;
 }
 
 .page-header {
@@ -47,7 +48,7 @@ page {
   width: 80rpx;
   height: 80rpx;
   border-radius: var(--radius-round);
-  border: none;
+  border: 2rpx solid var(--color-border);
   background: var(--color-bg-soft);
   display: flex;
   align-items: center;

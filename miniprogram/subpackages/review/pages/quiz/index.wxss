@@ -3,12 +3,13 @@ page {
 }
 
 .container {
-  padding: var(--space-8);
+  padding: var(--space-6);
   min-height: 100vh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  animation: pageFadeIn 0.3s var(--ease-out-expo) both;
 }
 
 .progress-section {
@@ -46,12 +47,13 @@ page {
   width: 88rpx;
   height: 88rpx;
   border-radius: 44rpx;
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-bg-card);
   box-sizing: border-box;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
 }
 
 .star-hit.starred {
@@ -83,7 +85,7 @@ page {
   width: 56rpx;
   height: 56rpx;
   border-radius: 28rpx;
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,7 +106,7 @@ page {
   width: 56rpx;
   height: 56rpx;
   border-radius: var(--radius-round);
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   flex: 0 0 auto;
   font-weight: var(--font-weight-heavy);
   color: var(--color-text-light);
@@ -122,7 +124,7 @@ page {
 .option-item.is-selected .option-marker {
   border-color: var(--color-juicy-blue);
   color: var(--color-juicy-blue);
-  background: var(--color-bg-card);
+  background: var(--color-bg-soft);
 }
 
 .option-item.is-correct {
@@ -135,7 +137,7 @@ page {
 .option-item.is-correct .option-state {
   border-color: var(--color-juicy-green);
   color: var(--color-juicy-green);
-  background: var(--color-bg-card);
+  background: var(--color-bg-soft);
 }
 
 .option-item.is-wrong {
@@ -148,7 +150,7 @@ page {
 .option-item.is-wrong .option-state {
   border-color: var(--color-juicy-red);
   color: var(--color-juicy-red);
-  background: var(--color-bg-card);
+  background: var(--color-bg-soft);
 }
 
 .fill-blank-section {
@@ -160,11 +162,11 @@ page {
 .fill-input {
   height: 96rpx;
   border-radius: var(--radius-btn);
-  border: var(--border-thick) solid var(--color-border);
+  border: 2rpx solid var(--color-border);
   padding: 0 var(--space-6);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
-  background: var(--color-bg-card);
+  background: var(--color-bg-soft);
   box-sizing: border-box;
 }
 
@@ -185,8 +187,9 @@ page {
   gap: var(--space-4);
   background: var(--color-bg-card);
   padding: var(--space-6);
-  border-radius: var(--radius-lg);
-  border: var(--border-thin) dashed var(--color-border);
+  border-radius: var(--radius-md);
+  border: none;
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.06);
 }
 
 .result-title {
@@ -214,12 +217,13 @@ page {
 
 .report-btn {
   border-radius: var(--radius-pill);
-  border: var(--border-thick) solid var(--color-border);
+  border: none;
   padding: 12rpx 24rpx;
-  background: var(--color-bg-card);
+  background: var(--color-bg-soft);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-heavy);
   color: var(--color-text-light);
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.06);
 }
 
 .action-section {

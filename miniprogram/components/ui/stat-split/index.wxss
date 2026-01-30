@@ -20,9 +20,9 @@
 }
 
 .ss__label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-light);
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .ss__divider {

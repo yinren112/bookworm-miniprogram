@@ -5,6 +5,9 @@
       <view class="tb__chevron" style="color: {{color}}"></view>
     </view>
     <view class="tb__title" style="color: {{color}}">{{title}}</view>
+    <view class="tb__right">
+      <slot name="right"></slot>
+    </view>
   </view>
 </view>
 <view class="tb__placeholder" style="height: {{statusBarHeight + navBarHeight}}px;" wx:if="{{show}}"></view>

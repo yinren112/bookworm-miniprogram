@@ -48,7 +48,7 @@
 - TabBar 仅包含“复习/我的”，对应 `pages/review/index` 与 `pages/profile/index`。
 - TabBar 页面必须在主包，复习首页不可放在分包。
 - 复习首页在主包，复习子页面仍在 `subpackages/review/`。
-- `miniprogram/config.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 需保持 `true`。
+- `miniprogram/utils/constants.js` 中 `APP_CONFIG.REVIEW_ONLY_MODE` 需保持 `true`（`config.js` 不再承载 APP_CONFIG）。
 - `miniprogram/utils/payment.js` 在复习模式下阻断 `createOrderAndPay`。
 - `pages/profile/index` 隐藏手机号授权与员工操作入口，分享指向复习首页。
 
@@ -61,7 +61,7 @@
 - 接口：`GET /study/activity-history`，用于获取热力图活动数据。
 
 ## 观测性（requestId）
-- 小程序请求统一走 `miniprogram/utils/request.js`，会为每次请求生成 `X-Request-ID: <timestamp-rand>`。
+- 小程序请求统一走 `miniprogram/utils/request.js`，每次**逻辑请求**生成 `X-Request-ID: <timestamp-rand>`，重试链路复用同一 requestId。
 - 后端会回写 `x-request-id` 响应头，并在访问日志/错误日志中输出同一个 requestId（便于端到端排障）。
 
 ## 沟通方式与角色定义
@@ -332,13 +332,13 @@
 - `utils/request.js`: 底层请求客户端（重试、Request-ID），唯一允许直接调用 `wx.request`
 - `utils/auth-guard.js`: Manages login/logout flow, depends on `config.js`, `token.js`, `ui.js`
 - `utils/ui.js`: UI helpers (showError, showSuccess, formatPrice)
-- `utils/error.js`: Error message extraction
+- `utils/error.js`: Deprecated，统一改用 `ui.getErrorMessage`/`ui.showError`
 - `utils/payment.js`: Payment workflow (createOrderAndPay, safeCreateOrderAndPay)
-- `utils/constants.js`: Business constants (ORDER_STATUS enums)
-- `config.js`: API configuration (apiBaseUrl, APP_CONFIG)
+- `utils/constants.js`: Business constants（ORDER_STATUS/APP_CONFIG/复习缓存键/ETA 常量）
+- `config.js`: API configuration（apiBaseUrl，APP_CONFIG 已迁至 `utils/constants.js`）
 - `utils/study-api.js`: 复习系统 API 封装
 - `utils/study-session.js`: 复习流程状态管理
-- `utils/url.js`: 归一化 DEV_API_BASE_URL 与链接
+- `utils/url.js`: URL 归一化与校验（`normalizeApiBaseUrl`/`enforceApiBaseUrlPolicy`/`buildFinalApiUrl`）
 - `utils/track.js`: 轻量埋点追踪
 - `utils/haptic.js`/`utils/sound-manager.js`/`utils/confetti.js`/`utils/theme.js`: 交互与主题辅助
 

@@ -10,6 +10,7 @@ page {
   flex-direction: column;
   gap: var(--space-6);
   position: relative; /* For confetti positioning */
+  animation: pageFadeIn 0.3s var(--ease-out-expo) both;
 }
 
 .confetti-canvas {
@@ -71,7 +72,8 @@ page {
   align-items: flex-start;
   background: var(--color-bg-card);
   padding: var(--space-4);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.06);
 }
 
 .stat-label {

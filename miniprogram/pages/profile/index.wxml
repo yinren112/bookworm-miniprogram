@@ -23,18 +23,6 @@
   </view>
   <view class="profile-content">
     <enter-transition staggerIndex="1">
-      <card-flat clickable custom-class="review-entry-card" bind:tap="goToReview">
-        <view class="review-entry-content">
-          <view class="review-icon-wrapper">
-            <image class="review-icon" src="/images/icons/review/book.svg" />
-          </view>
-          <view class="review-text-wrapper">
-            <text class="review-title">复习助手</text>
-            <text class="review-desc">背卡片、练习题、查资料</text>
-          </view>
-        </view>
-        <image class="menu-arrow" src="/images/icons/arrow-right.svg" />
-      </card-flat>
       <card-flat>
         <view class="reminder-row">
           <view class="menu-content">

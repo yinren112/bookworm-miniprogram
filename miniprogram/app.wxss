@@ -1,49 +1,49 @@
 page {
-  --color-juicy-green: #58CC02;
-  --color-juicy-green-shade: #46a302;
+  --color-juicy-green: #46B065;
+  --color-juicy-green-shade: #008E6B;
   --color-juicy-blue: #1CB0F6;
   --color-juicy-blue-shade: #1899d6;
   --color-juicy-yellow: #FFC800;
   --color-juicy-yellow-shade: #e5b400;
   --color-juicy-red: #FF4B4B;
   --color-juicy-red-shade: #d43636;
-  --color-text-main: #4B4B4B;
-  --color-text-light: #777777;
-  --color-border: #E5E5E5;
-  --color-border-shade: #CECECE;
+  --color-text-main: #1D1D1F;
+  --color-text-light: #6B7280;
+  --color-border: #F3F4F6;
+  --color-border-shade: #E5E5E5;
   --color-bg-page: #FFFFFF;
   --color-bg-card: #FFFFFF;
-  --color-bg-soft: #F0F4F8;
-  --color-bg-highlight-green: #E8F5E9;
+  --color-bg-soft: #F5F5F7;
+  --color-bg-highlight-green: #DCECB5;
   --color-bg-highlight-blue: #E1F5FE;
-  --color-text-muted: #AFAFAF;
-  --color-juicy-green-light: #93D333;
+  --color-text-muted: #737980;
+  --color-juicy-green-light: #81C570;
   --color-text-inverse: #FFFFFF;
-  --color-bg-success: rgba(88, 204, 2, 0.16);
+  --color-bg-success: rgba(70, 176, 101, 0.16);
   --color-bg-info: rgba(28, 176, 246, 0.16);
   --color-bg-warn: rgba(255, 200, 0, 0.18);
   --color-bg-danger: rgba(255, 75, 75, 0.14);
   --color-heat-0: #E5E5E5;
-  --color-heat-1: #D6F5D6;
-  --color-heat-2: #93D333;
-  --color-heat-3: #58CC02;
-  --color-heat-4: #4B8B02;
+  --color-heat-1: #DCECB5;
+  --color-heat-2: #81C570;
+  --color-heat-3: #46B065;
+  --color-heat-4: #008E6B;
   
   --primary-color: var(--color-juicy-green);
   --background-color: var(--color-bg-page);
 
-  --radius-btn: 32rpx;
-  --radius-card: 40rpx;
-  --radius-pill: 32rpx;
+  --radius-btn: 36rpx;
+  --radius-card: 32rpx;
+  --radius-pill: 999rpx;
   --radius-round: 999rpx;
-  --radius-lg: var(--radius-card);
+  --radius-lg: 64rpx;
+  --radius-md: 32rpx;
+  --radius-sm: 16rpx;
 
   --border-thin: 2rpx;
-  --border-thick: 4rpx;
+  --border-thick: 2rpx;
 
-  --lip-sm: 6rpx;
-  --lip-md: 8rpx;
-  --lip-width: var(--lip-md);
+  --shadow-card: 0 4rpx 24rpx rgba(0,0,0,0.06);
   
   --ease-bouncy: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
@@ -90,27 +90,35 @@ page {
   min-height: 100vh;
 }
 
-/* Dark Mode Overrides (Midnight Forest) */
+/* Dark Mode Overrides */
 @media (prefers-color-scheme: dark) {
   page {
-    --color-bg-page: #131F24;
-    --color-bg-card: #202F36;
-    --color-bg-highlight-green: #163521;
-    --color-bg-highlight-blue: #0F2A36;
+    --color-bg-page: #111111;
+    --color-bg-card: #1C1C1E;
+    --color-bg-highlight-green: #1A2E1A;
+    --color-bg-highlight-blue: #0F1E2E;
     --color-text-main: #FFFFFF;
-    --color-text-light: #94A3B8;
-    --color-border: #37464F;
-      --color-border-shade: #2B3942;
-      --color-bg-soft: #0F1A1F;
-      --color-text-muted: #64748B;
+    --color-text-light: #9CA3AF;
+    --color-border: #2C2C2E;
+    --color-border-shade: #232325;
+    --color-bg-soft: #161618;
+    --color-text-muted: #6B7280;
 
-    --color-heat-0: #2B3942;
-    --color-heat-1: #1F3D2A;
-    --color-heat-2: #2F6A2D;
-    --color-heat-3: #58CC02;
-    --color-heat-4: #93D333;
-    
-    --color-juicy-green-shade: #3a8a02; 
+    --color-bg-success: rgba(70, 176, 101, 0.24);
+    --color-bg-info: rgba(28, 176, 246, 0.24);
+    --color-bg-warn: rgba(255, 200, 0, 0.24);
+    --color-bg-danger: rgba(255, 75, 75, 0.20);
+
+    --color-heat-0: #2C2C2E;
+    --color-heat-1: #3A3A3C;
+    --color-heat-2: #46B065;
+    --color-heat-3: #81C570;
+    --color-heat-4: #DCECB5;
+
+    --shadow-card: 0 0 0 1rpx rgba(255,255,255,0.06);
+
+    --color-juicy-green: #81C570;
+    --color-juicy-green-shade: #46B065;
     --color-juicy-blue-shade: #127cb0;
   }
 }
@@ -173,6 +181,11 @@ page {
 @keyframes pageActivate {
   0% { opacity: 0; transform: scale(0.96); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pageFadeIn {
+  0% { opacity: 0; transform: translateY(var(--motion-translate-sm)); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {

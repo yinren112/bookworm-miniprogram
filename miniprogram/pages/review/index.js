@@ -2,7 +2,7 @@
 // 复习首页 (Duolingo Style)
 
 const { getDashboard, getCourses } = require('../../utils/study-api');
-const { swrFetch } = require('../../utils/cache');
+const { swrFetch, subscribe } = require('../../utils/cache');
 const logger = require('../../utils/logger');
 const { getResumeSession, getLastSessionType } = require('../../utils/study-session');
 const { REVIEW_DASHBOARD_CACHE_VERSION, REVIEW_COURSES_CACHE_VERSION } = require('../../utils/constants');
@@ -63,6 +63,13 @@ Page({
     this.setData({ isPageActive: false });
   },
 
+  onUnload() {
+    if (this._dashboardUnsub) {
+      this._dashboardUnsub();
+      this._dashboardUnsub = null;
+    }
+  },
+
   setTodayDate() {
     const ymd = getBeijingDateOnlyString();
     const parts = ymd.split('-');
@@ -85,27 +92,14 @@ Page({
     try {
       const selectedCourseKey = this.data.selectedCourseKey || undefined;
       const dashboardCacheKey = `review:dashboard:${REVIEW_DASHBOARD_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}:${selectedCourseKey || 'auto'}`;
+      this.bindDashboardSubscription(dashboardCacheKey);
       const dashboard = await swrFetch(
         dashboardCacheKey,
         () => getDashboard({ courseKey: selectedCourseKey, includeUnpublished }),
         { ttlMs: 600000, forceRefresh }
       );
 
-      const currentCourse = dashboard?.currentCourse
-        ? {
-            ...dashboard.currentCourse,
-            progressPercent: Math.round((dashboard.currentCourse.progress || 0) * 100),
-          }
-        : null;
-      
-      const heatmapData = (dashboard?.activeHeatmap || [])
-        .slice(-7) // Limit to last 7 days to prevent overflow
-        .map((item) => ({
-          date: item.date,
-          totalDurationSeconds: item.totalDurationSeconds || 0,
-          level: item.level || 0,
-          dayLabel: ymdToWeekdayLabel(item.date),
-        }));
+      const viewState = this.deriveDashboardState(dashboard);
 
       let courses = [];
       let recommendedCourses = [];
@@ -134,29 +128,12 @@ Page({
       }
 
       const resumeSession = getResumeSession();
-      const dueTotal =
-        (dashboard?.dueCardCount || 0) +
-        (dashboard?.dueQuizCount || 0) +
-        (dashboard?.wrongCount || 0);
-      const noDueTasks = !!currentCourse && dueTotal === 0;
-
-      // Engaging Copy (Tone of Voice)
-      let ctaText = '开始今日挑战';
-      if (!currentCourse) {
-        ctaText = '选择课程开始';
-      } else if (noDueTasks) {
-        ctaText = '今日任务达成！来组巩固？';
-      }
-
       this.setData({
         dashboard,
-        currentCourse,
-        heatmapData,
+        ...viewState,
         resumeSession,
         recommendedCourses,
         courses,
-        noDueTasks,
-        primaryCtaText: ctaText,
         loading: false,
         isDevtools,
         debugApiBaseUrl: isDevtools ? apiBaseUrl : '',
@@ -174,6 +151,63 @@ Page({
       logger.error('Failed to load dashboard:', err);
       this.setData({ loading: false, error: true });
     }
+  },
+
+  bindDashboardSubscription(dashboardCacheKey) {
+    if (this._dashboardCacheKey === dashboardCacheKey && this._dashboardUnsub) {
+      return;
+    }
+    if (this._dashboardUnsub) {
+      this._dashboardUnsub();
+      this._dashboardUnsub = null;
+    }
+    this._dashboardCacheKey = dashboardCacheKey;
+    this._dashboardUnsub = subscribe(dashboardCacheKey, (dashboard) => {
+      if (!dashboard) return;
+      const viewState = this.deriveDashboardState(dashboard);
+      this.setData({
+        dashboard,
+        ...viewState,
+      });
+    });
+  },
+
+  deriveDashboardState(dashboard) {
+    const currentCourse = dashboard?.currentCourse
+      ? {
+          ...dashboard.currentCourse,
+          progressPercent: Math.round((dashboard.currentCourse.progress || 0) * 100),
+        }
+      : null;
+
+    const heatmapData = (dashboard?.activeHeatmap || [])
+      .slice(-7)
+      .map((item) => ({
+        date: item.date,
+        totalDurationSeconds: item.totalDurationSeconds || 0,
+        level: item.level || 0,
+        dayLabel: ymdToWeekdayLabel(item.date),
+      }));
+
+    const dueTotal =
+      (dashboard?.dueCardCount || 0) +
+      (dashboard?.dueQuizCount || 0) +
+      (dashboard?.wrongCount || 0);
+    const noDueTasks = !!currentCourse && dueTotal === 0;
+
+    let ctaText = '开始今日挑战';
+    if (!currentCourse) {
+      ctaText = '选择课程开始';
+    } else if (noDueTasks) {
+      ctaText = '今日任务达成！来组巩固？';
+    }
+
+    return {
+      currentCourse,
+      heatmapData,
+      noDueTasks,
+      primaryCtaText: ctaText,
+    };
   },
 
   onRetry() {

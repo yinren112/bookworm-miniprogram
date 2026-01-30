@@ -1,6 +1,11 @@
 const logManager = typeof wx !== 'undefined' && wx.getLogManager ? wx.getLogManager() : null;
 const noop = () => {};
 const withTag = (tag, fn) => (...args) => fn(`[${tag}]`, ...args);
+const bindOr = (obj, method, fallback) => {
+  const fn = obj && typeof obj[method] === 'function' ? obj[method].bind(obj) : fallback;
+  return fn || noop;
+};
+const consoleError = typeof console !== 'undefined' && console.error ? console.error.bind(console) : noop;
 
 const DEBUG = (() => {
   if (typeof wx !== 'undefined' && typeof wx.getAccountInfoSync === 'function') {
@@ -16,8 +21,8 @@ const DEBUG = (() => {
 })();
 
 module.exports = {
-  debug: DEBUG && logManager ? withTag('DEBUG', logManager.debug.bind(logManager)) : noop,
-  info:  DEBUG && logManager ? withTag('INFO', logManager.info.bind(logManager)) : noop,
-  warn:  DEBUG && logManager ? withTag('WARN', logManager.warn.bind(logManager)) : noop,
-  error: logManager ? withTag('ERROR', logManager.error.bind(logManager)) : withTag('ERROR', console.error),
+  debug: DEBUG ? withTag('DEBUG', bindOr(logManager, 'debug', noop)) : noop,
+  info:  DEBUG ? withTag('INFO', bindOr(logManager, 'info', noop)) : noop,
+  warn:  DEBUG ? withTag('WARN', bindOr(logManager, 'warn', noop)) : noop,
+  error: withTag('ERROR', bindOr(logManager, 'error', consoleError)),
 };
