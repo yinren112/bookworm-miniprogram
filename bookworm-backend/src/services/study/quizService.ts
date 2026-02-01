@@ -1,7 +1,7 @@
 // src/services/study/quizService.ts
 // 刷题服务 - 题目拉取、答题提交、错题本管理
 
-import { PrismaClient, QuestionType } from "@prisma/client";
+import { PrismaClient, Prisma, QuestionType } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 import {
   questionSelectPublic,
@@ -15,7 +15,7 @@ import { log } from "../../lib/logger";
 import { isPrismaUniqueConstraintError } from "../../utils/typeGuards";
 import { StudyServiceError, StudyErrorCodes } from "../../errors";
 
-type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+type DbCtx = PrismaClient | Prisma.TransactionClient;
 
 const QUIZ_DEBUG = process.env.QUIZ_DEBUG === "true";
 

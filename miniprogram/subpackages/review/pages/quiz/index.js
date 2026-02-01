@@ -2,13 +2,24 @@
 // 刷题闯关页
 
 const { startQuiz, submitQuizAnswer, starItem, unstarItem, getStarredItems } = require("../../utils/study-api");
-const { getResumeSession, saveResumeSession, clearResumeSession, setLastSessionType } = require("../../utils/study-session");
+const { saveResumeSession, clearResumeSession, setLastSessionType } = require("../../utils/study-session");
+const { getValidResumeSession, clampIndex } = require("../../utils/study-resume-helpers");
+const { toggleStarWithOptimisticUpdate } = require("../../utils/study-ui-helpers");
+const { sanitizeMpHtmlContent } = require("../../utils/mp-html-sanitize");
+const { getPageState, clearPageState } = require("../../utils/page-state");
 const studyTimer = require("../../utils/study-timer");
 const logger = require("../../../../utils/logger");
 const { track } = require("../../../../utils/track");
 const feedback = require("../../../../utils/ui/feedback");
 const { createFatigueChecker } = require("../../../../utils/fatigue");
-const { QUIZ_SECONDS_PER_ITEM } = require("../../../../utils/constants");
+const { QUIZ_SECONDS_PER_ITEM, QUIZ_HINT_COUNT_KEY } = require("../../../../utils/constants");
+
+function getQuizState(page) {
+  return getPageState("review.quiz", page, () => ({
+    questions: [],
+    questionEnterTimer: null,
+  }));
+}
 
 Page({
   data: {
@@ -50,18 +61,22 @@ Page({
     questionTypeClass: "",
     accuracyPercent: 0,
     questionEnter: true,
+    lastSubmitAt: 0,
+    autoAdvancing: false,
+    showQuizHint: false,
   },
 
   playQuestionEnter() {
-    if (this._questionEnterTimer) {
-      clearTimeout(this._questionEnterTimer);
-      this._questionEnterTimer = null;
+    const state = getQuizState(this);
+    if (state.questionEnterTimer) {
+      clearTimeout(state.questionEnterTimer);
+      state.questionEnterTimer = null;
     }
 
     this.setData({ questionEnter: false }, () => {
-      this._questionEnterTimer = setTimeout(() => {
+      state.questionEnterTimer = setTimeout(() => {
         this.setData({ questionEnter: true });
-        this._questionEnterTimer = null;
+        state.questionEnterTimer = null;
       }, 0);
     });
   },
@@ -107,17 +122,14 @@ Page({
   },
 
   tryResumeSession(courseKey) {
-    const session = getResumeSession();
-    if (!session || session.type !== "quiz" || session.courseKey !== courseKey) {
-      return false;
-    }
-    const questions = session.questions || [];
-    if (!Array.isArray(questions) || questions.length === 0) {
-      return false;
-    }
+    const result = getValidResumeSession({ expectedType: "quiz", courseKey, itemsKey: "questions" });
+    if (!result) return false;
 
-    this._questions = questions;
-    const currentIndex = Math.min(session.currentIndex || 0, questions.length - 1);
+    const { session, items } = result;
+    const questions = items.map(sanitizeQuestion);
+    const state = getQuizState(this);
+    state.questions = questions;
+    const currentIndex = clampIndex(session.currentIndex || 0, questions.length - 1);
     const currentQuestion = questions[currentIndex];
     this.elapsedOffset = session.elapsedSeconds || 0;
     const accuracyPercent = calcAccuracy(
@@ -147,6 +159,7 @@ Page({
       optionStates: buildOptionStates(currentQuestion?.options || [], [], []),
       questionTypeClass: getQuestionTypeClass(currentQuestion),
       accuracyPercent,
+      lastSubmitAt: session.lastSubmitAt || 0,
     });
 
     this.updateProgress(currentIndex);
@@ -166,7 +179,8 @@ Page({
       const { sessionId, questions } = res;
 
       if (!questions || questions.length === 0) {
-        this._questions = [];
+        const state = getQuizState(this);
+        state.questions = [];
         clearResumeSession();
         this.setData({
           loading: false,
@@ -187,15 +201,16 @@ Page({
         logger.error("Failed to load starred items:", err);
       }
 
-      this._questions = questions;
+      const state = getQuizState(this);
+      state.questions = questions.map(sanitizeQuestion);
 
       this.setData({
         sessionId,
-        questionsLength: questions.length,
+        questionsLength: state.questions.length,
         currentIndex: 0,
-        currentQuestion: questions[0],
+        currentQuestion: state.questions[0],
         starredItems,
-        isStarred: starredItems[questions[0].id] || false,
+        isStarred: starredItems[state.questions[0].id] || false,
         selectedAnswers: [],
         fillAnswer: "",
         showResult: false,
@@ -206,9 +221,10 @@ Page({
         startTime: Date.now(),
         correctIndices: [],
         correctAnswerText: "",
-        optionStates: buildOptionStates(questions[0]?.options || [], [], []),
-        questionTypeClass: getQuestionTypeClass(questions[0]),
+        optionStates: buildOptionStates(state.questions[0]?.options || [], [], []),
+        questionTypeClass: getQuestionTypeClass(state.questions[0]),
         accuracyPercent: 0,
+        lastSubmitAt: 0,
       }, () => {
         this.playQuestionEnter();
       });
@@ -222,34 +238,22 @@ Page({
     }
   },
 
-  toggleStar() {
-     const { isStarred, currentQuestion, starredItems } = this.data;
-     if (!currentQuestion) return;
-
-     const newVal = !isStarred;
-     const qId = currentQuestion.id;
-
-     feedback.tap('light');
-     this.setData({ isStarred: newVal });
-
-     const updatePromise = newVal
-       ? starItem({ type: 'question', questionId: qId })
-       : unstarItem({ type: 'question', questionId: qId });
-
-     updatePromise
-       .then(() => {
-         starredItems[qId] = newVal;
-         if (!newVal) delete starredItems[qId];
-         this.setData({ starredItems });
-       })
-       .catch((err) => {
-         logger.error("Failed to update star:", err);
-         this.setData({ isStarred: !newVal });
-         wx.showToast({
-           title: "星标同步失败",
-           icon: "none",
-         });
-       });
+  async toggleStar() {
+    const { isStarred, currentQuestion } = this.data;
+    if (!currentQuestion) return;
+    feedback.tap('light');
+    this.cancelAutoAdvance();
+    await toggleStarWithOptimisticUpdate({
+      page: this,
+      currentValue: isStarred,
+      itemId: currentQuestion.id,
+      updateRemote: (newVal) => (
+        newVal
+          ? starItem({ type: 'question', questionId: currentQuestion.id })
+          : unstarItem({ type: 'question', questionId: currentQuestion.id })
+      ),
+      logger,
+    });
   },
   
   checkFatigue() {
@@ -319,13 +323,14 @@ Page({
   },
 
   async submitAnswer(answer) {
-    // 防重复提交
     if (this.data.submitting) return;
+    const now = Date.now();
+    if (now - (this.data.lastSubmitAt || 0) < 500) return;
 
     const { currentQuestion, sessionId, startTime } = this.data;
     const durationMs = Date.now() - startTime;
 
-    this.setData({ submitting: true });
+    this.setData({ submitting: true, lastSubmitAt: now });
     
     this.checkFatigue(); // Fatigue Check
 
@@ -337,14 +342,12 @@ Page({
         durationMs,
       );
 
-      // 直接使用后端返回的 correctOptionIndices（已标准化为 number[]）
-      const correctIndices = Array.isArray(result.correctOptionIndices)
-        ? result.correctOptionIndices
-        : [];
+      const correctIndices = normalizeOptionIndices(result && result.correctOptionIndices);
       const correctAnswerText = formatCorrectAnswer(
         currentQuestion,
         result.correctAnswer,
       );
+      const explanation = typeof result?.explanation === 'string' ? sanitizeMpHtmlContent(result.explanation) : '';
 
       const newCorrectCount =
         this.data.correctCount + (result.isCorrect ? 1 : 0);
@@ -356,20 +359,39 @@ Page({
         this.data.selectedAnswers,
       );
 
+      // Show multi-choice hint for first 3 times
+      let showQuizHint = false;
+      if (currentQuestion.questionType === 'MULTI_CHOICE') {
+        const quizHintCount = wx.getStorageSync(QUIZ_HINT_COUNT_KEY);
+        const count = typeof quizHintCount === 'number' ? quizHintCount : 0;
+        if (count < 3) {
+          showQuizHint = true;
+        }
+      }
+
       this.setData({
         showResult: true,
-        lastResult: result,
+        lastResult: {
+          isCorrect: !!result.isCorrect,
+          explanation,
+        },
         correctIndices,
-        correctAnswerText,
+        correctAnswerText: sanitizeMpHtmlContent(correctAnswerText),
         optionStates,
         answeredCount,
         correctCount: newCorrectCount,
         accuracyPercent,
+        showQuizHint,
       });
 
       // 触觉反馈
       if (result.isCorrect) feedback.correct();
       else feedback.wrong();
+
+      // Auto-advance on correct for single/true-false/fill
+      if (result.isCorrect && currentQuestion.questionType !== 'MULTI_CHOICE') {
+        this.startAutoAdvance();
+      }
     } catch (err) {
       logger.error("Failed to submit answer:", err);
       wx.showToast({
@@ -381,9 +403,36 @@ Page({
     }
   },
 
+  startAutoAdvance() {
+    this.cancelAutoAdvance();
+    this.setData({ autoAdvancing: true });
+    this._autoAdvanceTimer = setTimeout(() => {
+      this._autoAdvanceTimer = null;
+      this.setData({ autoAdvancing: false });
+      this.nextQuestion();
+    }, 1200);
+  },
+
+  cancelAutoAdvance() {
+    if (this._autoAdvanceTimer) {
+      clearTimeout(this._autoAdvanceTimer);
+      this._autoAdvanceTimer = null;
+    }
+    if (this.data.autoAdvancing) {
+      this.setData({ autoAdvancing: false });
+    }
+  },
+
   nextQuestion() {
+    this.cancelAutoAdvance();
+    // Increment quiz hint count if hint was shown
+    if (this.data.showQuizHint) {
+      const quizHintCount = wx.getStorageSync(QUIZ_HINT_COUNT_KEY);
+      const count = typeof quizHintCount === 'number' ? quizHintCount : 0;
+      wx.setStorageSync(QUIZ_HINT_COUNT_KEY, count + 1);
+    }
     const { currentIndex } = this.data;
-    const questions = this._questions || [];
+    const questions = getQuizState(this).questions || [];
     const nextIndex = currentIndex + 1;
 
     if (nextIndex >= questions.length) {
@@ -425,6 +474,7 @@ Page({
       selectedAnswers: [],
       fillAnswer: "",
       showResult: false,
+      showQuizHint: false,
       lastResult: null,
       correctIndices: [],
       correctAnswerText: "",
@@ -442,7 +492,7 @@ Page({
 
   retryQuiz() {
     // 重做错题
-    this._questions = [];
+    getQuizState(this).questions = [];
     this.setData({
       wrongItemsOnly: true,
     });
@@ -498,12 +548,13 @@ Page({
 
   saveSnapshot() {
     if (!this.data.sessionId || this.resumeSaveFailed) return;
+    const state = getQuizState(this);
     const saved = saveResumeSession({
       type: "quiz",
       courseKey: this.data.courseKey,
       unitId: this.data.unitId,
       sessionId: this.data.sessionId,
-      questions: this._questions,
+      questions: state.questions,
       questionsLength: this.data.questionsLength,
       currentIndex: this.data.currentIndex,
       starredItems: this.data.starredItems,
@@ -511,6 +562,7 @@ Page({
       correctCount: this.data.correctCount,
       wrongItemsOnly: this.data.wrongItemsOnly,
       elapsedSeconds: this.getElapsedSeconds(),
+      lastSubmitAt: this.data.lastSubmitAt || 0,
     });
     if (!saved) {
       this.resumeSaveFailed = true;
@@ -533,9 +585,17 @@ Page({
   },
 
   onUnload() {
+    this.cancelAutoAdvance();
     this.trackAbort("close");
     studyTimer.flush();
     studyTimer.stop();
+    const state = getQuizState(this);
+    if (state.questionEnterTimer) {
+      clearTimeout(state.questionEnterTimer);
+      state.questionEnterTimer = null;
+    }
+    state.questions = [];
+    clearPageState("review.quiz", this);
   },
 
   onShareAppMessage() {
@@ -608,4 +668,24 @@ function getQuestionTypeClass(question) {
 function calcAccuracy(correctCount, answeredCount) {
   if (!answeredCount) return 0;
   return Math.round((correctCount / answeredCount) * 100);
+}
+
+function normalizeOptionIndices(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const v of input) {
+    const n = Number(v);
+    if (Number.isFinite(n)) out.push(n);
+  }
+  return out;
+}
+
+function sanitizeQuestion(q) {
+  if (!q || typeof q !== 'object') return q;
+  const stem = typeof q.stem === 'string' ? sanitizeMpHtmlContent(q.stem) : '';
+  const options = Array.isArray(q.options)
+    ? q.options.map((opt) => (typeof opt === 'string' ? sanitizeMpHtmlContent(opt) : ''))
+    : [];
+  const explanation = typeof q.explanation === 'string' ? sanitizeMpHtmlContent(q.explanation) : undefined;
+  return { ...q, stem, options, ...(explanation === undefined ? {} : { explanation }) };
 }

@@ -19,6 +19,7 @@
     "seed": "node ./node_modules/prisma/build/index.js db seed",
     "job:cancel-orders": "node ./node_modules/ts-node/dist/bin.js src/jobs/cancelExpiredOrders.ts",
     "test:integration": "dotenv -e .env.test -- node ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "test:study:kpi": "dotenv -e .env.test -- node ./node_modules/vitest/vitest.mjs run --config vitest.study-kpi.config.ts --coverage",
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node ./node_modules/eslint/bin/eslint.js . --fix",
     "generate-tokens": "node ./node_modules/ts-node/dist/bin.js scripts/generate-load-test-tokens.ts"
@@ -50,7 +51,8 @@
     "wechatpay-node-v3": "^2.2.1"
   },
   "devDependencies": {
-    "@testcontainers/postgresql": "^11.5.1",
+    "@testcontainers/postgresql": "^11.11.0",
+    "testcontainers": "^11.11.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.14.2",
     "@types/node-cron": "^3.0.11",

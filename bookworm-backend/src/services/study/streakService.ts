@@ -1,7 +1,8 @@
 // src/services/study/streakService.ts
 // 连续学习服务 - Streak 与周榜
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { streakWithUserInclude } from "../../db/views";
 import {
   getBeijingDateOnlyString,
@@ -9,7 +10,7 @@ import {
   isYesterdayBeijing,
 } from "../../utils/timezone";
 
-type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+type DbCtx = PrismaClient | Prisma.TransactionClient;
 
 export interface StreakInfo {
   currentStreak: number;
@@ -68,25 +69,44 @@ export async function recordActivity(
   });
 
   if (!streak) {
-    // 首次学习，创建记录
-    streak = await db.userStudyStreak.create({
-      data: {
-        userId,
-        currentStreak: 1,
-        bestStreak: 1,
-        lastStudyDate: today,
-        weeklyPoints: pointsEarned,
-        weekStartDate: weekStart,
-      },
-    });
+    try {
+      streak = await db.userStudyStreak.create({
+        data: {
+          userId,
+          currentStreak: 1,
+          bestStreak: 1,
+          lastStudyDate: today,
+          weeklyPoints: pointsEarned,
+          weekStartDate: weekStart,
+        },
+      });
 
-    return {
-      currentStreak: streak.currentStreak,
-      bestStreak: streak.bestStreak,
-      weeklyPoints: streak.weeklyPoints,
-      lastStudyDate: streak.lastStudyDate,
-      isStudiedToday: true,
-    };
+      return {
+        currentStreak: streak.currentStreak,
+        bestStreak: streak.bestStreak,
+        weeklyPoints: streak.weeklyPoints,
+        lastStudyDate: streak.lastStudyDate,
+        isStudiedToday: true,
+      };
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
+        const updated = await db.userStudyStreak.update({
+          where: { userId },
+          data: {
+            weeklyPoints: { increment: pointsEarned },
+            weekStartDate: weekStart,
+          },
+        });
+        return {
+          currentStreak: updated.currentStreak,
+          bestStreak: updated.bestStreak,
+          weeklyPoints: updated.weeklyPoints,
+          lastStudyDate: updated.lastStudyDate,
+          isStudiedToday: true,
+        };
+      }
+      throw error;
+    }
   }
 
   // 检查是否需要重置周积分 (新的一周)

@@ -20,9 +20,6 @@ export { cardSelectPublic } from "../../db/views";
 
 // 卡片排程服务
 export {
-  LEITNER_INTERVALS,
-  MAX_DAILY_ATTEMPTS,
-  FORGOT_INTERVAL_HOURS,
   calculateNextSchedule,
   getTodayQueueSummary,
   startCardSession,
@@ -33,6 +30,15 @@ export {
   type CardItem,
   type CardStateUpdate,
 } from "./cardScheduler";
+
+export {
+  LEITNER_INTERVALS,
+  MAX_DAILY_ATTEMPTS,
+  FORGOT_INTERVAL_HOURS,
+  EXAM_PREP_DAYS,
+  EXAM_CRAM_DAYS,
+  EXAM_INTERVALS,
+} from "../../constants/study";
 
 // 刷题服务
 export {

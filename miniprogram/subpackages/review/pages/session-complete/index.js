@@ -31,6 +31,10 @@ Page({
     subscribeLoading: false,
     actionLoading: false,
     actionType: '',
+    // Animated display values
+    displayCount: 0,
+    displayAccuracy: 0,
+    displayStreak: 0,
   },
 
   onLoad(options) {
@@ -63,9 +67,31 @@ Page({
   },
 
   onUnload() {
+    this._animationActive = false;
     if (this.confetti) {
       this.confetti.clear();
     }
+  },
+
+  animateCountUp(key, target, durationMs) {
+    if (!target || target <= 0) {
+      this.setData({ [key]: 0 });
+      return;
+    }
+    const startTime = Date.now();
+    const step = () => {
+      if (!this._animationActive) return;
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / durationMs, 1);
+      // ease-out-cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = Math.round(eased * target);
+      this.setData({ [key]: current });
+      if (t < 1) {
+        setTimeout(step, 16);
+      }
+    };
+    step();
   },
 
   initConfetti() {
@@ -124,8 +150,16 @@ Page({
         nextDueText,
         loading: false,
       });
+      this._animationActive = true;
+      this.animateCountUp('displayCount', this.data.count, 600);
+      this.animateCountUp('displayAccuracy', this.data.accuracy, 600);
+      this.animateCountUp('displayStreak', streakRes.currentStreak || 0, 600);
     } catch (err) {
-      this.setData({ loading: false });
+      this.setData({
+        loading: false,
+        displayCount: this.data.count,
+        displayAccuracy: this.data.accuracy,
+      });
     }
   },
 

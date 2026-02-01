@@ -169,8 +169,8 @@ async function swrFetch(key, fetcher, { ttlMs = 30000, forceRefresh = false } = 
         setWithTTL(key, freshData, ttlMs);
         publish(key, freshData);
       })
-      .catch(() => {
-        // 后台刷新失败，静默处理
+      .catch((err) => {
+        logger.warn('[cache] background refresh failed', { key, err });
       });
 
     return cached.data;

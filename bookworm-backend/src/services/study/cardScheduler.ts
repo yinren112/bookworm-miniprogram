@@ -2,7 +2,6 @@
 // Leitner 盒子法排程算法实现
 import crypto from "crypto";
 import { Prisma, PrismaClient, FeedbackRating } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import {
   cardSelectPublic,
   cardCourseIdView,
@@ -13,6 +12,15 @@ import {
 import { recordActivity } from "./streakService";
 import { getBeijingTodayStart, getBeijingDateStart } from "../../utils/timezone";
 import { StudyServiceError, StudyErrorCodes } from "../../errors";
+import {
+  EXAM_CRAM_DAYS,
+  EXAM_INTERVALS,
+  EXAM_PREP_DAYS,
+  FORGOT_INTERVAL_HOURS,
+  LEITNER_INTERVALS,
+  MAX_DAILY_ATTEMPTS,
+  MS_PER_DAY,
+} from "../../constants/study";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -25,48 +33,6 @@ async function withTransaction<T>(
   }
   return fn(dbCtx as Prisma.TransactionClient);
 }
-
-// ============================================
-// Leitner 盒子法常量
-// ============================================
-
-// boxLevel 1-5 对应的间隔天数
-export const LEITNER_INTERVALS: Record<number, number> = {
-  1: 1,   // 1 天
-  2: 3,   // 3 天
-  3: 7,   // 7 天
-  4: 14,  // 14 天
-  5: 30,  // 30 天
-};
-
-// 每张卡片每天最多出现次数
-export const MAX_DAILY_ATTEMPTS = 3;
-
-// "不会"反馈后的短间隔（5小时，确保当天能再见一次）
-export const FORGOT_INTERVAL_HOURS = 5;
-
-// 考试周排程参数
-export const EXAM_PREP_DAYS = 21;
-export const EXAM_CRAM_DAYS = 7;
-
-const EXAM_INTERVALS: Record<"prep" | "cram", Record<number, number>> = {
-  prep: {
-    1: 1,
-    2: 2,
-    3: 4,
-    4: 7,
-    5: 14,
-  },
-  cram: {
-    1: 1,
-    2: 1,
-    3: 2,
-    4: 3,
-    5: 5,
-  },
-};
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // ============================================
 // 类型定义
@@ -422,9 +388,9 @@ async function createNewCardState(ctx: CardFeedbackContext) {
     todayStart,
   });
 
-  try {
-    return await tx.userCardState.create({
-      data: {
+  const created = await tx.userCardState.createMany({
+    data: [
+      {
         userId,
         cardId,
         boxLevel: newBoxLevel,
@@ -434,17 +400,16 @@ async function createNewCardState(ctx: CardFeedbackContext) {
         todayShownCount: 1,
         totalAttempts: 1,
       },
-    });
-  } catch (error) {
-    // 并发创建冲突：返回已存在的记录
-    if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
-      const existing = await tx.userCardState.findUnique({
-        where: { userId_cardId: { userId, cardId } },
-      });
-      if (existing) return existing;
-    }
-    throw error;
-  }
+    ],
+    skipDuplicates: true,
+  });
+
+  const state = await tx.userCardState.findUniqueOrThrow({
+    where: { userId_cardId: { userId, cardId } },
+  });
+
+  if (created.count === 1) return state;
+  return updateExistingCardState(ctx, state);
 }
 
 async function updateExistingCardState(

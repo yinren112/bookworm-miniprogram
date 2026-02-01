@@ -194,4 +194,25 @@ page {
   .page-active .header {
     animation: none;
   }
+  .skel-block {
+    animation: none !important;
+  }
+}
+
+/* Skeleton Screen */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skel-block {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-soft) 25%,
+    var(--color-border) 50%,
+    var(--color-bg-soft) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: var(--radius-sm);
 }

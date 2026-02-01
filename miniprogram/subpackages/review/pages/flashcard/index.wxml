@@ -33,8 +33,8 @@
         <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
       </view>
     </view>
-    <view id="swipe-card" class="card-container" data-screen-width="{{screenWidth}}" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
-      <view class="card-stack {{isFlipped ? 'is-flipped' : ''}}">
+    <view id="swipe-card" class="card-container" style="{{cardInlineStyle}}" data-screen-width="{{screenWidth}}" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
+      <view class="card-stack {{isFlipped ? 'is-flipped' : ''}} {{cardTransitionClass}}">
         <view class="face-front" bindtap="flipCard">
           <card-flat>
             <view class="card-face">
@@ -64,7 +64,24 @@
       </view>
     </view>
   </view>
-  <!-- 反馈按钮 -->
+  <!-- 滑动引导遮罩（首次） -->
+  <view class="swipe-hint-overlay" wx:if="{{showSwipeHint}}" catchtap="dismissSwipeHint">
+    <view class="swipe-hint-content">
+      <view class="swipe-hint-arrow swipe-hint-left">
+        <text class="swipe-hint-emoji">👈</text>
+        <text class="swipe-hint-text">想不起来</text>
+      </view>
+      <view class="swipe-hint-arrow swipe-hint-right">
+        <text class="swipe-hint-text">记住了</text>
+        <text class="swipe-hint-emoji">👉</text>
+      </view>
+    </view>
+    <text class="swipe-hint-dismiss">点击任意位置关闭</text>
+  </view>
+  <!-- 内联滑动提示 -->
+  <view class="swipe-tip" wx:if="{{showSwipeTip && isFlipped}}">
+    <text>← 滑动卡片 或 点击按钮 →</text>
+  </view>
   <!-- 反馈按钮 (Bottom Golden Zone) -->
   <view class="feedback-zone" wx:if="{{!loading && !error && !empty && currentCard && isFlipped}}">
     <view class="feedback-buttons">

@@ -64,14 +64,17 @@
       <view class="tool-item pressable" bindtap="startAllFlashcard" hover-class="hover-pressed" hover-stay-time="80">
         <image class="tool-icon-img" src="/images/icons/review/flashcards.svg" mode="aspectFit" />
         <text class="tool-label">背一背</text>
+        <text class="tool-desc">翻牌记忆，间隔复习</text>
       </view>
       <view class="tool-item pressable" bindtap="startAllQuiz" hover-class="hover-pressed" hover-stay-time="80">
         <image class="tool-icon-img" src="/images/icons/review/quiz.svg" mode="aspectFit" />
         <text class="tool-label">练一练</text>
+        <text class="tool-desc">选择题与填空题</text>
       </view>
       <view class="tool-item pressable" bindtap="goToCheatsheet" hover-class="hover-pressed" hover-stay-time="80">
         <image class="tool-icon-img" src="/images/icons/review/cheatsheet.svg" mode="aspectFit" />
         <text class="tool-label">急救包</text>
+        <text class="tool-desc">考前速览知识点</text>
       </view>
     </view>
   </card-flat>

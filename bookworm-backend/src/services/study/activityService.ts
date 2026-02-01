@@ -1,11 +1,11 @@
 // src/services/study/activityService.ts
 // 学习活动统计服务 - 热力图数据
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { dailyStudyActivityHistoryView } from "../../db/views";
 import { getBeijingDateOnlyString } from "../../utils/timezone";
 
-type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+type DbCtx = PrismaClient | Prisma.TransactionClient;
 
 export interface DailyActivity {
   date: string; // YYYY-MM-DD

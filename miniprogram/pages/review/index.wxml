@@ -10,7 +10,35 @@
     </view>
   </topbar>
   <scroll-view scroll-y class="main-scroll {{showCoursePicker ? 'scale-down' : ''}}" enable-flex>
-    <loading-state wx:if="{{loading}}" variant="page" text="加载中..." />
+    <!-- Skeleton Screen -->
+    <view wx:if="{{loading}}" class="content-wrapper skel-wrapper">
+      <view class="study-card">
+        <view class="course-header">
+          <view class="course-info">
+            <view class="skel-block skel-title"></view>
+            <view class="skel-stat-split">
+              <view class="skel-block skel-stat"></view>
+              <view class="skel-block skel-stat"></view>
+            </view>
+          </view>
+          <view class="skel-block skel-icon"></view>
+        </view>
+        <view class="skel-block skel-progress"></view>
+        <view class="skel-block skel-cta"></view>
+      </view>
+      <view class="study-card">
+        <view class="skel-block skel-section-title"></view>
+        <view class="skel-heatmap-row">
+          <view class="skel-block skel-bar" style="height:40rpx"></view>
+          <view class="skel-block skel-bar" style="height:80rpx"></view>
+          <view class="skel-block skel-bar" style="height:56rpx"></view>
+          <view class="skel-block skel-bar" style="height:100rpx"></view>
+          <view class="skel-block skel-bar" style="height:32rpx"></view>
+          <view class="skel-block skel-bar" style="height:72rpx"></view>
+          <view class="skel-block skel-bar" style="height:48rpx"></view>
+        </view>
+      </view>
+    </view>
     <block wx:elif="{{error}}">
       <error-state mode="network" title="加载失败" desc="请重试" bind:retry="onRetry" />
       <view class="error-debug" wx:if="{{isDevtools && debugApiBaseUrl}}">
@@ -18,6 +46,15 @@
       </view>
     </block>
     <enter-transition wx:else class="content-wrapper" visible="{{!loading && !error}}" staggerIndex="0">
+      <view class="welcome-guide" wx:if="{{showWelcomeGuide && enrolledCourses.length === 0}}">
+        <card-flat>
+          <view class="welcome-content">
+            <text class="welcome-title">选一门课程，开始复习</text>
+            <text class="welcome-desc">点击下方浏览课程列表，注册后即可开始学习</text>
+            <juicy-button type="primary" size="sm" bind:tap="openCoursePicker">浏览课程</juicy-button>
+          </view>
+        </card-flat>
+      </view>
       <view class="study-card">
         <view class="course-header pressable" bindtap="navigateToCourse" data-course-key="{{currentCourse ? currentCourse.courseKey : ''}}" hover-class="course-header--pressed" hover-stay-time="80">
           <view class="course-info">
@@ -111,8 +148,13 @@
           </view>
           <view class="heatmap-row">
             <block wx:for="{{heatmapData}}" wx:key="date">
-              <view class="day-column" bindtap="onHeatmapTap" data-date="{{item.date}}">
-                <view class="day-bar level-{{item.level}}"></view>
+              <view class="day-column" bindtap="onHeatmapTap" data-date="{{item.date}}" data-index="{{index}}">
+                <view class="day-bar-wrapper">
+                  <view class="heatmap-tooltip" wx:if="{{heatmapTooltipIndex === index}}">
+                    <text>{{heatmapTooltipText}}</text>
+                  </view>
+                  <view class="day-bar level-{{item.level}}"></view>
+                </view>
                 <text class="day-label">{{item.dayLabel}}</text>
               </view>
             </block>

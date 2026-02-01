@@ -244,9 +244,17 @@ fastify.setErrorHandler(
         // Study module errors (StudyServiceError)
         'COURSE_NOT_FOUND': 404,
         'COURSE_NOT_PUBLISHED': 400,
+        'COURSE_SCOPE_REQUIRED': 400,
         'CARD_NOT_FOUND': 404,
+        'CARD_CONTENT_ID_NOT_UNIQUE': 409,
         'CARD_DAILY_LIMIT_REACHED': 429,
         'QUESTION_NOT_FOUND': 404,
+        'WRONG_ITEM_NOT_FOUND': 404,
+        'CHEATSHEET_NOT_FOUND': 404,
+        'INVALID_EXAM_DATE': 400,
+        'INVALID_ACTIVITY_DATE': 400,
+        'ACTIVITY_DATE_IN_FUTURE': 400,
+        'ACTIVITY_DATE_TOO_OLD': 400,
         'FEEDBACK_TARGET_REQUIRED': 400,
       };
       const statusCode = statusCodeMap[error.code] || 500;

@@ -2,17 +2,28 @@
 // 卡片复习页
 
 const { startSession, submitCardAnswer, starItem, unstarItem, getStarredItems } = require('../../utils/study-api');
-const { getResumeSession, saveResumeSession, clearResumeSession, setLastSessionType } = require('../../utils/study-session');
+const { saveResumeSession, clearResumeSession, setLastSessionType } = require('../../utils/study-session');
+const { getValidResumeSession, clampIndex } = require('../../utils/study-resume-helpers');
+const { toggleStarWithOptimisticUpdate } = require('../../utils/study-ui-helpers');
+const { sanitizeMpHtmlContent } = require('../../utils/mp-html-sanitize');
+const { getPageState, clearPageState } = require('../../utils/page-state');
 const studyTimer = require('../../utils/study-timer');
 const logger = require('../../../../utils/logger');
 const haptic = require('../../../../utils/haptic');
 const soundManager = require('../../../../utils/sound-manager');
 const { track } = require('../../../../utils/track');
 const { createFatigueChecker } = require('../../../../utils/fatigue');
-const { CARD_SECONDS_PER_ITEM } = require('../../../../utils/constants');
+const { CARD_SECONDS_PER_ITEM, SWIPE_HINT_COUNT_KEY } = require('../../../../utils/constants');
 // Swipe thresholds - kept for reference (actual logic in WXS)
 // const T1_RATIO = 0.22;  // Light threshold
 // const T2_RATIO = 0.42;  // Heavy threshold
+
+function getFlashcardState(page) {
+  return getPageState('review.flashcard', page, () => ({
+    cards: [],
+    swipeCommitTimer: null,
+  }));
+}
 
 Page({
   data: {
@@ -40,6 +51,15 @@ Page({
     // Starred state
     isStarred: false,
     starredItems: {},
+
+    // Swipe hint (first-time overlay)
+    showSwipeHint: false,
+    // Inline swipe tip (shown after flip, count-based)
+    showSwipeTip: false,
+
+    // Card transition
+    cardTransitionClass: '',
+    cardInlineStyle: '',
   },
 
   onLoad(options) {
@@ -87,23 +107,19 @@ Page({
   },
 
   tryResumeSession(courseKey) {
-    const session = getResumeSession();
-    if (!session || session.type !== 'flashcard' || session.courseKey !== courseKey) {
-      return false;
-    }
+    const result = getValidResumeSession({ expectedType: 'flashcard', courseKey, itemsKey: 'cards' });
+    if (!result) return false;
 
-    const cards = session.cards || [];
-    if (!Array.isArray(cards) || cards.length === 0) {
-      return false;
-    }
-
-    this._cards = cards;
-    const currentIndex = Math.min(session.currentIndex || 0, cards.length - 1);
+    const { session, items } = result;
+    const cards = items.map(sanitizeCard);
+    const state = getFlashcardState(this);
+    state.cards = cards;
+    const currentIndex = clampIndex(session.currentIndex || 0, cards.length - 1);
     const currentCard = cards[currentIndex];
 
     this.elapsedOffset = session.elapsedSeconds || 0;
 
-    this.setData({
+      this.setData({
       sessionId: session.sessionId || '',
       cardsLength: session.cardsLength || cards.length,
       currentIndex,
@@ -116,6 +132,7 @@ Page({
       error: false,
       empty: false,
       progressPercent: 0,
+        cardInlineStyle: '',
     });
 
     this.updateProgress(currentIndex);
@@ -139,7 +156,8 @@ Page({
       const { sessionId, cards } = res;
 
       if (!cards || cards.length === 0) {
-        this._cards = [];
+        const state = getFlashcardState(this);
+        state.cards = [];
         clearResumeSession();
         this.setData({
           loading: false,
@@ -160,12 +178,13 @@ Page({
         logger.error('Failed to load starred items:', err);
       }
 
-      this._cards = cards;
-      const firstCard = cards[0];
+      const state = getFlashcardState(this);
+      state.cards = cards.map(sanitizeCard);
+      const firstCard = state.cards[0];
 
       this.setData({
         sessionId,
-        cardsLength: cards.length,
+        cardsLength: state.cards.length,
         currentIndex: 0,
         currentCard: firstCard,
         starredItems,
@@ -177,15 +196,44 @@ Page({
         cardStyle: '',
         swipeOpacityForgot: 0,
         swipeOpacityKnew: 0,
+        cardInlineStyle: '',
       });
 
       this.updateProgress(0);
       this.saveSnapshot();
+      this.showSwipeHintIfNeeded();
       track('session_start', { type: 'flashcard', resume: false, entry: this.entry || 'direct' });
     } catch (err) {
       logger.error('Failed to startSession:', err);
       this.setData({ loading: false, error: true });
     }
+  },
+
+  getSwipeHintCount() {
+    // Backward compat: old boolean key means graduated (count=3)
+    const oldSeen = wx.getStorageSync('review:swipeHintSeen');
+    if (oldSeen === true) return 3;
+    const count = wx.getStorageSync(SWIPE_HINT_COUNT_KEY);
+    return typeof count === 'number' ? count : 0;
+  },
+
+  showSwipeHintIfNeeded() {
+    if (this.getSwipeHintCount() >= 3) return;
+    this.setData({ showSwipeHint: true });
+    this._swipeHintTimer = setTimeout(() => {
+      this.dismissSwipeHint();
+    }, 3500);
+  },
+
+  dismissSwipeHint() {
+    if (this._swipeHintTimer) {
+      clearTimeout(this._swipeHintTimer);
+      this._swipeHintTimer = null;
+    }
+    if (!this.data.showSwipeHint) return;
+    this.setData({ showSwipeHint: false });
+    const count = this.getSwipeHintCount();
+    wx.setStorageSync(SWIPE_HINT_COUNT_KEY, count + 1);
   },
 
   // --- Interaction: Flip ---
@@ -195,7 +243,8 @@ Page({
     // 触觉反馈 (Light)
     haptic.trigger('light');
 
-    this.setData({ isFlipped: true });
+    const showSwipeTip = this.getSwipeHintCount() < 3;
+    this.setData({ isFlipped: true, showSwipeTip });
   },
 
   // --- WXS Swipe Callbacks ---
@@ -227,8 +276,14 @@ Page({
     this.setData({ submitting: true });
     
     // 延迟提交，让飞出动画完成
-    setTimeout(() => {
+    const state = getFlashcardState(this);
+    if (state.swipeCommitTimer) {
+      clearTimeout(state.swipeCommitTimer);
+      state.swipeCommitTimer = null;
+    }
+    state.swipeCommitTimer = setTimeout(() => {
       this.submitRating(rating);
+      state.swipeCommitTimer = null;
     }, 300);
   },
 
@@ -251,7 +306,7 @@ Page({
   
   async submitRating(rating) {
       const { currentCard, sessionId, currentIndex } = this.data;
-      const cards = this._cards || [];
+      const cards = getFlashcardState(this).cards || [];
       if (!currentCard) return;
 
       this.setData({ submitting: true });
@@ -311,17 +366,23 @@ Page({
             });
         } else {
             const nextCard = cards[nextIndex];
-            // Prepare next card
+            // Swap data immediately (WXS controls card-container inline styles)
+            // Enter animation on inner card-stack via cardTransitionClass
             this.setData({
                 currentIndex: nextIndex,
                 currentCard: nextCard,
                 isStarred: this.data.starredItems[nextCard.contentId] || false,
                 isFlipped: false,
-                progressPercent: Math.round((nextIndex / this.data.cardsLength) * 100)
+                showSwipeTip: false,
+                progressPercent: Math.round((nextIndex / this.data.cardsLength) * 100),
+                cardTransitionClass: 'card-entering',
+                cardInlineStyle: 'transform: translateX(0) rotate(0deg); opacity: 1; transition: none;',
             });
             this.updateProgress(nextIndex);
             this.saveSnapshot();
-
+            setTimeout(() => {
+              this.setData({ cardTransitionClass: '' });
+            }, 250);
         }
       } catch (err) {
         logger.error('Failed to submit feedback:', err);
@@ -339,36 +400,21 @@ Page({
   },
 
   // --- Interaction: Star ---
-  toggleStar() {
-      const { isStarred, currentCard, starredItems } = this.data;
-      if (!currentCard) return;
-
-      const newVal = !isStarred;
-      const contentId = currentCard.contentId;
-      
-      haptic.trigger('light');
-
-      // Optimistic update
-      this.setData({ isStarred: newVal });
-
-      const updatePromise = newVal
-        ? starItem({ type: 'card', contentId, courseKey: this.data.courseKey })
-        : unstarItem({ type: 'card', contentId, courseKey: this.data.courseKey });
-
-      updatePromise
-        .then(() => {
-          starredItems[contentId] = newVal;
-          if (!newVal) delete starredItems[contentId];
-          this.setData({ starredItems });
-        })
-        .catch((err) => {
-          logger.error('Failed to update star:', err);
-          this.setData({ isStarred: !newVal });
-          wx.showToast({
-            title: '星标同步失败',
-            icon: 'none',
-          });
-        });
+  async toggleStar() {
+    const { isStarred, currentCard } = this.data;
+    if (!currentCard) return;
+    haptic.trigger('light');
+    await toggleStarWithOptimisticUpdate({
+      page: this,
+      currentValue: isStarred,
+      itemId: currentCard.contentId,
+      updateRemote: (newVal) => (
+        newVal
+          ? starItem({ type: 'card', contentId: currentCard.contentId, courseKey: this.data.courseKey })
+          : unstarItem({ type: 'card', contentId: currentCard.contentId, courseKey: this.data.courseKey })
+      ),
+      logger,
+    });
   },
 
   goBack() {
@@ -420,12 +466,13 @@ Page({
 
   saveSnapshot() {
     if (!this.data.sessionId || this.data.completed || this.resumeSaveFailed) return;
+    const state = getFlashcardState(this);
     const saved = saveResumeSession({
       type: 'flashcard',
       courseKey: this.data.courseKey,
       unitId: this.data.unitId,
       sessionId: this.data.sessionId,
-      cards: this._cards,
+      cards: state.cards,
       cardsLength: this.data.cardsLength,
       currentIndex: this.data.currentIndex,
       starredItems: this.data.starredItems,
@@ -455,6 +502,17 @@ Page({
     this.trackAbort('close');
     studyTimer.flush();
     studyTimer.stop();
+    if (this._swipeHintTimer) {
+      clearTimeout(this._swipeHintTimer);
+      this._swipeHintTimer = null;
+    }
+    const state = getFlashcardState(this);
+    if (state.swipeCommitTimer) {
+      clearTimeout(state.swipeCommitTimer);
+      state.swipeCommitTimer = null;
+    }
+    state.cards = [];
+    clearPageState('review.flashcard', this);
     // 释放音效实例，避免长期资源占用
     soundManager.destroyAll();
   },
@@ -488,4 +546,11 @@ function buildStarredMap(items, type) {
     }
     return acc;
   }, {});
+}
+
+function sanitizeCard(card) {
+  if (!card || typeof card !== 'object') return card;
+  const front = typeof card.front === 'string' ? sanitizeMpHtmlContent(card.front) : '';
+  const back = typeof card.back === 'string' ? sanitizeMpHtmlContent(card.back) : '';
+  return { ...card, front, back };
 }

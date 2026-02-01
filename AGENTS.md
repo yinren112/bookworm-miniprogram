@@ -60,6 +60,9 @@
 ## 学习活动热力图
 - 接口：`GET /study/activity-history`，用于获取热力图活动数据。
 
+## 复习前端排障速查
+- 闪卡滑动后不显示：检查 `subpackages/review/utils/swipe-gesture.wxs` 是否设置 `#swipe-card` 的 `transform/opacity`，换卡时必须重置容器内联样式。
+
 ## 观测性（requestId）
 - 小程序请求统一走 `miniprogram/utils/request.js`，每次**逻辑请求**生成 `X-Request-ID: <timestamp-rand>`，重试链路复用同一 requestId。
 - 后端会回写 `x-request-id` 响应头，并在访问日志/错误日志中输出同一个 requestId（便于端到端排障）。

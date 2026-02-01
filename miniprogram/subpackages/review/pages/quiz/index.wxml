@@ -113,7 +113,14 @@
     </card-flat>
   </enter-transition>
   <view class="action-section" wx:if="{{showResult && !loading && !error && !empty}}">
-    <juicy-button type="primary" full hapticEnabled="{{false}}" bind:tap="nextQuestion">
+    <view class="auto-advance-hint" wx:if="{{autoAdvancing}}">
+      <text class="auto-advance-text">答对自动跳转...</text>
+      <view class="auto-advance-bar-track">
+        <view class="auto-advance-bar"></view>
+      </view>
+    </view>
+    <text class="quiz-hint" wx:if="{{showQuizHint && !autoAdvancing}}">多选题需手动点击下一题</text>
+    <juicy-button wx:if="{{!autoAdvancing}}" type="primary" full hapticEnabled="{{false}}" bind:tap="nextQuestion">
       {{currentIndex < questionsLength - 1 ? '下一题' : '查看结果'}}
     </juicy-button>
   </view>

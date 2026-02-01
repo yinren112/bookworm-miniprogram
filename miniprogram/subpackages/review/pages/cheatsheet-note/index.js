@@ -2,6 +2,7 @@ const { getCheatSheetDetail } = require("../../../../utils/study-api");
 const studyTimer = require("../../../../utils/study-timer");
 const logger = require("../../../../utils/logger");
 const feedback = require("../../../../utils/ui/feedback");
+const { sanitizeMpHtmlContent } = require("../../../../utils/mp-html-sanitize");
 
 Page({
   data: {
@@ -58,7 +59,7 @@ Page({
         title: sheet.title || "",
         unitTitle: sheet.unit && sheet.unit.title ? sheet.unit.title : "",
         version: sheet.version || null,
-        content: sheet.content || "",
+        content: sanitizeMpHtmlContent(sheet.content || ""),
         contentFormat: sheet.contentFormat || "markdown",
       });
     } catch (err) {

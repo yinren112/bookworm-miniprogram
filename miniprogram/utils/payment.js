@@ -1,6 +1,6 @@
 const { request } = require('./api');
 const ui = require('./ui');
-const { APP_CONFIG } = require('../config');
+const { APP_CONFIG } = require('./constants');
 const logger = require('./logger');
 
 function requestPayment(params) {

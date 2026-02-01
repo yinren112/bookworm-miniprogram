@@ -242,3 +242,107 @@ page {
   font-weight: var(--font-weight-heavy);
   color: var(--color-text-light);
 }
+
+/* Card Transition Animation (on card-stack, not card-container which WXS controls) */
+@keyframes cardEnter {
+  0% { opacity: 0; transform: translateY(30rpx); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.card-stack.card-entering {
+  animation: cardEnter 250ms var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-stack.card-entering {
+    animation: none;
+  }
+}
+
+/* Swipe Hint Overlay */
+.swipe-hint-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-10);
+  animation: hintFadeIn 0.3s var(--ease-out-expo) both;
+}
+
+@keyframes hintFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.swipe-hint-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 80rpx;
+}
+
+.swipe-hint-arrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.swipe-hint-left {
+  animation: hintSwayLeft 1.2s ease-in-out infinite;
+}
+
+.swipe-hint-right {
+  animation: hintSwayRight 1.2s ease-in-out infinite;
+}
+
+@keyframes hintSwayLeft {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-20rpx); }
+}
+
+@keyframes hintSwayRight {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(20rpx); }
+}
+
+.swipe-hint-emoji {
+  font-size: 64rpx;
+}
+
+.swipe-hint-text {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
+  color: #FFFFFF;
+}
+
+.swipe-hint-dismiss {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: var(--font-weight-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-hint-left,
+  .swipe-hint-right {
+    animation: none;
+  }
+}
+
+/* Inline Swipe Tip (count-based, non-blocking) */
+.swipe-tip {
+  text-align: center;
+  padding: var(--space-2) 0;
+  animation: hintFadeIn 0.3s var(--ease-out-expo) both;
+}
+.swipe-tip text {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-muted);
+}

@@ -173,6 +173,12 @@ export const cardCourseIdView = {
   courseId: true,
 } as const satisfies Prisma.StudyCardSelect;
 
+export const cardIdContentCourseView = {
+  id: true,
+  contentId: true,
+  courseId: true,
+} as const satisfies Prisma.StudyCardSelect;
+
 // ============================================
 // StudyQuestion 视图选择器
 // ============================================
@@ -213,6 +219,11 @@ export const questionSelectWithAnswer = {
  */
 export const questionIdOnlyView = {
   id: true,
+} as const satisfies Prisma.StudyQuestionSelect;
+
+export const questionIdCourseIdView = {
+  id: true,
+  courseId: true,
 } as const satisfies Prisma.StudyQuestionSelect;
 
 /**

@@ -790,3 +790,10 @@ Host lailinkeji
 1. 迁移验证必须是独立 job，不要插在“起 DB 之前”的步骤里赌顺序。
 2. job 内启动临时 Postgres，注入临时 `DATABASE_URL`，然后依次跑：`prisma generate` → `prisma migrate deploy` → `prisma migrate status`。
 3. 该 job 不接触生产凭据，目的是验证 migrations 链条可用且可重复。
+
+### SOP-闪卡滑动后下一张不显示
+1. 复现路径：闪卡页面滑动提交后，下一张卡片不显示或不可见。
+2. 排查 WXS：检查 `subpackages/review/utils/swipe-gesture.wxs` 是否对 `#swipe-card` 设置了 `transform/opacity`。
+3. 排查换卡：确认换卡逻辑是否在 `setData` 时重置容器内联样式，否则上一张卡的飞出样式会残留。
+4. 修复方式：在换卡时显式设置 `transform: translateX(0) rotate(0deg); opacity: 1; transition: none;`。
+5. 验证：连续滑动 3-5 张，卡片均可正常显示。

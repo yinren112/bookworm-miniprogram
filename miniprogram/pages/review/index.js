@@ -5,12 +5,20 @@ const { getDashboard, getCourses } = require('../../utils/study-api');
 const { swrFetch, subscribe } = require('../../utils/cache');
 const logger = require('../../utils/logger');
 const { getResumeSession, getLastSessionType } = require('../../utils/study-session');
-const { REVIEW_DASHBOARD_CACHE_VERSION, REVIEW_COURSES_CACHE_VERSION } = require('../../utils/constants');
+const { REVIEW_DASHBOARD_CACHE_VERSION, REVIEW_COURSES_CACHE_VERSION, ONBOARDING_WELCOME_KEY } = require('../../utils/constants');
 const { track } = require('../../utils/track');
 const feedback = require('../../utils/ui/feedback');
 const soundManager = require('../../utils/sound-manager');
 const config = require('../../config');
 const { ymdToWeekdayLabel, getBeijingDateOnlyString } = require('../../utils/date');
+const { getPageState, clearPageState } = require('../../utils/page-state');
+
+function getReviewHomeState(page) {
+  return getPageState('review.home', page, () => ({
+    dashboardCacheKey: '',
+    dashboardUnsub: null,
+  }));
+}
 
 Page({
   data: {
@@ -35,7 +43,10 @@ Page({
     primaryCtaText: '开始今日挑战', // Updated Tone
     isDevtools: false,
     debugApiBaseUrl: '',
+    showWelcomeGuide: false,
     isPageActive: false, // For Tab Switch Animation
+    heatmapTooltipIndex: -1,
+    heatmapTooltipText: '',
   },
 
   onLoad(options) {
@@ -47,7 +58,11 @@ Page({
       debugApiBaseUrl: isDevtools ? config.apiBaseUrl : '',
     });
     const selectedCourseKey = wx.getStorageSync('review:selectedCourseKey') || '';
-    this.setData({ selectedCourseKey });
+    const welcomeSeen = wx.getStorageSync(ONBOARDING_WELCOME_KEY);
+    this.setData({
+      selectedCourseKey,
+      showWelcomeGuide: !welcomeSeen,
+    });
     if (options && options.source === 'reminder') {
       this.setData({ highlightStart: true });
       track('reminder_open', { route: 'pages/review/index' });
@@ -61,13 +76,23 @@ Page({
 
   onHide() {
     this.setData({ isPageActive: false });
+    if (this._heatmapTooltipTimer) {
+      clearTimeout(this._heatmapTooltipTimer);
+      this._heatmapTooltipTimer = null;
+    }
   },
 
   onUnload() {
-    if (this._dashboardUnsub) {
-      this._dashboardUnsub();
-      this._dashboardUnsub = null;
+    if (this._heatmapTooltipTimer) {
+      clearTimeout(this._heatmapTooltipTimer);
+      this._heatmapTooltipTimer = null;
     }
+    const state = getReviewHomeState(this);
+    if (state.dashboardUnsub) {
+      state.dashboardUnsub();
+      state.dashboardUnsub = null;
+    }
+    clearPageState('review.home', this);
   },
 
   setTodayDate() {
@@ -128,12 +153,15 @@ Page({
       }
 
       const resumeSession = getResumeSession();
+      const welcomeSeen = wx.getStorageSync(ONBOARDING_WELCOME_KEY);
+      const hasEnrolledCourse = courses.some((course) => !!course.enrolled);
       this.setData({
         dashboard,
         ...viewState,
         resumeSession,
         recommendedCourses,
         courses,
+        showWelcomeGuide: !welcomeSeen && !hasEnrolledCourse,
         loading: false,
         isDevtools,
         debugApiBaseUrl: isDevtools ? apiBaseUrl : '',
@@ -154,15 +182,16 @@ Page({
   },
 
   bindDashboardSubscription(dashboardCacheKey) {
-    if (this._dashboardCacheKey === dashboardCacheKey && this._dashboardUnsub) {
+    const state = getReviewHomeState(this);
+    if (state.dashboardCacheKey === dashboardCacheKey && state.dashboardUnsub) {
       return;
     }
-    if (this._dashboardUnsub) {
-      this._dashboardUnsub();
-      this._dashboardUnsub = null;
+    if (state.dashboardUnsub) {
+      state.dashboardUnsub();
+      state.dashboardUnsub = null;
     }
-    this._dashboardCacheKey = dashboardCacheKey;
-    this._dashboardUnsub = subscribe(dashboardCacheKey, (dashboard) => {
+    state.dashboardCacheKey = dashboardCacheKey;
+    state.dashboardUnsub = subscribe(dashboardCacheKey, (dashboard) => {
       if (!dashboard) return;
       const viewState = this.deriveDashboardState(dashboard);
       this.setData({
@@ -313,7 +342,14 @@ Page({
     });
   },
 
+  dismissWelcomeGuide() {
+    if (!this.data.showWelcomeGuide) return;
+    this.setData({ showWelcomeGuide: false });
+    wx.setStorageSync(ONBOARDING_WELCOME_KEY, true);
+  },
+
   openCoursePicker() {
+    this.dismissWelcomeGuide();
     this.triggerHaptic('light');
     this.setData({ showCoursePicker: true, courseSearch: '' }, () => this.applyCourseSearch());
     track('review_course_picker_open', { entry: 'review_home' });
@@ -461,16 +497,39 @@ Page({
 
   onHeatmapTap(e) {
     this.triggerHaptic('light');
-    const { date } = e.currentTarget.dataset;
+    const { date, index } = e.currentTarget.dataset;
     if (!date) {
       wx.navigateTo({
         url: '/subpackages/review/pages/leaderboard/index',
       });
       return;
     }
-    wx.navigateTo({
-      url: `/subpackages/review/pages/activity-history/index?date=${date}`,
+
+    // Clear previous tooltip timer
+    if (this._heatmapTooltipTimer) {
+      clearTimeout(this._heatmapTooltipTimer);
+      this._heatmapTooltipTimer = null;
+    }
+
+    // Find the heatmap item for tooltip text
+    const item = (this.data.heatmapData || [])[index];
+    const seconds = item ? (item.totalDurationSeconds || 0) : 0;
+    const tooltipText = seconds > 0
+      ? (seconds < 60 ? `${seconds}秒` : `${Math.round(seconds / 60)}分钟`)
+      : '无记录';
+
+    this.setData({
+      heatmapTooltipIndex: parseInt(index, 10),
+      heatmapTooltipText: tooltipText,
     });
+
+    this._heatmapTooltipTimer = setTimeout(() => {
+      this._heatmapTooltipTimer = null;
+      this.setData({ heatmapTooltipIndex: -1, heatmapTooltipText: '' });
+      wx.navigateTo({
+        url: `/subpackages/review/pages/activity-history/index?date=${date}`,
+      });
+    }, 800);
   },
 
   onPullDownRefresh() {

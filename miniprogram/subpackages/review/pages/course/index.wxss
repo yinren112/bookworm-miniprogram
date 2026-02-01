@@ -177,6 +177,14 @@ page {
   color: var(--color-text-main);
 }
 
+.tool-desc {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-muted);
+  opacity: 0.75;
+  text-align: center;
+}
+
 .section-header {
   display: flex;
   align-items: baseline;

@@ -229,3 +229,47 @@ page {
 .action-section {
   margin-top: var(--space-6);
 }
+
+/* Auto-advance */
+.auto-advance-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.auto-advance-text {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-juicy-green);
+}
+
+.auto-advance-bar-track {
+  width: 100%;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background: var(--color-bg-soft);
+  overflow: hidden;
+}
+
+.auto-advance-bar {
+  height: 100%;
+  border-radius: 4rpx;
+  background: var(--color-juicy-green);
+  animation: autoAdvanceShrink 1.2s linear forwards;
+}
+
+@keyframes autoAdvanceShrink {
+  0% { width: 100%; }
+  100% { width: 0%; }
+}
+
+/* Quiz multi-choice hint */
+.quiz-hint {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-muted);
+  padding: var(--space-2) 0;
+}

@@ -538,3 +538,100 @@ page {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
+
+/* Skeleton Screen */
+.skel-wrapper {
+  animation: pageFadeIn 0.3s var(--ease-out-expo) both;
+}
+
+.skel-title {
+  width: 280rpx;
+  height: 44rpx;
+  margin-bottom: var(--space-4);
+}
+
+.skel-stat-split {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.skel-stat {
+  width: 120rpx;
+  height: 32rpx;
+}
+
+.skel-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 24rpx;
+}
+
+.skel-progress {
+  width: 100%;
+  height: 24rpx;
+  margin-bottom: var(--space-8);
+  border-radius: 12rpx;
+}
+
+.skel-cta {
+  width: 100%;
+  height: 96rpx;
+  border-radius: var(--radius-btn);
+}
+
+.skel-section-title {
+  width: 180rpx;
+  height: 36rpx;
+  margin-bottom: 36rpx;
+}
+
+.skel-heatmap-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 160rpx;
+}
+
+.skel-bar {
+  width: 32rpx;
+  border-radius: 20rpx;
+}
+
+/* Heatmap Tooltip */
+.day-bar-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.heatmap-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8rpx);
+  white-space: nowrap;
+  padding: 8rpx 16rpx;
+  border-radius: var(--radius-sm);
+  background: var(--color-text-main);
+  animation: tooltipPop 0.2s var(--ease-bouncy) both;
+  z-index: 10;
+}
+
+.heatmap-tooltip text {
+  font-size: 20rpx;
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-inverse);
+}
+
+@keyframes tooltipPop {
+  0% { opacity: 0; transform: scale(0.8) translateY(4rpx); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Welcome Guide */
+.welcome-guide { animation: pageFadeIn 0.3s var(--ease-out-expo) both; }
+.welcome-content { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); text-align: center; }
+.welcome-title { font-size: var(--font-size-xl); font-weight: var(--font-weight-heavy); color: var(--color-text-main); }
+.welcome-desc { font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); color: var(--color-text-light); line-height: 1.5; }

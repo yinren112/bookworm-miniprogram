@@ -43,6 +43,11 @@ const APP_CONFIG = {
 const CARD_SECONDS_PER_ITEM = 8;
 const QUIZ_SECONDS_PER_ITEM = 30;
 
+// 新用户引导存储键
+const ONBOARDING_WELCOME_KEY = 'review:welcomeSeen';
+const SWIPE_HINT_COUNT_KEY = 'review:swipeHintCount';
+const QUIZ_HINT_COUNT_KEY = 'review:quizHintCount';
+
 module.exports = {
   ORDER_STATUS,
   ORDER_STATUS_COLOR,
@@ -59,4 +64,7 @@ module.exports = {
   APP_CONFIG,
   CARD_SECONDS_PER_ITEM,
   QUIZ_SECONDS_PER_ITEM,
+  ONBOARDING_WELCOME_KEY,
+  SWIPE_HINT_COUNT_KEY,
+  QUIZ_HINT_COUNT_KEY,
 };

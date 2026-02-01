@@ -1,11 +1,11 @@
 // src/services/study/feedbackService.ts
 // 纠错反馈服务 - 用户内容纠错
 
-import { PrismaClient, FeedbackReasonType, StudyFeedbackStatus } from "@prisma/client";
+import { PrismaClient, Prisma, FeedbackReasonType, StudyFeedbackStatus } from "@prisma/client";
 import { feedbackWithCourseInclude } from "../../db/views";
 import { StudyServiceError, StudyErrorCodes } from "../../errors";
 
-type DbCtx = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+type DbCtx = PrismaClient | Prisma.TransactionClient;
 
 export interface CreateFeedbackInput {
   userId: number;

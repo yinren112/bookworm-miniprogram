@@ -239,10 +239,14 @@ export const DeleteWrongItemParamsSchema = Type.Object({
   questionId: Type.String({ pattern: "^\\d+$" }),
 });
 
+export const ClearWrongItemParamsSchema = DeleteWrongItemParamsSchema;
+
 // GET /api/study/quiz/stats
 export const GetQuizStatsQuerySchema = Type.Object({
   courseKey: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
 });
+
+export const QuizStatsQuerySchema = GetQuizStatsQuerySchema;
 
 // 刷题响应 Schema
 export const QuestionItemSchema = Type.Object({
@@ -466,6 +470,8 @@ export type SubmitQuizAnswerBody = Static<typeof SubmitQuizAnswerBodySchema>;
 export type GetWrongItemsQuery = Static<typeof GetWrongItemsQuerySchema>;
 export type DeleteWrongItemParams = Static<typeof DeleteWrongItemParamsSchema>;
 export type GetQuizStatsQuery = Static<typeof GetQuizStatsQuerySchema>;
+export type ClearWrongItemParams = Static<typeof ClearWrongItemParamsSchema>;
+export type QuizStatsQuery = Static<typeof QuizStatsQuerySchema>;
 
 // Phase 4 types
 export type GetCheatSheetsQuery = Static<typeof GetCheatSheetsQuerySchema>;

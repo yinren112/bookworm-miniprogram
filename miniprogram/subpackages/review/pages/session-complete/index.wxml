@@ -13,11 +13,11 @@
     <view class="stat-grid">
       <view class="stat-item">
         <text class="stat-label">完成量</text>
-        <text class="stat-value">{{count}}</text>
+        <text class="stat-value">{{displayCount}}</text>
       </view>
       <view class="stat-item">
         <text class="stat-label">正确率</text>
-        <text class="stat-value">{{mode === 'quiz' ? accuracy + '%' : '--'}}</text>
+        <text class="stat-value">{{mode === 'quiz' ? displayAccuracy + '%' : '--'}}</text>
       </view>
       <view class="stat-item">
         <text class="stat-label">耗时</text>
@@ -42,7 +42,7 @@
     <image class="streak-flame" src="/images/icons/review/flame.svg" mode="aspectFit" />
     <view class="streak-info">
       <view class="streak-current">
-        <text class="streak-number">{{currentStreak}}</text>
+        <text class="streak-number">{{displayStreak}}</text>
         <text class="streak-unit">天连续学习</text>
       </view>
       <view class="streak-best" wx:if="{{bestStreak > 0}}">历史最佳 {{bestStreak}} 天</view>

@@ -1,0 +1,551 @@
+[
+  {
+    "status": "不存在（非API能力检测）",
+    "id": "AI-MP-001",
+    "severity": "P2",
+    "area": "miniprogram",
+    "path": "miniprogram/utils/study-api.js",
+    "symbol": "getCourses",
+    "category": "platform_api",
+    "evidence": {
+      "why": [
+        "使用typeof检查而非wx.canIUse进行API能力检测",
+        "虽然当前是类型检查，但不符合微信小程序最佳实践"
+      ],
+      "signals": [
+        "typeof options.includeUnpublished === 'boolean'",
+        "未使用wx.canIUse进行平台能力检查"
+      ],
+      "loc_hint": "Lines 29-31"
+    },
+    "impact": "未来若需要检测新API能力时可能误判，不符合平台规范",
+    "recommendation": [
+      "使用wx.canIUse进行API能力检测",
+      "参考微信官方文档：https://developers.weixin.qq.com/miniprogram/dev/api/base/wx.canIUse.html"
+    ],
+    "verification": [
+      "检查代码中所有typeof xxx === 'boolean'模式",
+      "确认是否应替换为wx.canIUse"
+    ],
+    "research_refs": [
+      {
+        "title": "WeChat Mini Program Best Practices",
+        "date": "2012-01-01",
+        "url": "https://developers.weixin.qq.com/miniprogram/en/dev/framework/audits/best-practice.html"
+      }
+    ]
+  },
+  {
+    "status": "存在（实际使用点在cheatsheet-note/quiz/flashcard的mp-html）",
+    "id": "AI-MP-002",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/cheatsheet/index.js",
+    "symbol": "Cheatsheet Page",
+    "category": "security",
+    "evidence": {
+      "why": [
+        "使用mp-html组件渲染后端返回的富文本内容",
+        "未确认是否配置了严格的白名单过滤"
+      ],
+      "signals": [
+        "mp-html组件渲染外部输入内容",
+        "急救包内容来自后端数据库"
+      ],
+      "loc_hint": "搜索mp-html使用位置"
+    },
+    "impact": "如果后端内容被污染，可能执行恶意脚本，造成XSS风险",
+    "recommendation": [
+      "确认mp-html组件配置了安全白名单",
+      "设置tag-style过滤危险标签",
+      "后端对急救包内容进行HTML净化"
+    ],
+    "verification": [
+      "检查cheatsheet页面mp-html组件配置",
+      "审查mp-html组件的安全选项",
+      "测试注入恶意脚本是否执行"
+    ],
+    "research_refs": [
+      {
+        "title": "The Most Common Security Vulnerabilities in AI-Generated Code",
+        "date": "2025-08-25",
+        "url": "https://www.endorlabs.com/learn/the-most-common-security-vulnerabilities-in-ai-generated-code"
+      }
+    ]
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-003",
+    "severity": "P2",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js",
+    "symbol": "logger.error",
+    "category": "security",
+    "evidence": {
+      "why": [
+        "多处使用logger.error记录完整错误对象",
+        "错误对象可能包含敏感信息如token"
+      ],
+      "signals": [
+        "logger.error('Failed to start quiz:', err)",
+        "logger.error('Failed to update star:', err)"
+      ],
+      "loc_hint": "Lines 220, 246 in quiz/index.js; Lines 160, 186, 365 in flashcard/index.js"
+    },
+    "impact": "敏感信息可能被记录到日志系统，存在泄露风险",
+    "recommendation": [
+      "审查logger.error实现是否过滤敏感字段",
+      "错误日志中排除token、openid、phone等字段",
+      "生产环境关闭详细错误日志"
+    ],
+    "verification": [
+      "检查utils/logger.js实现",
+      "确认错误日志中无敏感信息",
+      "审查日志存储和访问权限"
+    ],
+    "research_refs": [
+      {
+        "title": "2025 CISO Guide to Securing AI-Generated Code",
+        "date": "2025-06-12",
+        "url": "https://checkmarx.com/blog/ai-is-writing-your-code-whos-keeping-it-secure/"
+      }
+    ]
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-004",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js",
+    "symbol": "toggleStar",
+    "category": "reliability",
+    "evidence": {
+      "why": [
+        "混用async/await与Promise链式调用",
+        "乐观更新后回滚逻辑分散在.catch中"
+      ],
+      "signals": [
+        "updatePromise.then().catch()链式调用",
+        "与页面其他async函数风格不一致"
+      ],
+      "loc_hint": "Lines 235-252"
+    },
+    "impact": "代码风格不一致影响可维护性；实际竞态风险较低（用户星标操作频率不高，Promise会排队执行），最坏情况下可能出现UI闪烁但不会导致数据错误",
+    "recommendation": [
+      "统一使用async/await改写toggleStar函数",
+      "使用try-catch集中处理错误和回滚",
+      "确保乐观更新与回滚逻辑清晰"
+    ],
+    "verification": [
+      "改写后grep确认无.then().catch()链",
+      "手动测试快速点击星标多次",
+      "断网测试确认UI正确回滚"
+    ],
+    "research_refs": [
+      {
+        "title": "Characterizing and Detecting Bugs in WeChat Mini-Programs",
+        "date": "2024-04-16",
+        "url": "https://github.com/tao2years/WeBug"
+      }
+    ]
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-005",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/flashcard/index.js",
+    "symbol": "toggleStar",
+    "category": "reliability",
+    "evidence": {
+      "why": [
+        "与quiz/index.js完全相同的Promise链混用问题",
+        "代码复制粘贴导致相同缺陷"
+      ],
+      "signals": [
+        "updatePromise.then().catch()链式调用",
+        "与AI-MP-004完全相同的模式"
+      ],
+      "loc_hint": "Lines 358-371"
+    },
+    "impact": "与AI-MP-004相同：代码风格不一致影响可维护性；功能正确，主要问题是代码重复和风格不一致",
+    "recommendation": [
+      "与AI-MP-004一起修复",
+      "提取共享函数避免重复代码",
+      "统一使用async/await"
+    ],
+    "verification": [
+      "与AI-MP-004一同验证",
+      "确认两处修复一致"
+    ],
+    "research_refs": [
+      {
+        "title": "Characterizing and Detecting Bugs in WeChat Mini-Programs",
+        "date": "2024-04-16",
+        "url": "https://github.com/tao2years/WeBug"
+      }
+    ]
+  },
+  {
+    "status": "存在（后端幂等已覆盖风险）",
+    "id": "AI-MP-006",
+    "severity": "P2",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js",
+    "symbol": "submitAnswer",
+    "category": "reliability",
+    "evidence": {
+      "why": [
+        "防重复提交仅依赖客户端submitting状态",
+        "后端已实现完善幂等性保护（数据库唯一约束sessionId_userId_questionId）",
+        "quiz-idempotency.integration.test.ts测试并发提交通过"
+      ],
+      "signals": [
+        "if (this.data.submitting) return;",
+        "后端quizService.ts:186-193有幂等性检查",
+        "后端已防止重复写入"
+      ],
+      "loc_hint": "Lines 321-324, 380-382"
+    },
+    "impact": "实际风险低。后端已防止数据重复，前端防重复主要是优化用户体验（避免不必要请求）。最坏情况是多发送请求但数据一致",
+    "recommendation": [
+      "前端可增加防抖优化体验（非必须）",
+      "当前实现已足够保护数据一致性"
+    ],
+    "verification": [
+      "检查后端quizService.ts幂等性实现",
+      "运行quiz-idempotency.integration.test.ts测试通过",
+      "模拟快速双击确认只产生一条记录"
+    ],
+    "research_refs": [
+      {
+        "title": "Security Attacks on LLM-based Code Completion Tools",
+        "date": "2025-04-07",
+        "url": "https://ojs.aaai.org/index.php/AAAI/article/view/34537/36692"
+      }
+    ]
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-007",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "miniprogram/utils/cache.js",
+    "symbol": "swrFetch",
+    "category": "reliability",
+    "evidence": {
+      "why": [
+        "后台刷新失败被静默.catch(() => {})处理",
+        "用户看到的是过期缓存数据而不知晓"
+      ],
+      "signals": [
+        ".catch(() => { // 后台刷新失败，静默处理 })",
+        "无日志记录",
+        "无用户通知"
+      ],
+      "loc_hint": "Lines 172-174"
+    },
+    "impact": "用户可能长期看到过期数据，导致不一致体验，错过重要更新",
+    "recommendation": [
+      "静默处理但记录日志: logger.warn",
+      "考虑在多次失败后提示用户刷新",
+      "添加后台刷新失败计数"
+    ],
+    "verification": [
+      "模拟后台刷新失败，检查日志有记录",
+      "确认用户无感知但可追踪问题"
+    ],
+    "research_refs": []
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-008",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js",
+    "symbol": "submitAnswer",
+    "category": "performance",
+    "evidence": {
+      "why": [
+        "单次答题触发大规模setData，包含多个计算属性",
+        "nextQuestion再次大规模setData"
+      ],
+      "signals": [
+        "setData包含9个字段更新",
+        "有计算属性如accuracyPercent"
+      ],
+      "loc_hint": "Lines 359-367, 420-436"
+    },
+    "impact": "低端设备可能出现卡顿，setData数据量大影响渲染性能",
+    "recommendation": [
+      "数据裁剪，只传输必要字段",
+      "延迟计算非立即需要的属性",
+      "大列表考虑分页或虚拟列表"
+    ],
+    "verification": [
+      "使用微信开发者工具性能面板检查setData数据量",
+      "确认数据量<100KB",
+      "低端设备测试无卡顿"
+    ],
+    "research_refs": []
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-009",
+    "severity": "P2",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/flashcard/index.js",
+    "symbol": "onSwipeCommit",
+    "category": "performance",
+    "evidence": {
+      "why": [
+        "setTimeout延迟提交无清理机制",
+        "300ms延迟较短，实际风险低"
+      ],
+      "signals": [
+        "setTimeout(() => { this.submitRating(rating); }, 300);",
+        "无timer变量保存",
+        "onUnload未清理"
+      ],
+      "loc_hint": "Lines 229-232"
+    },
+    "impact": "实际风险低。300ms延迟很短，用户极少在此时间内完成滑动手势后立即退出；小程序页面onUnload后JS环境不会立即销毁，且框架通常会忽略已卸载页面的setData调用",
+    "recommendation": [
+      "保存timer引用: this._swipeCommitTimer",
+      "onUnload中清理: clearTimeout(this._swipeCommitTimer)",
+      "或使用页面存活标志位检查"
+    ],
+    "verification": [
+      "快速进出页面测试",
+      "检查控制台无'setData on unloaded page'警告",
+      "内存分析无泄漏"
+    ],
+    "research_refs": [
+      {
+        "title": "Sec-Context - AI Code Security Anti-Patterns for LLMs",
+        "date": "2026-01-21",
+        "url": "https://github.com/Arcanum-Sec/sec-context"
+      }
+    ]
+  },
+  {
+    "status": "不存在（bindDashboardSubscription已清理旧订阅）",
+    "id": "AI-MP-010",
+    "severity": "P2",
+    "area": "miniprogram",
+    "path": "miniprogram/pages/review/index.js",
+    "symbol": "onUnload",
+    "category": "performance",
+    "evidence": {
+      "why": [
+        "bindDashboardSubscription可能创建多个订阅",
+        "onUnload只清理最后一个订阅"
+      ],
+      "signals": [
+        "每次loadData调用bindDashboardSubscription",
+        "可能创建多个_dashboardUnsub"
+      ],
+      "loc_hint": "Lines 66-71, 156-173"
+    },
+    "impact": "内存泄漏，旧订阅回调仍在执行，可能导致竞态",
+    "recommendation": [
+      "bindDashboardSubscription前先清理旧订阅",
+      "或使用单一订阅模式",
+      "维护订阅列表而非单个引用"
+    ],
+    "verification": [
+      "多次切换课程测试",
+      "检查subscribers Map大小",
+      "内存分析确认无泄漏"
+    ],
+    "research_refs": []
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-011",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js,subpackages/review/pages/flashcard/index.js",
+    "symbol": "toggleStar",
+    "category": "maintainability",
+    "evidence": {
+      "why": [
+        "两个页面的toggleStar函数几乎完全相同",
+        "代码重复约25行"
+      ],
+      "signals": [
+        "相同的乐观更新模式",
+        "相同的Promise链结构",
+        "仅变量名差异"
+      ],
+      "loc_hint": "quiz: Lines 225-252, flashcard: Lines 342-371"
+    },
+    "impact": "修改时需要同步两处，容易遗漏导致行为不一致",
+    "recommendation": [
+      "提取到utils/study-ui-helpers.js",
+      "创建toggleStarWithOptimisticUpdate共享函数",
+      "统一错误处理和回滚逻辑"
+    ],
+    "verification": [
+      "提取后两个页面import共享函数",
+      "功能测试确认行为一致",
+      "代码重复检测工具确认重复减少"
+    ],
+    "research_refs": [
+      {
+        "title": "Sec-Context - AI Code Security Anti-Patterns for LLMs",
+        "date": "2026-01-21",
+        "url": "https://github.com/Arcanum-Sec/sec-context"
+      }
+    ]
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-012",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js,subpackages/review/pages/flashcard/index.js",
+    "symbol": "tryResumeSession",
+    "category": "maintainability",
+    "evidence": {
+      "why": [
+        "两个页面的tryResumeSession逻辑高度相似",
+        "会话类型检查、数组边界检查、状态恢复逻辑重复"
+      ],
+      "signals": [
+        "相同的session类型验证",
+        "相同的questions数组检查",
+        "相似的setData模式"
+      ],
+      "loc_hint": "quiz: Lines 109-155, flashcard: Lines 89-123"
+    },
+    "impact": "会话恢复逻辑变更需多处修改，维护成本高",
+    "recommendation": [
+      "提取到utils/study-session.js",
+      "创建通用resumeSession函数",
+      "通过参数区分不同会话类型"
+    ],
+    "verification": [
+      "提取后两个页面调用共享函数",
+      "会话恢复测试正常",
+      "代码重复减少"
+    ],
+    "research_refs": []
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-013",
+    "severity": "P2",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js,subpackages/review/pages/flashcard/index.js,miniprogram/pages/review/index.js",
+    "symbol": "this._xxx",
+    "category": "maintainability",
+    "evidence": {
+      "why": [
+        "多处使用this._xxx隐式状态",
+        "隐式状态不触发WXML更新，难以追踪"
+      ],
+      "signals": [
+        "this._questions, this._cards",
+        "this._questionEnterTimer",
+        "this._dashboardUnsub"
+      ],
+      "loc_hint": "quiz: this._questions(119,190); flashcard: this._cards(100,163); review: this._dashboardUnsub(67)"
+    },
+    "impact": "上一轮审计LM-008 P1问题：状态来源不明确，难以调试，易引入竞态bug",
+    "recommendation": [
+      "逐步迁移到this.data.xxx",
+      "临时状态使用局部变量",
+      "确实需要跨函数的状态放入data"
+    ],
+    "verification": [
+      "grep this._ 统计数量",
+      "目标减少50%以上",
+      "调试时状态可追踪"
+    ],
+    "research_refs": [
+      {
+        "title": "Sec-Context - AI Code Security Anti-Patterns for LLMs",
+        "date": "2026-01-21",
+        "url": "https://github.com/Arcanum-Sec/sec-context"
+      }
+    ]
+  },
+  {
+    "status": "存在（后端已标准化为number[]）",
+    "id": "AI-MP-014",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "subpackages/review/pages/quiz/index.js",
+    "symbol": "submitAnswer",
+    "category": "validation",
+    "evidence": {
+      "why": [
+        "correctOptionIndices直接使用不做元素类型检查",
+        "后端可能返回字符串数组而非数字数组"
+      ],
+      "signals": [
+        "Array.isArray(result.correctOptionIndices)",
+        "未对数组元素做Number转换"
+      ],
+      "loc_hint": "Lines 341-343"
+    },
+    "impact": "如果后端返回[\"1\",\"2\"]而非[1,2]，后续索引比较逻辑可能异常",
+    "recommendation": [
+      "添加数组元素类型转换: .map(i => Number(i))",
+      "过滤NaN值",
+      "与后端约定明确的数据格式"
+    ],
+    "verification": [
+      "模拟后端返回字符串数组",
+      "确认前端正确处理",
+      "单元测试覆盖边界情况"
+    ],
+    "research_refs": [
+      {
+        "title": "The Most Common Security Vulnerabilities in AI-Generated Code",
+        "date": "2025-08-25",
+        "url": "https://www.endorlabs.com/learn/the-most-common-security-vulnerabilities-in-ai-generated-code"
+      }
+    ]
+  },
+  {
+    "status": "存在",
+    "id": "AI-MP-015",
+    "severity": "P1",
+    "area": "miniprogram",
+    "path": "miniprogram/utils/study-api.js",
+    "symbol": "API Functions",
+    "category": "validation",
+    "evidence": {
+      "why": [
+        "多处API函数缺少参数校验",
+        "encodeURIComponent(undefined)返回'undefined'字符串"
+      ],
+      "signals": [
+        "getCourseDetail(courseKey)无校验",
+        "enrollCourse(courseKey)无校验",
+        "直接使用encodeURIComponent"
+      ],
+      "loc_hint": "Lines 47-67多处"
+    },
+    "impact": "传入undefined/null导致请求错误URI，难以调试",
+    "recommendation": [
+      "API函数入口添加参数校验",
+      "抛出明确错误信息",
+      "开发环境添加断言"
+    ],
+    "verification": [
+      "传入undefined测试，应抛出明确错误",
+      "检查所有API函数都有参数校验",
+      "类型检查通过"
+    ],
+    "research_refs": [
+      {
+        "title": "The Most Common Security Vulnerabilities in AI-Generated Code",
+        "date": "2025-08-25",
+        "url": "https://www.endorlabs.com/learn/the-most-common-security-vulnerabilities-in-ai-generated-code"
+      }
+    ]
+  }
+]
