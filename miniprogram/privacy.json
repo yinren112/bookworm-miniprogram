@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "desc": "隐私保护指引",
+  "rules": [
+    {
+      "type": "getPhoneNumber",
+      "desc": "用于账号识别与绑定手机号"
+    }
+  ]
+}
