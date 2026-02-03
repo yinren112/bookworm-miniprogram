@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const baseEnv = {
   NODE_ENV: "production",
+  APP_MODE: "full",
   PORT: "8080",
   HOST: "0.0.0.0",
   DATABASE_URL: "postgresql://user:pass@localhost:5432/bookworm",
-  JWT_SECRET: "StrongSecret!1234567890StrongSecret!1234567890",
+  JWT_SECRET: "A1!b2@c3#d4$e5%f6^g7&h8*I9(J0)kL",
   WX_APP_ID: "wx-test",
   WX_APP_SECRET: "wx-secret",
   WXPAY_MCHID: "mchid",
@@ -108,6 +109,46 @@ describe("config production validation", () => {
     }).rejects.toThrow("process.exit:1");
 
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("should fail when payment config is missing in production full mode", async () => {
+    process.env.APP_MODE = "full";
+    process.env.WXPAY_MCHID = "";
+    process.env.WXPAY_PRIVATE_KEY_PATH = "";
+    process.env.WXPAY_CERT_SERIAL_NO = "";
+    process.env.WXPAY_API_V3_KEY = "";
+    process.env.WXPAY_NOTIFY_URL = "";
+
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn().mockReturnValue(false),
+    }));
+
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((code?: number) => {
+        throw new Error(`process.exit:${code}`);
+      }) as never);
+
+    await expect(async () => {
+      await import("../config");
+    }).rejects.toThrow("process.exit:1");
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("should allow missing payment config in production review mode", async () => {
+    process.env.APP_MODE = "review";
+    process.env.WXPAY_MCHID = "";
+    process.env.WXPAY_PRIVATE_KEY_PATH = "/tmp/missing.pem";
+    process.env.WXPAY_CERT_SERIAL_NO = "";
+    process.env.WXPAY_API_V3_KEY = "";
+    process.env.WXPAY_NOTIFY_URL = "";
+
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn().mockReturnValue(false),
+    }));
+
+    await expect(import("../config")).resolves.toBeDefined();
   });
 });
 

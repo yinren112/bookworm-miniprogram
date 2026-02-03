@@ -162,31 +162,35 @@ const writeErrorLog = async (error: unknown, request: FastifyRequest) => {
 
 // --- WeChat Pay Setup ---
 let wechatPayAdapter: WechatPayAdapter | null = null;
-try {
-  if (
-    config.WXPAY_MCHID &&
-    config.WXPAY_PRIVATE_KEY_PATH &&
-    fs.existsSync(config.WXPAY_PRIVATE_KEY_PATH) &&
-    config.WXPAY_CERT_SERIAL_NO &&
-    config.WXPAY_API_V3_KEY
-  ) {
-    wechatPayAdapter = createWechatPayAdapter({
-      appid: config.WX_APP_ID,
-      mchid: config.WXPAY_MCHID,
-      privateKey: fs.readFileSync(config.WXPAY_PRIVATE_KEY_PATH),
-      serial_no: config.WXPAY_CERT_SERIAL_NO,
-      key: config.WXPAY_API_V3_KEY,
-    });
-    fastify.log.info("WeChat Pay SDK initialized successfully");
-  } else {
-    throw new Error(
-      "WeChat Pay configuration is incomplete or certificate files are missing.",
+if (config.paymentEnabled) {
+  try {
+    if (
+      config.WXPAY_MCHID &&
+      config.WXPAY_PRIVATE_KEY_PATH &&
+      fs.existsSync(config.WXPAY_PRIVATE_KEY_PATH) &&
+      config.WXPAY_CERT_SERIAL_NO &&
+      config.WXPAY_API_V3_KEY
+    ) {
+      wechatPayAdapter = createWechatPayAdapter({
+        appid: config.WX_APP_ID,
+        mchid: config.WXPAY_MCHID,
+        privateKey: fs.readFileSync(config.WXPAY_PRIVATE_KEY_PATH),
+        serial_no: config.WXPAY_CERT_SERIAL_NO,
+        key: config.WXPAY_API_V3_KEY,
+      });
+      fastify.log.info("WeChat Pay SDK initialized successfully");
+    } else {
+      throw new Error(
+        "WeChat Pay configuration is incomplete or certificate files are missing.",
+      );
+    }
+  } catch (error) {
+    console.warn(
+      `!!! WARNING: Failed to initialize WeChat Pay SDK. Payment features will be disabled. Reason: ${getErrorMessage(error)}`,
     );
   }
-} catch (error) {
-  console.warn(
-    `!!! WARNING: Failed to initialize WeChat Pay SDK. Payment features will be disabled. Reason: ${getErrorMessage(error)}`,
-  );
+} else {
+  fastify.log.info("APP_MODE=review: payment features disabled");
 }
 
 // --- Global Error Handler ---
@@ -359,14 +363,19 @@ const setupApplication = async () => {
   await fastify.register(healthRoutes);
   await fastify.register(authRoutes);
   await fastify.register(usersRoutes);
-  await fastify.register(booksRoutes);
-  await fastify.register(acquisitionsRoutes);
-  await fastify.register(inventoryRoutes);
-  await fastify.register(contentRoutes);
-  await fastify.register(sellOrdersRoutes);
-  await fastify.register(ordersRoutes);
-  await fastify.register(paymentRoutes, { wechatPayAdapter });
   await fastify.register(studyRoutes);
+
+  if (config.appMode === "full") {
+    await fastify.register(booksRoutes);
+    await fastify.register(acquisitionsRoutes);
+    await fastify.register(inventoryRoutes);
+    await fastify.register(contentRoutes);
+    await fastify.register(sellOrdersRoutes);
+    await fastify.register(ordersRoutes);
+    await fastify.register(paymentRoutes, { wechatPayAdapter });
+  } else {
+    fastify.log.info("APP_MODE=review: commerce routes disabled");
+  }
 };
 
 // Export function to build app for testing

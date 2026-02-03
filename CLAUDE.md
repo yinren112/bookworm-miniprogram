@@ -797,3 +797,12 @@ Host lailinkeji
 3. 排查换卡：确认换卡逻辑是否在 `setData` 时重置容器内联样式，否则上一张卡的飞出样式会残留。
 4. 修复方式：在换卡时显式设置 `transform: translateX(0) rotate(0deg); opacity: 1; transition: none;`。
 5. 验证：连续滑动 3-5 张，卡片均可正常显示。
+
+### SOP-预发布 review-only 模式启动
+1. 环境变量设置：`NODE_ENV=production` 且 `APP_MODE=review`。
+2. 生产校验要求（仍必须满足）：`JWT_SECRET` 强度、`WX_APP_ID/WX_APP_SECRET`、`DATABASE_URL`、`HOST`、`CORS_ORIGIN`、`METRICS_AUTH_TOKEN`。
+3. review-only 下不要求 `WXPAY_*`，且不会注册电商/支付路由，也不会启动订单/库存/退款任务。
+4. 验证方式：请求 `/api/study/courses` 返回 401/403（代表路由存在），请求 `/api/orders/create` 返回 404（代表路由已裁剪）。
+
+### SOP-修复技巧
+当我报告一个错误时，不要一开始就尝试修复它。而是先编写一个能够重现该错误的测试。然后，让子代理尝试修复该错误，并通过一个通过的测试来证明修复成功

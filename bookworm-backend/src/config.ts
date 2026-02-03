@@ -16,6 +16,10 @@ const schema = Type.Object({
     enum: ["development", "production", "staging", "test"],
     default: "development",
   }),
+  APP_MODE: Type.String({
+    enum: ["full", "review"],
+    default: "full",
+  }),
   LOG_LEVEL: Type.String({ default: "info" }),
 
   // Database
@@ -89,12 +93,16 @@ const schema = Type.Object({
 });
 
 type Schema = Static<typeof schema>;
+type AppMode = "full" | "review";
 
 // The `dotenv: true` option will automatically load the .env file
 const config = envSchema<Schema>({
   schema,
   dotenv: !isTestRuntime,
-});
+}) as Schema & { appMode: AppMode; paymentEnabled: boolean };
+
+config.appMode = config.APP_MODE as AppMode;
+config.paymentEnabled = config.appMode === "full";
 
 // Strong secret validation helper
 function validateSecretStrength(name: string, value: string): string[] {
@@ -161,8 +169,8 @@ if (config.NODE_ENV === "production" || config.NODE_ENV === "staging") {
     );
   }
 
-  // WeChat Pay Configuration (only required in production, not staging)
-  if (config.NODE_ENV === "production") {
+  // WeChat Pay Configuration (only required in production + full mode)
+  if (config.NODE_ENV === "production" && config.paymentEnabled) {
     if (!config.WXPAY_MCHID) {
       errors.push("WXPAY_MCHID must be set in production.");
     }

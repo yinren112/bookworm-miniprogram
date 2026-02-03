@@ -47,81 +47,87 @@ export function startCronJobs(fastify: FastifyInstance): void {
     return;
   }
 
+  const isReviewMode = config.appMode === "review";
+
   // 注意：'*/1 * * * *' (每分钟执行) 适用于开发和测试。
   // 在生产环境中，应通过 config.ts 配置为更合理的频率，例如 '*/5 * * * *' (每5分钟)。
-  const orderCleanupTask = cron.schedule(config.CRON_ORDER_CLEANUP, async () => {
-    if (isShuttingDown) return;
-    const jobPromise = withAdvisoryLock(prisma, "job:cancel_expired_orders", async () => {
-      fastify.log.info("Running scheduled job: CancelExpiredOrders");
-      try {
-        const result = await prisma.$transaction(async (tx) => {
-          return cancelExpiredOrders(tx);
-        });
-        if (result.cancelledCount > 0) {
-          fastify.log.info(
-            `CancelExpiredOrders job finished: ${result.cancelledCount} order(s) cancelled`,
-          );
-        } else {
-          fastify.log.info(
-            "CancelExpiredOrders job finished: No expired orders found",
-          );
+  if (!isReviewMode) {
+    const orderCleanupTask = cron.schedule(config.CRON_ORDER_CLEANUP, async () => {
+      if (isShuttingDown) return;
+      const jobPromise = withAdvisoryLock(prisma, "job:cancel_expired_orders", async () => {
+        fastify.log.info("Running scheduled job: CancelExpiredOrders");
+        try {
+          const result = await prisma.$transaction(async (tx) => {
+            return cancelExpiredOrders(tx);
+          });
+          if (result.cancelledCount > 0) {
+            fastify.log.info(
+              `CancelExpiredOrders job finished: ${result.cancelledCount} order(s) cancelled`,
+            );
+          } else {
+            fastify.log.info(
+              "CancelExpiredOrders job finished: No expired orders found",
+            );
+          }
+        } catch (error) {
+          fastify.log.error(error, 'CRITICAL: The "CancelExpiredOrders" job failed');
         }
-      } catch (error) {
-        fastify.log.error(error, 'CRITICAL: The "CancelExpiredOrders" job failed');
-      }
+      });
+      runningJobs.add(jobPromise);
+      jobPromise.finally(() => runningJobs.delete(jobPromise));
     });
-    runningJobs.add(jobPromise);
-    jobPromise.finally(() => runningJobs.delete(jobPromise));
-  });
-  scheduledTasks.push(orderCleanupTask);
+    scheduledTasks.push(orderCleanupTask);
 
-  // Schedule a job to update inventory gauge metrics every 5 minutes.
-  const metricsTask = cron.schedule(config.CRON_INVENTORY_METRICS, async () => {
-    if (isShuttingDown) return;
-    const jobPromise = withAdvisoryLock(
-      prisma,
-      "job:update_inventory_metrics",
-      async () => {
-        fastify.log.info("Running scheduled job to update inventory metrics");
-        try {
-          const inventoryCounts = await prisma.inventoryItem.groupBy({
-            by: ["status"],
-            _count: {
-              id: true,
-            },
-          });
-          inventoryCounts.forEach((item) => {
-            metrics.inventoryStatus.labels(item.status).set(item._count.id);
-          });
-        } catch (error) {
-          fastify.log.error(error, 'CRITICAL: The "updateInventoryMetrics" job failed');
-        }
-      },
-    );
-    runningJobs.add(jobPromise);
-    jobPromise.finally(() => runningJobs.delete(jobPromise));
-  });
-  scheduledTasks.push(metricsTask);
+    // Schedule a job to update inventory gauge metrics every 5 minutes.
+    const metricsTask = cron.schedule(config.CRON_INVENTORY_METRICS, async () => {
+      if (isShuttingDown) return;
+      const jobPromise = withAdvisoryLock(
+        prisma,
+        "job:update_inventory_metrics",
+        async () => {
+          fastify.log.info("Running scheduled job to update inventory metrics");
+          try {
+            const inventoryCounts = await prisma.inventoryItem.groupBy({
+              by: ["status"],
+              _count: {
+                id: true,
+              },
+            });
+            inventoryCounts.forEach((item) => {
+              metrics.inventoryStatus.labels(item.status).set(item._count.id);
+            });
+          } catch (error) {
+            fastify.log.error(error, 'CRITICAL: The "updateInventoryMetrics" job failed');
+          }
+        },
+      );
+      runningJobs.add(jobPromise);
+      jobPromise.finally(() => runningJobs.delete(jobPromise));
+    });
+    scheduledTasks.push(metricsTask);
 
-  // Schedule refund processing job every 10 minutes
-  const refundTask = cron.schedule(config.CRON_REFUND_PROCESSOR, async () => {
-    if (isShuttingDown) return;
-    const jobPromise = withAdvisoryLock(
-      prisma,
-      "job:process_refunds",
-      async () => {
-        fastify.log.info("Running scheduled job to process pending refunds");
-        try {
-          await processRefundQueue();
-        } catch (error) {
-          fastify.log.error(error, 'CRITICAL: The "processRefunds" job failed');
-        }
-      },
-    );
-    runningJobs.add(jobPromise);
-    jobPromise.finally(() => runningJobs.delete(jobPromise));
-  });
-  scheduledTasks.push(refundTask);
+    // Schedule refund processing job every 10 minutes
+    const refundTask = cron.schedule(config.CRON_REFUND_PROCESSOR, async () => {
+      if (isShuttingDown) return;
+      const jobPromise = withAdvisoryLock(
+        prisma,
+        "job:process_refunds",
+        async () => {
+          fastify.log.info("Running scheduled job to process pending refunds");
+          try {
+            await processRefundQueue();
+          } catch (error) {
+            fastify.log.error(error, 'CRITICAL: The "processRefunds" job failed');
+          }
+        },
+      );
+      runningJobs.add(jobPromise);
+      jobPromise.finally(() => runningJobs.delete(jobPromise));
+    });
+    scheduledTasks.push(refundTask);
+  } else {
+    fastify.log.info("APP_MODE=review: skipping order/payment/inventory cron jobs");
+  }
 
   // Schedule weekly points reset (Monday 00:00 Beijing time = Sunday 16:00 UTC)
   const weeklyResetTask = cron.schedule(config.CRON_WEEKLY_POINTS_RESET, async () => {
