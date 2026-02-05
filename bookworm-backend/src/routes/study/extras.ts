@@ -585,6 +585,7 @@ const studyExtrasRoutes: FastifyPluginAsync = async (fastify) => {
           dryRun: options?.dryRun,
           overwriteContent: options?.overwriteContent,
           publishOnImport: options?.publishOnImport,
+          validateSchema: false,
         });
       });
 
@@ -640,4 +641,3 @@ const studyExtrasRoutes: FastifyPluginAsync = async (fastify) => {
 };
 
 export default studyExtrasRoutes;
-

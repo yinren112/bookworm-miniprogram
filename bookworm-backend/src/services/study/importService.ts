@@ -69,6 +69,7 @@ export interface ImportOptions {
   dryRun?: boolean;
   overwriteContent?: boolean;
   publishOnImport?: boolean;
+  validateSchema?: boolean;
 }
 
 export interface ImportResult {
@@ -460,12 +461,17 @@ function formatSchemaError(path: string, message: string) {
  * 返回验证错误列表
  * @exported for testing
  */
-export function validateCoursePackage(pkg: CoursePackage): string[] {
+export function validateCoursePackageSchema(pkg: CoursePackage): string[] {
   const errors: string[] = [];
   const importBody = buildImportBody(pkg);
   for (const error of Value.Errors(ImportCourseBodySchema, importBody)) {
     errors.push(formatSchemaError(error.path, error.message));
   }
+  return errors;
+}
+
+export function validateCoursePackage(pkg: CoursePackage): string[] {
+  const errors: string[] = [];
 
   // 1. 验证 units 定义
   const definedUnits = new Set(pkg.units.map((u) => u.unitKey));
@@ -548,7 +554,12 @@ export async function importCoursePackage(
   pkg: CoursePackage,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
-  const { dryRun = false, overwriteContent = false, publishOnImport = false } = options;
+  const {
+    dryRun = false,
+    overwriteContent = false,
+    publishOnImport = false,
+    validateSchema = true,
+  } = options;
   const result: ImportResult = {
     success: false,
     courseId: null,
@@ -586,7 +597,9 @@ export async function importCoursePackage(
 
     if (dryRun) {
       // 验证模式：完整数据格式校验，不写入
-      const validationErrors = validateCoursePackage(pkg);
+      const schemaErrors = validateSchema ? validateCoursePackageSchema(pkg) : [];
+      const ruleErrors = validateCoursePackage(pkg);
+      const validationErrors = [...schemaErrors, ...ruleErrors];
 
       if (validationErrors.length > 0) {
         result.errors.push(...validationErrors);

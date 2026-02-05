@@ -159,7 +159,7 @@ export async function getTodayQueueSummary(
       card: { courseId },
     },
   });
-  const newCards = totalCourseCards - userCardStates;
+  const newCards = Math.max(0, totalCourseCards - userCardStates);
 
   // 查询今日已复习数
   const reviewedToday = await dbCtx.userCardState.count({

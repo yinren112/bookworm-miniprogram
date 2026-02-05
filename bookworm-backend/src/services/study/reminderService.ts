@@ -6,11 +6,11 @@ import { PrismaClient, Prisma, StudyReminderStatus } from "@prisma/client";
 import config from "../../config";
 import { retryAsync } from "../../utils/retry";
 import { isSameDayBeijing, toBeijingDate } from "../../utils/timezone";
-import { getCourseByKey } from "./courseService";
 import { getTodayQueueSummary } from "./cardScheduler";
+import { resolveCurrentCourse, getQuizPendingStats, getWrongCount } from "./studyStats";
 import { WECHAT_CONSTANTS } from "../../constants";
 import { log } from "../../lib/logger";
-import { enrollmentCourseKeyView, questionAttemptQuestionIdView, reminderSubscriptionWithUserInclude } from "../../db/views";
+import { reminderSubscriptionWithUserInclude } from "../../db/views";
 import { REMINDER_TEMPLATE_KEYS } from "./studyReminderTemplate";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
@@ -387,81 +387,6 @@ async function buildReminderPayload(
       [REMINDER_TEMPLATE_KEYS.REMARK]: { value: remarkText },
     },
   };
-}
-
-async function resolveCurrentCourse(
-  dbCtx: PrismaClient,
-  userId: number,
-): Promise<{ id: number; courseKey: string; title: string; totalCards: number; totalQuestions: number } | null> {
-  // 明确规则：优先“最近学习”的课程；若从未学习，则取最近注册
-  const enrollment = await dbCtx.userCourseEnrollment.findFirst({
-    where: { userId, isActive: true },
-    orderBy: [
-      { lastStudiedAt: { sort: "desc", nulls: "last" } },
-      { enrolledAt: "desc" },
-    ],
-    select: enrollmentCourseKeyView,
-  });
-
-  if (!enrollment?.course?.courseKey) {
-    return null;
-  }
-
-  const course = await getCourseByKey(dbCtx, enrollment.course.courseKey, {
-    userId,
-    publishedOnly: true,
-  });
-  if (!course) return null;
-
-  return {
-    id: course.id,
-    courseKey: course.courseKey,
-    title: course.title,
-    totalCards: course.totalCards,
-    totalQuestions: course.totalQuestions,
-  };
-}
-
-async function getQuizPendingStats(
-  dbCtx: PrismaClient,
-  userId: number,
-  courseId: number,
-  totalQuestions: number,
-): Promise<{ pendingCount: number }> {
-  if (totalQuestions <= 0) {
-    return { pendingCount: 0 };
-  }
-
-  const [questionCount, answered] = await Promise.all([
-    dbCtx.studyQuestion.count({ where: { courseId } }),
-    dbCtx.userQuestionAttempt.findMany({
-    where: {
-      userId,
-      question: { courseId },
-    },
-    distinct: ["questionId"],
-      select: questionAttemptQuestionIdView,
-    }),
-  ]);
-  const effectiveTotalQuestions = questionCount > 0 ? questionCount : totalQuestions;
-
-  return {
-    pendingCount: Math.max(0, effectiveTotalQuestions - answered.length),
-  };
-}
-
-async function getWrongCount(
-  dbCtx: PrismaClient,
-  userId: number,
-  courseId: number,
-): Promise<number> {
-  return dbCtx.userWrongItem.count({
-    where: {
-      userId,
-      clearedAt: null,
-      question: { courseId },
-    },
-  });
 }
 
 function formatBeijingDateTime(date: Date): string {

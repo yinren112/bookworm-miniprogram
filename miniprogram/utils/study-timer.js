@@ -110,6 +110,17 @@ class StudyTimer {
     if (!this._lastCountedAtMs) return;
 
     const now = Date.now();
+    const currentYmd = getBeijingYmdNow();
+    if (currentYmd !== this._activeYmd) {
+      const previousYmd = this._activeYmd;
+      this._activeYmd = currentYmd;
+      this._lastInteractionMs = now;
+      this._lastCountedAtMs = now;
+      if (previousYmd) {
+        this._flushYmd(previousYmd);
+      }
+      return;
+    }
     const countedUntil = Math.min(now, this._lastInteractionMs + IDLE_TIMEOUT_MS);
     if (countedUntil <= this._lastCountedAtMs) return;
 
@@ -126,8 +137,11 @@ class StudyTimer {
   async flush() {
     this.tick();
     if (!this._activeYmd) return;
+    await this._flushYmd(this._activeYmd);
+  }
 
-    const ymd = this._activeYmd;
+  async _flushYmd(ymd) {
+    if (!ymd) return;
     const totals = loadDayTotals(ymd);
 
     const tasks = [];
@@ -154,4 +168,3 @@ class StudyTimer {
 }
 
 module.exports = new StudyTimer();
-

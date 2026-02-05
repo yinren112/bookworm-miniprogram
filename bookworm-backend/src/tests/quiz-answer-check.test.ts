@@ -32,6 +32,16 @@ describe("Quiz answer checking compatibility", () => {
     expect(ok).toBe(true);
   });
 
+  it("accepts numeric chosen answer index for single choice", () => {
+    const ok = __testing.checkAnswer(
+      "SINGLE_CHOICE",
+      "A",
+      "0",
+      ["foo", "bar"],
+    );
+    expect(ok).toBe(true);
+  });
+
   it("accepts Chinese true/false aliases with TRUE/FALSE options", () => {
     const ok = __testing.checkAnswer(
       "TRUE_FALSE",
@@ -61,5 +71,14 @@ describe("Quiz answer checking compatibility", () => {
     );
     expect(ok).toBe(false);
   });
-});
 
+  it("accepts numeric chosen indices for multi choice", () => {
+    const ok = __testing.checkAnswer(
+      "MULTI_CHOICE",
+      "A,C",
+      "0|2",
+      ["foo", "bar", "baz"],
+    );
+    expect(ok).toBe(true);
+  });
+});

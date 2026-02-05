@@ -1,11 +1,14 @@
 // src/services/study/dashboardService.ts
 // 复习首页聚合数据服务
 import { PrismaClient, Prisma } from "@prisma/client";
-import { questionAttemptQuestionIdView } from "../../db/views";
 import { getActivityHistory } from "./activityService";
 import { getStreakInfo } from "./streakService";
-import { getCourseByKey, getUserEnrolledCourses } from "./courseService";
 import { getTodayQueueSummary } from "./cardScheduler";
+import {
+  resolveCurrentCourse,
+  getQuizPendingStats,
+  getWrongCount,
+} from "./studyStats";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -41,14 +44,8 @@ export interface GetStudyDashboardOptions {
   includeUnpublished?: boolean;
 }
 
-export interface ResolvedCourse {
-  id: number;
-  courseKey: string;
-  title: string;
-  totalCards: number;
-  totalQuestions: number;
-  upgradeAvailable: boolean;
-}
+export { resolveCurrentCourse, getQuizPendingStats, getWrongCount } from "./studyStats";
+export type { ResolvedCourse } from "./studyStats";
 
 // ============================================
 // 常量
@@ -110,82 +107,6 @@ export async function getStudyDashboard(
 // 可测试的子函数（已导出）
 // ============================================
 
-export interface ResolveCurrentCourseOptions {
-  includeUnpublished?: boolean;
-}
-
-/**
- * 解析当前课程
- * - 如果提供了 courseKey，按 key 查找
- * - 否则返回用户第一个已注册的课程
- */
-export async function resolveCurrentCourse(
-  dbCtx: DbCtx,
-  userId: number,
-  courseKey?: string,
-  options: ResolveCurrentCourseOptions = {},
-): Promise<ResolvedCourse | null> {
-  const { includeUnpublished = false } = options;
-
-  if (courseKey) {
-    const course = await getCourseByKey(dbCtx, courseKey, {
-      userId,
-      publishedOnly: !includeUnpublished,
-    });
-    return course ? toResolvedCourse(course) : null;
-  }
-
-  const courses = await getUserEnrolledCourses(dbCtx, userId);
-  if (!courses[0]) {
-    return null;
-  }
-
-  const course = await getCourseByKey(dbCtx, courses[0].courseKey, {
-    userId,
-    publishedOnly: !includeUnpublished,
-  });
-
-  return course ? toResolvedCourse(course) : toResolvedCourse(courses[0]);
-}
-
-/**
- * 获取待做题目统计
- */
-export async function getQuizPendingStats(
-  dbCtx: DbCtx,
-  userId: number,
-  courseId: number,
-  totalQuestions: number,
-): Promise<{ pendingCount: number }> {
-  if (totalQuestions <= 0) {
-    return { pendingCount: 0 };
-  }
-
-  const [questionCount, answered] = await Promise.all([
-    dbCtx.studyQuestion.count({ where: { courseId } }),
-    dbCtx.userQuestionAttempt.findMany({
-      where: { userId, question: { courseId } },
-      distinct: ["questionId"],
-      select: questionAttemptQuestionIdView,
-    }),
-  ]);
-
-  const effectiveTotal = questionCount > 0 ? questionCount : totalQuestions;
-  return { pendingCount: Math.max(0, effectiveTotal - answered.length) };
-}
-
-/**
- * 获取错题数
- */
-export async function getWrongCount(
-  dbCtx: DbCtx,
-  userId: number,
-  courseId: number,
-): Promise<number> {
-  return dbCtx.userWrongItem.count({
-    where: { userId, clearedAt: null, question: { courseId } },
-  });
-}
 
 /**
  * 获取课程进度（0-1）
@@ -223,24 +144,6 @@ export function estimateMinutes(
 // ============================================
 // 辅助函数
 // ============================================
-
-function toResolvedCourse(course: {
-  id: number;
-  courseKey: string;
-  title: string;
-  totalCards: number;
-  totalQuestions: number;
-  upgradeAvailable?: boolean;
-}): ResolvedCourse {
-  return {
-    id: course.id,
-    courseKey: course.courseKey,
-    title: course.title,
-    totalCards: course.totalCards,
-    totalQuestions: course.totalQuestions,
-    upgradeAvailable: course.upgradeAvailable ?? false,
-  };
-}
 
 function mapActivityToHeatmap(
   days: Array<{ date: string; totalDurationSeconds: number; level: number }>,

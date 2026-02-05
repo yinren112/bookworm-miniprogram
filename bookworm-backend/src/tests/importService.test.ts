@@ -10,6 +10,7 @@ import {
   parseQuestionsGift,
   parseCheatsheets,
   validateCoursePackage,
+  validateCoursePackageSchema,
   CoursePackage,
 } from "../services/study/importService";
 
@@ -479,8 +480,9 @@ describe("validateCoursePackage", () => {
 
   it("should pass validation for valid package", () => {
     const pkg = createValidPackage();
-    const errors = validateCoursePackage(pkg);
-    expect(errors).toHaveLength(0);
+    const schemaErrors = validateCoursePackageSchema(pkg);
+    const ruleErrors = validateCoursePackage(pkg);
+    expect([...schemaErrors, ...ruleErrors]).toHaveLength(0);
   });
 
   it("should detect undefined unitKey in cards", () => {
@@ -500,7 +502,7 @@ describe("validateCoursePackage", () => {
       { contentId: "", front: "Q", back: "A" },
     ]);
 
-    const errors = validateCoursePackage(pkg);
+    const errors = validateCoursePackageSchema(pkg);
 
     expect(errors.some((e) => e.includes("schema:cards/u1/0/contentId"))).toBe(true);
   });
@@ -511,7 +513,7 @@ describe("validateCoursePackage", () => {
       { contentId: "C001", front: "", back: "A" },
     ]);
 
-    const errors = validateCoursePackage(pkg);
+    const errors = validateCoursePackageSchema(pkg);
 
     expect(errors.some((e) => e.includes("schema:cards/u1/0/front"))).toBe(true);
   });
@@ -617,7 +619,7 @@ describe("validateCoursePackage", () => {
       },
     ]);
 
-    const errors = validateCoursePackage(pkg);
+    const errors = validateCoursePackageSchema(pkg);
 
     expect(errors.some((e) => e.includes("schema:questions/u1/0/stem"))).toBe(true);
   });

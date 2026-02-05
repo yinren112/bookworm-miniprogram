@@ -249,8 +249,8 @@ Page({
       itemId: currentQuestion.id,
       updateRemote: (newVal) => (
         newVal
-          ? starItem({ type: 'question', questionId: currentQuestion.id })
-          : unstarItem({ type: 'question', questionId: currentQuestion.id })
+          ? starItem({ type: 'question', questionId: currentQuestion.id, courseKey: this.data.courseKey })
+          : unstarItem({ type: 'question', questionId: currentQuestion.id, courseKey: this.data.courseKey })
       ),
       logger,
     });
@@ -283,11 +283,7 @@ Page({
     }
 
     this.setData({ selectedAnswers: [index] });
-
-    const optionText = currentQuestion.options
-      ? currentQuestion.options[index]
-      : "";
-    this.submitAnswer(String(optionText).trim());
+    this.submitAnswer(String(index));
   },
 
   onFillInput(e) {
@@ -312,14 +308,20 @@ Page({
       return;
     }
 
-    const answerTexts = currentQuestion.options
-      .map((option, idx) =>
-        selectedAnswers.indexOf(idx) !== -1 ? option : null,
-      )
-      .filter((option) => option !== null)
-      .map((option) => String(option).trim());
+    const normalizedIndices = selectedAnswers
+      .map((idx) => Number(idx))
+      .filter((idx) => Number.isInteger(idx))
+      .sort((a, b) => a - b);
 
-    this.submitAnswer(answerTexts.join("|"));
+    if (normalizedIndices.length === 0) {
+      wx.showToast({
+        title: "请选择答案",
+        icon: "none",
+      });
+      return;
+    }
+
+    this.submitAnswer(normalizedIndices.join("|"));
   },
 
   async submitAnswer(answer) {
@@ -346,6 +348,7 @@ Page({
       const correctAnswerText = formatCorrectAnswer(
         currentQuestion,
         result.correctAnswer,
+        correctIndices,
       );
       const explanation = typeof result?.explanation === 'string' ? sanitizeMpHtmlContent(result.explanation) : '';
 
@@ -606,33 +609,24 @@ Page({
   },
 });
 
-function formatCorrectAnswer(question, correctAnswer) {
-  if (!question || question.questionType !== "MULTI_CHOICE") {
-    return correctAnswer;
-  }
-
-  // 多选题：尝试解析并格式化答案
-  const trimmed = String(correctAnswer || "").trim();
-  if (!trimmed) return "";
-
-  // 尝试 JSON 数组格式
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).join(", ");
-      }
-    } catch {
-      // Fall back
+function formatCorrectAnswer(question, correctAnswer, correctIndices = []) {
+  if (question && Array.isArray(question.options) && correctIndices.length > 0) {
+    const answerTexts = correctIndices
+      .map((idx) => (Number.isInteger(idx) ? question.options[idx] : undefined))
+      .filter((option) => typeof option === "string")
+      .map((option) => String(option).trim())
+      .filter(Boolean);
+    const uniqueAnswers = Array.from(new Set(answerTexts));
+    if (uniqueAnswers.length > 0) {
+      return uniqueAnswers.join(", ");
     }
   }
 
-  // 尝试管道符分隔格式
-  if (trimmed.includes("|")) {
-    return trimmed.split("|").map((item) => item.trim()).join(", ");
+  if (typeof correctAnswer === "string") {
+    return correctAnswer.trim();
   }
 
-  return trimmed;
+  return "";
 }
 
 /**
