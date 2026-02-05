@@ -58,5 +58,5 @@ export default fp(async (fastify) => {
   });
 }, {
   name: 'auth-plugin',
-  fastify: '4.x',
+  fastify: '5.x',
 });

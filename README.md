@@ -21,7 +21,7 @@ Bookworm 是一个基于微信小程序的校园二手教材交易平台，采�
 | 层级       | 技术选型                    | 说明                       |
 | ---------- | --------------------------- | -------------------------- |
 | **前端**   | 微信小程序原生框架          | 9个页面 + TabBar导航       |
-| **后端**   | Fastify + TypeScript        | RESTful API + 插件化架构   |
+| **后端**   | Fastify v5 + TypeScript     | RESTful API + 插件化架构   |
 | **数据库** | PostgreSQL 15+ + Prisma ORM | 14个模型 + pg_trgm全文搜索 |
 | **支付**   | 微信支付 API v3             | Native支付 + 自动证书刷新  |
 | **测试**   | Vitest + Testcontainers     | 单元测试 + 隔离集成测试    |
@@ -91,7 +91,7 @@ npm run dev
 cd ..
 
 # 使用微信开发者工具打开 miniprogram/ 目录
-# 配置 API 端点：编辑 miniprogram/utils/config.js
+# 配置 API 端点：编辑 miniprogram/config.js
 # 修改 apiBaseUrl 为后端地址（开发环境：http://localhost:8080）
 # 体验版/正式版已预设为 https://api-staging.lailinkeji.com/api 与 https://api.lailinkeji.com/api，
 # 请保证相应域名已在微信「业务域名」中备案并指向 Nginx 反向代理 8080 端口。
@@ -105,10 +105,10 @@ cd bookworm-backend
 # 单元测试（带覆盖率）
 npm test
 
-# 集成测试（使用 Testcontainers）
-docker compose --profile test up -d postgres_test
+# 集成测试（使用 Testcontainers，串行执行，需 Docker Desktop）
 npm run test:integration
-# Windows 用户可运行 `bookworm-backend/run-integration-tests.ps1` 自动完成以上步骤
+# Windows 用户可运行 `bookworm-backend/run-integration-tests.ps1`
+# 注意：脚本会启动 postgres_test 容器，但默认测试仍由 Testcontainers 创建容器
 
 # 代码检查
 npm run lint
@@ -129,7 +129,7 @@ miniprogram-13/
 │   │   ├── plugins/           # Fastify 插件（认证、限流、监控）
 │   │   ├── jobs/              # 定时任务（订单清理、指标更新）
 │   │   ├── db/                # 数据库工具（事务重试、视图选择器）
-│   │   └── tests/             # 测试套件（24个测试文件）
+│   │   └── tests/             # 测试套件（随功能增长）
 │   ├── prisma/                # Prisma ORM
 │   │   ├── schema.prisma      # 数据库 schema（14个模型）
 │   │   ├── migrations/        # 数据库迁移历史

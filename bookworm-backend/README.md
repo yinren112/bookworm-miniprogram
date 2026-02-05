@@ -5,7 +5,7 @@ A robust backend API server for the Bookworm campus textbook marketplace, built 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20+
 - Docker & Docker Compose
 - Git
 
@@ -30,9 +30,6 @@ A robust backend API server for the Bookworm campus textbook marketplace, built 
    ```bash
    # Start PostgreSQL database for development
    docker-compose up -d postgres
-
-   # For testing (starts both dev and test databases)
-   docker-compose --profile test up -d
 
    # Wait for database to be ready (check health)
    docker-compose ps
@@ -73,11 +70,7 @@ npx prisma studio
 
 ### Test Database
 ```bash
-# Start test database (separate from development)
-docker-compose --profile test up -d postgres_test
-
-# Run tests with test database
-npm test
+# 集成测试默认使用 Testcontainers（无需手动启动 postgres_test）
 npm run test:integration
 ```
 
@@ -107,10 +100,8 @@ npx prisma generate  # Regenerate Prisma client after schema changes
 ### Testing
 ```bash
 npm test                    # Run unit tests
-docker-compose --profile test up -d postgres_test  # Ensure test DB is running
-npm run test:integration    # Run integration tests with real database
-# Windows: use ./run-integration-tests.ps1 to automate the above steps
-npm run test:all           # Run all tests with coverage
+npm run test:integration    # Run integration tests with Testcontainers (serial)
+# Windows: use ./run-integration-tests.ps1
 ```
 
 ### Background Jobs
@@ -159,7 +150,7 @@ bookworm-backend/
 ### Orders
 - `POST /api/orders/create` - Create new order
 - `GET /api/orders/:id` - Get order details
-- `GET /api/orders/user/:userId` - User order history
+- `GET /api/orders/my` - User order history (auth)
 - `PATCH /api/orders/:id/status` - Update order status (STAFF only)
 - `POST /api/orders/fulfill` - Fulfill order with pickup code (STAFF only)
 - `GET /api/orders/pending-pickup` - List pending pickup orders (STAFF only)
@@ -285,7 +276,7 @@ Change ports in `docker-compose.yml` if needed.
 
 1. Create a feature branch
 2. Make changes with tests
-3. Run full test suite: `npm run test:all`
+3. Run test suites: `npm test` and `npm run test:integration`
 4. Ensure TypeScript compiles: `npm run build`
 5. Create pull request
 

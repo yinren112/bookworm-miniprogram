@@ -5,7 +5,8 @@ const { getDashboard, getCourses } = require('../../utils/study-api');
 const { swrFetch, subscribe } = require('../../utils/cache');
 const logger = require('../../utils/logger');
 const { getResumeSession, getLastSessionType } = require('../../utils/study-session');
-const { REVIEW_DASHBOARD_CACHE_VERSION, REVIEW_COURSES_CACHE_VERSION, ONBOARDING_WELCOME_KEY } = require('../../utils/constants');
+const { REVIEW_DASHBOARD_CACHE_VERSION, REVIEW_COURSES_CACHE_VERSION, REVIEW_HOME_REFRESH_COOLDOWN_MS, ONBOARDING_WELCOME_KEY } = require('../../utils/constants');
+const tokenUtil = require('../../utils/token');
 const { track } = require('../../utils/track');
 const feedback = require('../../utils/ui/feedback');
 const soundManager = require('../../utils/sound-manager');
@@ -17,6 +18,8 @@ function getReviewHomeState(page) {
   return getPageState('review.home', page, () => ({
     dashboardCacheKey: '',
     dashboardUnsub: null,
+    lastLoadAt: 0,
+    lastDashboardCacheKey: '',
   }));
 }
 
@@ -108,15 +111,28 @@ Page({
 
   async loadData(options = {}) {
     const { forceRefresh = false } = options;
-    this.setData({ loading: true, error: false });
+    const state = getReviewHomeState(this);
+    const now = Date.now();
+    const userId = tokenUtil.getUserId();
+    const userKey = userId ? `uid:${userId}` : 'uid:anonymous';
     const apiBaseUrl = config.apiBaseUrl;
     const isDevtools = this.data.isDevtools || config.isDevtools();
     const includeUnpublished = isDevtools;
-    const coursesCacheKey = `review:courses:${REVIEW_COURSES_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}`;
+    const coursesCacheKey = `review:courses:${REVIEW_COURSES_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}:${userKey}`;
+    const selectedCourseKey = this.data.selectedCourseKey || undefined;
+    const dashboardCacheKey = `review:dashboard:${REVIEW_DASHBOARD_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}:${userKey}:${selectedCourseKey || 'auto'}`;
+
+    if (!forceRefresh && state.lastLoadAt && now - state.lastLoadAt < REVIEW_HOME_REFRESH_COOLDOWN_MS) {
+      if (state.lastDashboardCacheKey === dashboardCacheKey && this.data.dashboard) {
+        return;
+      }
+    }
+
+    state.lastLoadAt = now;
+    state.lastDashboardCacheKey = dashboardCacheKey;
+    this.setData({ loading: true, error: false });
 
     try {
-      const selectedCourseKey = this.data.selectedCourseKey || undefined;
-      const dashboardCacheKey = `review:dashboard:${REVIEW_DASHBOARD_CACHE_VERSION}:${includeUnpublished ? 'devtools' : 'published'}:${encodeURIComponent(apiBaseUrl)}:${selectedCourseKey || 'auto'}`;
       this.bindDashboardSubscription(dashboardCacheKey);
       const dashboard = await swrFetch(
         dashboardCacheKey,

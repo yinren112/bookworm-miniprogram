@@ -62,5 +62,5 @@ export default fp(async (fastify) => {
   });
 }, {
   name: 'staff-auth-plugin',
-  fastify: '4.x',
+  fastify: '5.x',
 });

@@ -3,13 +3,14 @@
 ## 项目结构与模块组织
 - `miniprogram/`：微信小程序前端；`pages/`承载复习主页(`pages/review`)、个人中心(`pages/profile`)、WebView(`pages/webview`)与客服(`pages/customer-service`)等主包页面，交易页面代码保留但不在`app.json`注册；`subpackages/review/`承载课程/背卡/刷题/急救包/急救包笔记/周榜/结算完成/学习热力图等复习子页面（不再包含复习主页 home）；`components/`与`utils/`提供可复用界面与逻辑；静态资源集中在`images/`与`templates/`。新增组件保持同名`.wxml`、`.wxss`、`.js`、`.json`四件套。
 - `miniprogram/components/mp-html/`：第三方富文本组件，保持原样，不做规则性格式化或 ESLint 改造。
-- `bookworm-backend/`：Fastify + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
+- `bookworm-backend/`：Fastify v5 + Prisma API；`src/routes`定义请求入口，`src/services`封装业务规则，`src/adapters`负责外部系统对接，`src/plugins`注册框架插件，`src/tests`维护 Vitest 套件；数据库 schema 与种子数据位于`prisma/`。
 - 根目录脚本`test_metrics.sh`与`update_user_metrics.js`用于观测性验证，改动前须先与运维同步。
 
 ## 构建、测试与开发命令
 - 安装依赖：`cd bookworm-backend && npm install`。
 - 开发环境：`npm run dev`启动热重载；正式部署使用`npm run build`后接`npm run start`。
-- 测试流程：`npm test`运行单元覆盖，`npm run test:integration`串行执行数据库集成，必要时用`npm run db:migrate:test:reset`重置测试库。
+- 测试流程：`npm test`运行单元覆盖，`npm run test:integration`串行执行数据库集成（Testcontainers），必要时用`npm run db:migrate:test:reset`重置测试库。集成测试耗时可达 5-7 分钟，CI/本地超时需 >= 600s。
+- Windows 集成测试可使用 `bookworm-backend/run-integration-tests.ps1`；脚本会启动 `postgres_test` 容器，默认测试仍由 Testcontainers 创建容器。
 - 小程序开发需在微信开发者工具导入`miniprogram/`，通过 Preview 与 Upload 验证；API 端点由 `miniprogram/config.js` 根据 `envVersion` 选择，复习模式不提供应用内切换入口。
 
 ## 代码风格与命名约定
@@ -23,6 +24,7 @@
 - 服务层覆盖率目标不低于约定阈值，若暂无法覆盖需在 PR 中记录原因。
 - 小程序改动必须附带人工验证说明（设备、账号）及 UI 截图影响。
 - 如需单文件集成测试，使用 `npx vitest run -c vitest.integration.config.ts <file> --testTimeout <ms>`。
+- 如需复用已有测试库，设置 `BOOKWORM_TEST_USE_EXISTING_DB=1` 并确保 `.env.test` 指向可用数据库。
 
 ## 提交与 Pull Request
 - 提交消息遵循 Conventional Commits（`feat:`, `fix:`, `perf:`, `build:` 等），标题不超过 72 个字符，正文引用相关需求或缺陷编号。
@@ -574,7 +576,7 @@ npm run test:integration    # Run integration tests
 - Test helpers in `test-helpers/testServices.ts`: Business logic test utilities
 
 **Important Notes:**
-- docker-compose.yml defines `postgres_test` service (port 54320) but is NOT used by integration tests
+- docker-compose.yml defines `postgres_test` service (port 54320) but is NOT used by integration tests by default
 - Integration tests create their own containers via Testcontainers, independent of docker-compose
 - vitest.database-integration.config.ts is legacy and not actively used (no corresponding npm script)
 

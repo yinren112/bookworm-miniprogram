@@ -170,7 +170,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     *   **指令**: 任何处理外部输入的代码，都必须遵循"验证，而不是信任"的原则。对于外部 API 的调用，必须包含带指数退避的重试逻辑。
 
 3.  **测试是唯一的真相 (Tests as the Single Source of Truth)**
-    *   **事实**: 项目拥有健壮的集成测试套件 (`npm run test:integration`)，该套件通过 **Testcontainers** 在完全隔离的、并行的 PostgreSQL 容器中运行，确保了测试的可靠性和无污染。
+    *   **事实**: 项目拥有健壮的集成测试套件 (`npm run test:integration`)，该套件通过 **Testcontainers** 在完全隔离的 PostgreSQL 容器中运行，测试采用单进程串行模式（`vitest.integration.config.ts`），确保可靠性和无污染。
     *   **指令**: 任何代码变更都必须有对应的测试来验证。所有测试必须 100% 通过才能被认为是"完成"。
 
 4.  **基础设施即代码 (Infrastructure as Code)**
@@ -601,7 +601,7 @@ npm run test:integration    # Run integration tests with Testcontainers
 - Test helpers in `test-helpers/testServices.ts`: Business logic test utilities
 
 **Important Notes:**
-- docker-compose.yml defines `postgres_test` service (port 54320) but is NOT used by integration tests
+- docker-compose.yml defines `postgres_test` service (port 54320) but is NOT used by integration tests by default
 - Integration tests create their own containers via Testcontainers, independent of docker-compose
 - vitest.database-integration.config.ts is legacy and not actively used (no corresponding npm script)
 
@@ -803,6 +803,16 @@ Host lailinkeji
 2. 生产校验要求（仍必须满足）：`JWT_SECRET` 强度、`WX_APP_ID/WX_APP_SECRET`、`DATABASE_URL`、`HOST`、`CORS_ORIGIN`、`METRICS_AUTH_TOKEN`。
 3. review-only 下不要求 `WXPAY_*`，且不会注册电商/支付路由，也不会启动订单/库存/退款任务。
 4. 验证方式：请求 `/api/study/courses` 返回 401/403（代表路由存在），请求 `/api/orders/create` 返回 404（代表路由已裁剪）。
+
+### SOP-Fastify 大版本升级（4.x → 5.x）
+1. 先升级 `fastify` 与 `@fastify/*` 插件到兼容 5.x 的版本，再更新 `fastify-raw-body` 与 `fastify-plugin`。
+2. 必查自定义插件的 `fastify-plugin` 元信息：`fastify: '5.x'`，否则会在启动/集成测试阶段直接抛错阻断。
+3. 运行 `npm run test:integration` 验证路由注册与插件链；该套件运行时间长，需确保命令超时 >= 600s。
+4. 回滚时恢复 `package.json`/`package-lock.json` 与插件元信息，再重跑 lint + integration。
+
+### SOP-集成测试运行超时
+1. `npm run test:integration` 默认串行执行，常见耗时 5-7 分钟；本地与 CI 的超时需要放宽（建议 >= 600s）。
+2. 若要复用已有测试库，可设置 `BOOKWORM_TEST_USE_EXISTING_DB=1` 并确保 `.env.test` 指向可用数据库。
 
 ### SOP-修复技巧
 当我报告一个错误时，不要一开始就尝试修复它。而是先编写一个能够重现该错误的测试。然后，让子代理尝试修复该错误，并通过一个通过的测试来证明修复成功

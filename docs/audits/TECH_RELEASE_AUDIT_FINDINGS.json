@@ -1,0 +1,113 @@
+[
+  {
+    "id": "BACK-SEC-001",
+    "severity": "P1",
+    "title": "后端 Fastify 版本存在高危已知漏洞风险",
+    "area": "deps",
+    "symptom": "安全扫描提示高危漏洞，可能被构造请求触发内存膨胀或校验绕过。",
+    "root_cause": "运行时依赖 fastify 版本停留在 4.29.1，命中已披露高危漏洞范围。",
+    "evidence": [
+      { "path": "bookworm-backend/package.json", "lines": "L31-L44", "note": "fastify 依赖版本声明为 ^4.29.1" },
+      { "path": "bookworm-backend/package-lock.json", "lines": "L4884-L4887", "note": "锁定的 fastify 实际版本为 4.29.1" }
+    ],
+    "repro": "在 `bookworm-backend` 下执行 `npm audit`，可看到 fastify 高危项。",
+    "impact": "可能导致后端被 DoS 或绕过部分校验，影响稳定性与安全性。",
+    "fix_suggestion": "升级 fastify 到官方修复版本并完成回归；如需跨大版本，先在 staging 验证路由/插件兼容性。",
+    "acceptance": "`npm audit` 不再报告 fastify 高危；`scripts/release/run_gates.ps1` 全部通过。"
+  },
+  {
+    "id": "BACK-OPS-002",
+    "severity": "P2",
+    "title": "复习提醒任务对微信接口调用缺少超时控制",
+    "area": "backend",
+    "symptom": "提醒任务在网络异常时可能长时间阻塞，导致定时任务堆积或延迟。",
+    "root_cause": "reminderService 中 axios 请求未设置 timeout。",
+    "evidence": [
+      { "path": "bookworm-backend/src/services/study/reminderService.ts", "lines": "L410-L427", "note": "sendWechatSubscribeMessage 使用 axios.post 未配置 timeout" },
+      { "path": "bookworm-backend/src/services/study/reminderService.ts", "lines": "L470-L473", "note": "getAccessToken 使用 axios.get 未配置 timeout" }
+    ],
+    "repro": "模拟微信接口不可达（丢包/黑洞路由），触发提醒任务，观察任务无法在合理时间内返回。",
+    "impact": "提醒任务延迟或卡死，日志堆积，影响稳定性与运维排障。",
+    "fix_suggestion": "为 axios 调用统一设置超时（例如 5-8 秒），并在重试后快速失败；超时值可由配置项控制。",
+    "acceptance": "微信接口不可达时，提醒任务在超时后退出，下一次调度可正常执行。"
+  },
+  {
+    "id": "FRONT-DATA-001",
+    "severity": "P2",
+    "title": "SWR 缓存未按用户维度隔离，存在跨账号脏数据风险",
+    "area": "frontend",
+    "symptom": "同设备切换账号或合并账号后，复习首页可能短时间展示上一账号的课程与进度。",
+    "root_cause": "缓存键仅包含 apiBaseUrl 与课程选择，不包含 userId/openid。",
+    "evidence": [
+      { "path": "miniprogram/pages/review/index.js", "lines": "L109-L120", "note": "dashboard/courses 缓存键未包含用户标识" },
+      { "path": "miniprogram/utils/cache.js", "lines": "L78-L110", "note": "缓存持久化到本地存储，跨会话复用" }
+    ],
+    "repro": "账号A登录并打开复习首页 → 切换账号B（清 token 后重登）→ 不下拉刷新直接进入复习首页。",
+    "impact": "展示错误课程/进度，存在隐私与数据一致性风险。",
+    "fix_suggestion": "缓存键增加 userId/openid；或在登录/登出时清理相关缓存。",
+    "acceptance": "切换账号后首次进入复习首页不会读取旧账号缓存。"
+  },
+  {
+    "id": "FRONT-OBS-002",
+    "severity": "P2",
+    "title": "请求失败缺少请求级别上报，无法与 requestId 关联",
+    "area": "frontend",
+    "symptom": "线上请求失败只能依赖用户反馈，无法快速定位对应 requestId 与接口。",
+    "root_cause": "request.js 仅返回错误对象，没有统一的失败上报或埋点。",
+    "evidence": [
+      { "path": "miniprogram/utils/request.js", "lines": "L95-L180", "note": "失败路径仅 reject，未进行统一上报" },
+      { "path": "miniprogram/app.js", "lines": "L73-L82", "note": "仅上报 app_error / unhandled_rejection，未覆盖请求失败" }
+    ],
+    "repro": "模拟接口 500 或断网，观察无 requestId 级别的统一上报。",
+    "impact": "可观测性不足，问题定位依赖重现，排障成本高。",
+    "fix_suggestion": "在 request.js 失败分支增加统一埋点或上报（包含 url、statusCode、requestId），并做节流。",
+    "acceptance": "任一请求失败均会产生可检索的错误上报，包含 requestId 与接口路径。"
+  },
+  {
+    "id": "FRONT-PERF-003",
+    "severity": "P3",
+    "title": "复习首页 onShow 触发 SWR 后台刷新，频繁切换 Tab 会产生多余请求",
+    "area": "frontend",
+    "symptom": "短时间频繁切换“复习/我的”会重复请求 dashboard/courses。",
+    "root_cause": "onShow 每次调用 loadData，swrFetch 在缓存有效时仍触发后台刷新。",
+    "evidence": [
+      { "path": "miniprogram/pages/review/index.js", "lines": "L72-L75", "note": "onShow 每次进入即调用 loadData" },
+      { "path": "miniprogram/utils/cache.js", "lines": "L164-L174", "note": "缓存有效时仍会后台刷新" }
+    ],
+    "repro": "快速切换 TabBar（复习↔我的）多次，观察网络请求数量明显增加。",
+    "impact": "额外的网络与电量消耗，后端被动增压。",
+    "fix_suggestion": "引入 lastFetchAt 或 isPageActive 守卫，TTL 内不触发后台刷新，或为 swrFetch 增加 skipRefresh 选项。",
+    "acceptance": "同一 TTL 内切换 Tab 不会产生额外 API 请求。"
+  },
+  {
+    "id": "DEPS-DRIFT-004",
+    "severity": "P3",
+    "title": "根目录 package.json 与 package-lock.json 版本不一致",
+    "area": "deps",
+    "symptom": "CI 与本地安装结果可能不一致，影响可复现性。",
+    "root_cause": "版本号升级后未同步更新锁文件。",
+    "evidence": [
+      { "path": "package.json", "lines": "L1-L4", "note": "版本为 1.1.0" },
+      { "path": "package-lock.json", "lines": "L1-L10", "note": "锁文件版本仍为 1.0.1" }
+    ],
+    "repro": "执行 `npm ci` 与 `npm install` 对比依赖树和版本记录。",
+    "impact": "构建结果漂移，问题复现成本上升。",
+    "fix_suggestion": "重新生成锁文件并提交，确保版本一致。",
+    "acceptance": "package.json 与 package-lock.json 版本一致，`npm ci` 可重复。"
+  },
+  {
+    "id": "DEPS-SEC-005",
+    "severity": "P3",
+    "title": "根目录 dev 依赖 js-yaml 存在中危原型污染漏洞",
+    "area": "deps",
+    "symptom": "npm audit 提示 js-yaml 中危漏洞。",
+    "root_cause": "锁文件中 js-yaml 版本为 4.1.0，命中漏洞范围。",
+    "evidence": [
+      { "path": "package-lock.json", "lines": "L797-L800", "note": "js-yaml 版本为 4.1.0" }
+    ],
+    "repro": "在仓库根目录执行 `npm audit`。",
+    "impact": "主要影响开发依赖链路，供应链风险仍需关注。",
+    "fix_suggestion": "执行 `npm audit fix` 或通过升级 eslint 相关依赖带动 js-yaml 更新。",
+    "acceptance": "根目录 `npm audit` 不再报告 js-yaml 漏洞。"
+  }
+]

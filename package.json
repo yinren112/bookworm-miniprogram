@@ -20,5 +20,8 @@
   "devDependencies": {
     "eslint": "^8.57.1",
     "husky": "^9.1.7"
+  },
+  "overrides": {
+    "js-yaml": "^4.1.1"
   }
 }

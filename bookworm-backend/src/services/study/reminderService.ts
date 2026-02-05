@@ -8,7 +8,7 @@ import { retryAsync } from "../../utils/retry";
 import { isSameDayBeijing, toBeijingDate } from "../../utils/timezone";
 import { getTodayQueueSummary } from "./cardScheduler";
 import { resolveCurrentCourse, getQuizPendingStats, getWrongCount } from "./studyStats";
-import { WECHAT_CONSTANTS } from "../../constants";
+import { BUSINESS_LIMITS, WECHAT_CONSTANTS } from "../../constants";
 import { log } from "../../lib/logger";
 import { reminderSubscriptionWithUserInclude } from "../../db/views";
 import { REMINDER_TEMPLATE_KEYS } from "./studyReminderTemplate";
@@ -418,13 +418,17 @@ async function sendWechatSubscribeMessage(
 
   const response = await retryAsync(
     async () => {
-      const { data } = await axios.post<WechatSubscribeResponse>(url, {
-        touser: openid,
-        template_id: payload.templateId,
-        page: payload.page,
-        data: payload.data,
-        miniprogram_state: config.NODE_ENV === "staging" ? "trial" : "formal",
-      });
+      const { data } = await axios.post<WechatSubscribeResponse>(
+        url,
+        {
+          touser: openid,
+          template_id: payload.templateId,
+          page: payload.page,
+          data: payload.data,
+          miniprogram_state: config.NODE_ENV === "staging" ? "trial" : "formal",
+        },
+        { timeout: BUSINESS_LIMITS.WECHAT_API_TIMEOUT_MS },
+      );
 
       if (data.errcode && data.errcode !== 0) {
         throw new Error(`WeChat subscribe error: ${data.errmsg || data.errcode}`);
@@ -469,7 +473,9 @@ async function getAccessToken(): Promise<string> {
     try {
       const url = `${WECHAT_CONSTANTS.GET_ACCESS_TOKEN_URL}?grant_type=client_credential&appid=${config.WX_APP_ID}&secret=${config.WX_APP_SECRET}`;
       const data = await retryAsync(async () => {
-        const response = await axios.get<WxAccessTokenResponse>(url);
+        const response = await axios.get<WxAccessTokenResponse>(url, {
+          timeout: BUSINESS_LIMITS.WECHAT_API_TIMEOUT_MS,
+        });
         if (response.data.errcode || !response.data.access_token || !response.data.expires_in) {
           throw new Error(`WeChat Access Token Error: ${response.data.errmsg || "Invalid response"}`);
         }

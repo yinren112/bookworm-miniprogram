@@ -2,6 +2,8 @@
 const config = require('../config');
 const tokenUtil = require('./token');
 const { buildFinalApiUrl } = require('./url');
+const { track } = require('./track');
+const { REQUEST_ERROR_REPORT_WINDOW_MS, REQUEST_ERROR_REPORT_MAX } = require('./constants');
 
 /**
  * 生成简易的请求ID（用于追踪）
@@ -43,6 +45,31 @@ function normalizeError(error, fallback = {}) {
     statusCode,
     requestId,
   };
+}
+
+let reportWindowStart = 0;
+let reportCount = 0;
+
+function shouldReportRequestError() {
+  const now = Date.now();
+  if (!reportWindowStart || now - reportWindowStart >= REQUEST_ERROR_REPORT_WINDOW_MS) {
+    reportWindowStart = now;
+    reportCount = 0;
+  }
+  if (reportCount >= REQUEST_ERROR_REPORT_MAX) {
+    return false;
+  }
+  reportCount += 1;
+  return true;
+}
+
+function reportRequestError(payload) {
+  if (!shouldReportRequestError()) return;
+  try {
+    track('request_error', payload);
+  } catch (error) {
+    // 忽略埋点失败，避免影响主流程
+  }
 }
 
 /**
@@ -87,6 +114,7 @@ function performRequest(options, attempt = 0) {
     requireAuth = false,
     timeout = 8000,
   } = options;
+  const requestStartAt = typeof options.requestStartAt === 'number' ? options.requestStartAt : Date.now();
 
   // 指数退避延迟：100ms, 300ms, 900ms
   const RETRY_DELAYS = [100, 300, 900];
@@ -138,7 +166,7 @@ function performRequest(options, attempt = 0) {
           const delayMs = RETRY_DELAYS[attempt];
           await sleep(delayMs);
           try {
-            const retryResult = await performRequest({ ...options, requestId }, attempt + 1);
+            const retryResult = await performRequest({ ...options, requestId, requestStartAt }, attempt + 1);
             resolve(retryResult);
           } catch (retryError) {
             reject(retryError);
@@ -153,6 +181,17 @@ function performRequest(options, attempt = 0) {
             : { statusCode: res.statusCode, requestId },
           { message: `请求失败 (${res.statusCode})` },
         );
+        reportRequestError({
+          url,
+          method,
+          requestId,
+          statusCode: res.statusCode,
+          errorCode: errorPayload.errorCode || '',
+          errMsg: String(errorPayload.message || '').slice(0, 200),
+          attempt: attempt + 1,
+          durationMs: Date.now() - requestStartAt,
+          isNetworkError: false,
+        });
         reject(errorPayload);
       },
       fail: async (error) => {
@@ -161,7 +200,7 @@ function performRequest(options, attempt = 0) {
           const delayMs = RETRY_DELAYS[attempt];
           await sleep(delayMs);
           try {
-            const retryResult = await performRequest({ ...options, requestId }, attempt + 1);
+            const retryResult = await performRequest({ ...options, requestId, requestStartAt }, attempt + 1);
             resolve(retryResult);
           } catch (retryError) {
             reject(retryError);
@@ -170,14 +209,26 @@ function performRequest(options, attempt = 0) {
         }
 
         // 非重试情况或重试次数用尽，返回网络错误
-        reject(normalizeError({
+        const errorPayload = normalizeError({
           message: '网络请求失败',
           errorCode: 'NETWORK_ERROR',
           requestId,
           url: finalUrl,
           errMsg: error && error.errMsg ? error.errMsg : '',
           detail: error,
-        }));
+        });
+        reportRequestError({
+          url,
+          method,
+          requestId,
+          statusCode: errorPayload.statusCode || null,
+          errorCode: errorPayload.errorCode || 'NETWORK_ERROR',
+          errMsg: String(errorPayload.message || '').slice(0, 200),
+          attempt: attempt + 1,
+          durationMs: Date.now() - requestStartAt,
+          isNetworkError: true,
+        });
+        reject(errorPayload);
       },
     });
   });
