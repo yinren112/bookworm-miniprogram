@@ -1,9 +1,9 @@
-﻿Gate-1 lint: PASS (5.4s)
-Gate-2 build: PASS (11.1s)
-Gate-3 unit tests: PASS (11.8s)
-Gate-4 integration (standard test DB): PASS (221.9s)
+﻿Gate-1 lint: PASS (8.5s)
+Gate-2 build: PASS (17.7s)
+Gate-3 unit tests: PASS (19.8s)
+Gate-4 integration (standard test DB): PASS (319.0s)
 Empty DB container: READY (port 65433)
-Gate-5 migrate deploy: PASS (5.2s)
-Gate-5 migrate status: PASS (3.3s)
-Gate-5 integration (empty DB + deploy): PASS (313.1s)
-Total duration: 576.6s
+Gate-5 migrate deploy: PASS (4.6s)
+Gate-5 migrate status: PASS (3.0s)
+Gate-5 integration (empty DB + deploy): PASS (319.2s)
+Total duration: 696.7s
