@@ -22,8 +22,20 @@ function getFlashcardState(page) {
   return getPageState('review.flashcard', page, () => ({
     cards: [],
     swipeCommitTimer: null,
+    swipeSafetyTimer: null,
+    pendingAnswer: null,
+    undoTimer: null,
   }));
 }
+
+const UNDO_WINDOW_MS = 3000;
+
+const RATING_LABELS = {
+  FORGOT: '想不起来',
+  FUZZY: '有点模糊',
+  KNEW: '记住了',
+  PERFECT: '完全掌握',
+};
 
 Page({
   data: {
@@ -59,7 +71,13 @@ Page({
 
     // Card transition
     cardTransitionClass: '',
+    swipeExitClass: '',
     cardInlineStyle: '',
+
+    // Undo state
+    undoVisible: false,
+    undoRatingText: '',
+    pendingComplete: false,
   },
 
   onLoad(options) {
@@ -68,6 +86,7 @@ Page({
     this.fatigueChecker = createFatigueChecker();
     this.abortTracked = false;
     this.resumeSaveFailed = false;
+    this._cardStyleResetSeq = 0;
 
     const sysInfo = wx.getSystemInfoSync();
     this.setData({ screenWidth: sysInfo.windowWidth });
@@ -120,8 +139,8 @@ Page({
     this.elapsedOffset = session.elapsedSeconds || 0;
 
       this.setData({
-      sessionId: session.sessionId || '',
-      cardsLength: session.cardsLength || cards.length,
+        sessionId: session.sessionId || '',
+        cardsLength: session.cardsLength || cards.length,
       currentIndex,
       currentCard,
       starredItems: session.starredItems || {},
@@ -132,6 +151,7 @@ Page({
       error: false,
       empty: false,
       progressPercent: 0,
+        swipeExitClass: '',
         cardInlineStyle: '',
     });
 
@@ -196,6 +216,7 @@ Page({
         cardStyle: '',
         swipeOpacityForgot: 0,
         swipeOpacityKnew: 0,
+        swipeExitClass: '',
         cardInlineStyle: '',
       });
 
@@ -220,9 +241,7 @@ Page({
   showSwipeHintIfNeeded() {
     if (this.getSwipeHintCount() >= 3) return;
     this.setData({ showSwipeHint: true });
-    this._swipeHintTimer = setTimeout(() => {
-      this.dismissSwipeHint();
-    }, 3500);
+    // 不再自动消失，等用户点"知道了"按钮
   },
 
   dismissSwipeHint() {
@@ -255,7 +274,17 @@ Page({
   onSwipeCommit(e) {
     if (this.data.submitting || this.data.completed) return;
     
-    const { rating, level } = e;
+    const payload = normalizeSwipePayload(e);
+    const { rating, level } = payload;
+    if (!isValidCardRating(rating)) {
+      logger.warn('Invalid swipe payload:', payload);
+      this.setData({
+        swipeExitClass: '',
+        cardInlineStyle: buildCardResetInlineStyle(this),
+        submitting: false,
+      });
+      return;
+    }
     
     // 触觉反馈
     if (rating === 'FORGOT') {
@@ -273,7 +302,12 @@ Page({
       soundManager.play('swipe_light');
     }
     
-    this.setData({ submitting: true });
+    const direction = payload.dx < 0 ? 'left' : 'right';
+    this.setData({
+      submitting: true,
+      // Exit animation runs on card-stack (JS class), not on swipe-card container style.
+      swipeExitClass: direction === 'left' ? 'card-swipe-exit-left' : 'card-swipe-exit-right',
+    });
     
     // 延迟提交，让飞出动画完成
     const state = getFlashcardState(this);
@@ -281,10 +315,21 @@ Page({
       clearTimeout(state.swipeCommitTimer);
       state.swipeCommitTimer = null;
     }
+    if (state.swipeSafetyTimer) {
+      clearTimeout(state.swipeSafetyTimer);
+      state.swipeSafetyTimer = null;
+    }
+    // Safety fallback: if submit chain stalls, force card visible again.
+    state.swipeSafetyTimer = setTimeout(() => {
+      if (this.data.submitting) {
+        this.setData({ cardInlineStyle: buildCardResetInlineStyle(this) });
+      }
+      state.swipeSafetyTimer = null;
+    }, 900);
     state.swipeCommitTimer = setTimeout(() => {
-      this.submitRating(rating);
+      this.commitAnswer(rating);
       state.swipeCommitTimer = null;
-    }, 300);
+    }, 180);
   },
 
   /**
@@ -296,103 +341,204 @@ Page({
   },
 
   // --- Interaction: Feedback Submit (Button fallback) ---
-  async submitFeedback(e) {
+  submitFeedback(e) {
     if (this.data.submitting) return;
     const { rating } = e.currentTarget.dataset;
     haptic.trigger(rating === 'FORGOT' ? 'heavy' : 'light');
     soundManager.play('swipe_light');
-    this.submitRating(rating);
+    this.commitAnswer(rating);
   },
   
-  async submitRating(rating) {
-      const { currentCard, sessionId, currentIndex } = this.data;
-      const cards = getFlashcardState(this).cards || [];
-      if (!currentCard) return;
+  /**
+   * 乐观提交：立即推进卡片，延迟 API 调用，提供撤销窗口
+   */
+  commitAnswer(rating) {
+    const { currentCard, sessionId, currentIndex, courseKey } = this.data;
+    const cards = getFlashcardState(this).cards || [];
+    if (!currentCard) return;
 
-      this.setData({ submitting: true });
-      
-      this.checkFatigue(); // Check fatigue
+    // 先 flush 上一张卡片的 pending（如果有）
+    this.flushPendingAnswer();
 
-      try {
-        const answerResult = await submitCardAnswer(
-          currentCard.contentId,
-          sessionId,
-          rating,
-          this.data.courseKey,
-        );
-        
-        // SRS Transparency Toast
+    const state = getFlashcardState(this);
+    const nextIndex = currentIndex + 1;
+    const isLastCard = nextIndex >= cards.length;
+
+    // 暂存答案，不立即提交 API
+    state.pendingAnswer = {
+      contentId: currentCard.contentId,
+      rating,
+      sessionId,
+      courseKey,
+      cardIndex: currentIndex,
+      card: currentCard,
+      isStarred: this.data.isStarred,
+      isLastCard,
+    };
+
+    this.checkFatigue();
+
+    if (isLastCard) {
+      // 最后一张：显示 pending 完成态 + undo 条
+      this.setData({
+        pendingComplete: true,
+        undoVisible: true,
+        undoRatingText: RATING_LABELS[rating] || rating,
+        submitting: false,
+        swipeExitClass: '',
+        cardInlineStyle: buildCardResetInlineStyle(this),
+      });
+    } else {
+      // 非最后一张：立即推进到下一张
+      const nextCard = cards[nextIndex];
+      this.setData({
+        currentIndex: nextIndex,
+        currentCard: nextCard,
+        isStarred: this.data.starredItems[nextCard.contentId] || false,
+        isFlipped: false,
+        showSwipeTip: false,
+        progressPercent: Math.round((nextIndex / this.data.cardsLength) * 100),
+        swipeExitClass: '',
+        cardTransitionClass: 'card-entering',
+        cardInlineStyle: buildCardResetInlineStyle(this),
+        undoVisible: true,
+        undoRatingText: RATING_LABELS[rating] || rating,
+        submitting: false,
+      });
+      this.updateProgress(nextIndex);
+      this.saveSnapshot();
+      setTimeout(() => {
+        this.setData({ cardTransitionClass: '' });
+      }, 250);
+    }
+
+    // 启动撤销倒计时
+    if (state.undoTimer) {
+      clearTimeout(state.undoTimer);
+    }
+    state.undoTimer = setTimeout(() => {
+      state.undoTimer = null;
+      this.flushPendingAnswer();
+    }, UNDO_WINDOW_MS);
+  },
+
+  /**
+   * 提交暂存答案到 API（后台执行，不阻塞 UI）
+   */
+  flushPendingAnswer() {
+    const state = getFlashcardState(this);
+    if (state.undoTimer) {
+      clearTimeout(state.undoTimer);
+      state.undoTimer = null;
+    }
+    const pending = state.pendingAnswer;
+    if (!pending) {
+      this.setData({ undoVisible: false });
+      return;
+    }
+    state.pendingAnswer = null;
+    this.setData({ undoVisible: false });
+
+    const { contentId, sessionId, rating, courseKey, isLastCard } = pending;
+
+    submitCardAnswer(contentId, sessionId, rating, courseKey)
+      .then((answerResult) => {
         if (rating === 'KNEW' || rating === 'PERFECT') {
-            const nextDueMessage = formatNextDueMessage(answerResult?.nextDueAt);
-            if (nextDueMessage) {
-              wx.showToast({
-                title: nextDueMessage,
-                icon: 'none',
-                duration: 1500
-              });
-            }
+          const msg = formatNextDueMessage(answerResult?.nextDueAt);
+          if (msg) {
+            wx.showToast({ title: msg, icon: 'none', duration: 1500 });
+          }
         }
-
-        const nextIndex = currentIndex + 1;
-        const isLastCard = nextIndex >= cards.length;
-
         if (isLastCard) {
-            haptic.trigger('celebration');
-            soundManager.play('celebration');
-            
-            const durationSeconds = this.getElapsedSeconds();
-            const starredCount = Object.keys(this.data.starredItems).length;
-
-            clearResumeSession();
-            setLastSessionType('flashcard');
-            track('session_complete', {
-              type: 'flashcard',
-              count: cards.length,
-              durationSeconds
-            });
-
-            const params = [
-              `mode=flashcard`,
-              `count=${cards.length}`,
-              `duration=${durationSeconds}`,
-              `starred=${starredCount}`,
-              `courseKey=${encodeURIComponent(this.data.courseKey)}`
-            ];
-            if (this.data.nextType) {
-              params.push(`nextType=${this.data.nextType}`);
-            }
-            wx.redirectTo({
-                url: `/subpackages/review/pages/session-complete/index?${params.join('&')}`
-            });
-        } else {
-            const nextCard = cards[nextIndex];
-            // Swap data immediately (WXS controls card-container inline styles)
-            // Enter animation on inner card-stack via cardTransitionClass
-            this.setData({
-                currentIndex: nextIndex,
-                currentCard: nextCard,
-                isStarred: this.data.starredItems[nextCard.contentId] || false,
-                isFlipped: false,
-                showSwipeTip: false,
-                progressPercent: Math.round((nextIndex / this.data.cardsLength) * 100),
-                cardTransitionClass: 'card-entering',
-                cardInlineStyle: 'transform: translateX(0) rotate(0deg); opacity: 1; transition: none;',
-            });
-            this.updateProgress(nextIndex);
-            this.saveSnapshot();
-            setTimeout(() => {
-              this.setData({ cardTransitionClass: '' });
-            }, 250);
+          this.completeSession();
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         logger.error('Failed to submit feedback:', err);
-        wx.showToast({
-            title: '同步失败',
-            icon: 'none'
-        });
-      } finally {
-        this.setData({ submitting: false });
-      }
+        wx.showToast({ title: '同步失败', icon: 'none' });
+        if (isLastCard) {
+          this.completeSession();
+        }
+      })
+      .finally(() => {
+        const s = getFlashcardState(this);
+        if (s.swipeSafetyTimer) {
+          clearTimeout(s.swipeSafetyTimer);
+          s.swipeSafetyTimer = null;
+        }
+      });
+  },
+
+  /**
+   * 完成会话：跳转到结算页
+   */
+  completeSession() {
+    const cards = getFlashcardState(this).cards || [];
+    haptic.trigger('celebration');
+    soundManager.play('celebration');
+
+    const durationSeconds = this.getElapsedSeconds();
+    const starredCount = Object.keys(this.data.starredItems).length;
+
+    clearResumeSession();
+    setLastSessionType('flashcard');
+    track('session_complete', {
+      type: 'flashcard',
+      count: cards.length,
+      durationSeconds,
+    });
+
+    const params = [
+      `mode=flashcard`,
+      `count=${cards.length}`,
+      `duration=${durationSeconds}`,
+      `starred=${starredCount}`,
+      `courseKey=${encodeURIComponent(this.data.courseKey)}`,
+    ];
+    if (this.data.nextType) {
+      params.push(`nextType=${this.data.nextType}`);
+    }
+    wx.redirectTo({
+      url: `/subpackages/review/pages/session-complete/index?${params.join('&')}`,
+    });
+  },
+
+  /**
+   * 撤销上一次滑动
+   */
+  undoLastSwipe() {
+    const state = getFlashcardState(this);
+    if (state.undoTimer) {
+      clearTimeout(state.undoTimer);
+      state.undoTimer = null;
+    }
+    const pending = state.pendingAnswer;
+    if (!pending) return;
+    state.pendingAnswer = null;
+
+    haptic.trigger('light');
+
+    this.setData({
+      currentIndex: pending.cardIndex,
+      currentCard: pending.card,
+      isStarred: pending.isStarred,
+      isFlipped: true,
+      showSwipeTip: false,
+      progressPercent: Math.round((pending.cardIndex / this.data.cardsLength) * 100),
+      swipeExitClass: '',
+      cardTransitionClass: 'card-entering',
+      cardInlineStyle: buildCardResetInlineStyle(this),
+      undoVisible: false,
+      undoRatingText: '',
+      pendingComplete: false,
+      submitting: false,
+    });
+    this.updateProgress(pending.cardIndex);
+    setTimeout(() => {
+      this.setData({ cardTransitionClass: '' });
+    }, 250);
+
+    track('flashcard_undo', { rating: pending.rating });
   },
   
   checkFatigue() {
@@ -449,6 +595,7 @@ Page({
   },
 
   onHide() {
+    this.flushPendingAnswer();
     this.trackAbort('hide');
     studyTimer.flush();
     studyTimer.stop();
@@ -499,6 +646,7 @@ Page({
   },
 
   onUnload() {
+    this.flushPendingAnswer();
     this.trackAbort('close');
     studyTimer.flush();
     studyTimer.stop();
@@ -510,6 +658,14 @@ Page({
     if (state.swipeCommitTimer) {
       clearTimeout(state.swipeCommitTimer);
       state.swipeCommitTimer = null;
+    }
+    if (state.swipeSafetyTimer) {
+      clearTimeout(state.swipeSafetyTimer);
+      state.swipeSafetyTimer = null;
+    }
+    if (state.undoTimer) {
+      clearTimeout(state.undoTimer);
+      state.undoTimer = null;
     }
     state.cards = [];
     clearPageState('review.flashcard', this);
@@ -550,7 +706,33 @@ function buildStarredMap(items, type) {
 
 function sanitizeCard(card) {
   if (!card || typeof card !== 'object') return card;
-  const front = typeof card.front === 'string' ? sanitizeMpHtmlContent(card.front) : '';
-  const back = typeof card.back === 'string' ? sanitizeMpHtmlContent(card.back) : '';
+  const front = typeof card.front === 'string'
+    ? sanitizeMpHtmlContent(card.front, { convertNewlinesToBr: true })
+    : '';
+  const back = typeof card.back === 'string'
+    ? sanitizeMpHtmlContent(card.back, { convertNewlinesToBr: true })
+    : '';
   return { ...card, front, back };
+}
+
+function buildCardResetInlineStyle(page) {
+  const currentSeq = typeof page._cardStyleResetSeq === 'number' ? page._cardStyleResetSeq : 0;
+  const nextSeq = (currentSeq + 1) % 1000000;
+  page._cardStyleResetSeq = nextSeq;
+  // Keep a unique style string on each card swap so render layer won't skip the reset.
+  return `transform: translateX(0) rotate(0deg); opacity: 1; transition: none; z-index: ${1 + (nextSeq % 2)};`;
+}
+
+function normalizeSwipePayload(e) {
+  if (e && typeof e === 'object' && e.detail && typeof e.detail === 'object') {
+    return e.detail;
+  }
+  if (e && typeof e === 'object') {
+    return e;
+  }
+  return {};
+}
+
+function isValidCardRating(rating) {
+  return rating === 'FORGOT' || rating === 'FUZZY' || rating === 'KNEW' || rating === 'PERFECT';
 }

@@ -23,7 +23,7 @@ page {
   --color-bg-info: rgba(28, 176, 246, 0.16);
   --color-bg-warn: rgba(255, 200, 0, 0.18);
   --color-bg-danger: rgba(255, 75, 75, 0.14);
-  --color-heat-0: #E5E5E5;
+  --color-heat-0: #D1D1D6;
   --color-heat-1: #DCECB5;
   --color-heat-2: #81C570;
   --color-heat-3: #46B065;

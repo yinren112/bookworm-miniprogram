@@ -151,6 +151,67 @@ page {
   gap: var(--space-7);
 }
 
+/* Resume Session Card */
+.resume-card {
+  padding: 28rpx 32rpx;
+  border-radius: 32rpx;
+  border: 2rpx solid var(--color-border-shade);
+  background: var(--color-bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.resume-card--pressed {
+  transform: scale(var(--motion-scale-press));
+}
+
+.resume-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.resume-card-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
+}
+
+.resume-card-detail {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-wrap: wrap;
+}
+
+.resume-card-type {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-juicy-green-shade);
+}
+
+.resume-card-sep {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+}
+
+.resume-card-course {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300rpx;
+}
+
+.resume-card-progress {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -177,6 +238,7 @@ page {
   align-items: center;
   gap: 16rpx;
   flex: 1;
+  padding: 12rpx 0;
 }
 
 .day-bar {
@@ -188,10 +250,9 @@ page {
 }
 
 .day-label {
-  font-size: 20rpx;
-  color: var(--color-text-muted);
+  font-size: 22rpx;
+  color: var(--color-text-light);
   font-weight: 700;
-  opacity: 0.6;
 }
 
 .day-bar.level-0 { height: 12rpx; background-color: var(--color-heat-0); }
@@ -199,6 +260,10 @@ page {
 .day-bar.level-2 { height: 50%; background-color: var(--color-heat-2); }
 .day-bar.level-3 { height: 75%; background-color: var(--color-heat-3); }
 .day-bar.level-4 { height: 100%; background-color: var(--color-heat-4); }
+
+.study-card--pressed {
+  transform: scale(var(--motion-scale-press));
+}
 
 .footer-slogan {
   text-align: center;
@@ -287,10 +352,9 @@ page {
 }
 
 .course-chip-sub {
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-text-light);
 }
 
 .discover-block {
@@ -315,8 +379,7 @@ page {
 .discover-sub {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-text-light);
 }
 
 .discover-item {
@@ -358,8 +421,7 @@ page {
 .discover-item-desc {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-text-light);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -383,7 +445,7 @@ page {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--duration-overlay) var(--ease-standard), visibility var(--duration-overlay) var(--ease-standard);
@@ -526,15 +588,13 @@ page {
 .picker-item-sub {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-text-light);
 }
 
 .picker-empty {
   padding: 20rpx;
   text-align: center;
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-text-light);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
@@ -630,8 +690,54 @@ page {
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Welcome Guide */
-.welcome-guide { animation: pageFadeIn 0.3s var(--ease-out-expo) both; }
-.welcome-content { display: flex; flex-direction: column; align-items: center; gap: var(--space-6); text-align: center; }
-.welcome-title { font-size: var(--font-size-xl); font-weight: var(--font-weight-heavy); color: var(--color-text-main); }
-.welcome-desc { font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); color: var(--color-text-light); line-height: 1.5; }
+/* Welcome Modal (Full-screen) */
+.welcome-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--duration-overlay) var(--ease-standard), visibility var(--duration-overlay) var(--ease-standard);
+}
+.welcome-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+.welcome-modal {
+  width: 600rpx;
+  background: var(--color-bg-card);
+  border-radius: 48rpx;
+  padding: 64rpx 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  text-align: center;
+  transform: translateY(40rpx) scale(0.95);
+  transition: transform var(--duration-overlay) var(--ease-standard);
+}
+.welcome-overlay.visible .welcome-modal {
+  transform: translateY(0) scale(1);
+}
+.welcome-icon-row {
+  margin-bottom: var(--space-2);
+}
+.welcome-icon-text {
+  font-size: 80rpx;
+}
+.welcome-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
+}
+.welcome-desc {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  white-space: pre-line;
+}

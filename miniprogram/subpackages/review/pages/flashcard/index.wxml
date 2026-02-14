@@ -26,21 +26,27 @@
       <pill-tag variant="neutral" size="sm" wx:if="{{remainingMinutes > 0}}">剩余约 {{remainingMinutes}} 分钟</pill-tag>
     </view>
   </view>
+  <!-- Pending Complete 态（最后一张滑走，等待 undo 窗口） -->
+  <view class="pending-complete" wx:if="{{pendingComplete && !loading && !error}}">
+    <view class="pending-complete-inner">
+      <text class="pending-complete-text">即将完成本轮复习</text>
+    </view>
+  </view>
   <!-- 卡片区域 -->
-  <view class="card-wrapper" wx:if="{{!loading && !error && !empty && currentCard}}">
+  <view class="card-wrapper" wx:if="{{!loading && !error && !empty && !pendingComplete && currentCard}}">
     <view class="star-btn {{isStarred ? 'starred' : ''}}" catchtap="toggleStar">
       <view class="star-hit {{isStarred ? 'starred' : ''}}">
         <image class="star-icon" src="/images/icons/review/star-{{isStarred ? 'filled' : 'outline'}}.svg" mode="aspectFit" />
       </view>
     </view>
     <view id="swipe-card" class="card-container" style="{{cardInlineStyle}}" data-screen-width="{{screenWidth}}" bindtouchstart="{{gesture.touchStart}}" bindtouchmove="{{gesture.touchMove}}" bindtouchend="{{gesture.touchEnd}}">
-      <view class="card-stack {{isFlipped ? 'is-flipped' : ''}} {{cardTransitionClass}}">
+      <view class="card-stack {{isFlipped ? 'is-flipped' : ''}} {{swipeExitClass}} {{cardTransitionClass}}">
         <view class="face-front" bindtap="flipCard">
           <card-flat>
             <view class="card-face">
               <view class="card-label">Q</view>
               <view class="card-content">
-                <mp-html content="{{currentCard.front}}" markdown="{{true}}" />
+                <mp-html content="{{currentCard.front}}" markdown="{{false}}" />
               </view>
               <view class="card-hint"><text>轻触翻牌</text></view>
             </view>
@@ -51,7 +57,7 @@
             <view class="card-face">
               <view class="card-label">A</view>
               <view class="card-content">
-                <mp-html content="{{currentCard.back}}" markdown="{{true}}" />
+                <mp-html content="{{currentCard.back}}" markdown="{{false}}" />
               </view>
             </view>
           </card-flat>
@@ -64,26 +70,48 @@
       </view>
     </view>
   </view>
-  <!-- 滑动引导遮罩（首次） -->
+  <!-- 滑动引导遮罩（首次，4级评分教学） -->
   <view class="swipe-hint-overlay" wx:if="{{showSwipeHint}}" catchtap="dismissSwipeHint">
-    <view class="swipe-hint-content">
-      <view class="swipe-hint-arrow swipe-hint-left">
-        <text class="swipe-hint-emoji">👈</text>
-        <text class="swipe-hint-text">想不起来</text>
+    <view class="swipe-tutorial" catchtap="noop">
+      <text class="tutorial-title">滑动评分</text>
+      <text class="tutorial-sub">看完答案后，滑动卡片评价记忆程度</text>
+      <view class="tutorial-levels">
+        <view class="tutorial-row tutorial-left">
+          <view class="tutorial-direction">← 左滑</view>
+          <view class="tutorial-items">
+            <view class="tutorial-item forgot">
+              <text class="tutorial-label">重滑</text>
+              <text class="tutorial-name">想不起来</text>
+            </view>
+            <view class="tutorial-item fuzzy">
+              <text class="tutorial-label">轻滑</text>
+              <text class="tutorial-name">有点模糊</text>
+            </view>
+          </view>
+        </view>
+        <view class="tutorial-row tutorial-right">
+          <view class="tutorial-direction">右滑 →</view>
+          <view class="tutorial-items">
+            <view class="tutorial-item knew">
+              <text class="tutorial-label">轻滑</text>
+              <text class="tutorial-name">记住了</text>
+            </view>
+            <view class="tutorial-item perfect">
+              <text class="tutorial-label">重滑</text>
+              <text class="tutorial-name">完全掌握</text>
+            </view>
+          </view>
+        </view>
       </view>
-      <view class="swipe-hint-arrow swipe-hint-right">
-        <text class="swipe-hint-text">记住了</text>
-        <text class="swipe-hint-emoji">👉</text>
-      </view>
+      <juicy-button type="primary" size="sm" bind:tap="dismissSwipeHint">知道了</juicy-button>
     </view>
-    <text class="swipe-hint-dismiss">点击任意位置关闭</text>
   </view>
   <!-- 内联滑动提示 -->
   <view class="swipe-tip" wx:if="{{showSwipeTip && isFlipped}}">
     <text>← 滑动卡片 或 点击按钮 →</text>
   </view>
   <!-- 反馈按钮 (Bottom Golden Zone) -->
-  <view class="feedback-zone" wx:if="{{!loading && !error && !empty && currentCard && isFlipped}}">
+  <view class="feedback-zone" wx:if="{{!loading && !error && !empty && !pendingComplete && currentCard && isFlipped}}">
     <view class="feedback-buttons">
       <juicy-button type="secondary" size="sm" hapticEnabled="{{false}}" data-rating="FORGOT" bind:tap="submitFeedback">
         <view class="feedback-btn-content">
@@ -112,13 +140,22 @@
     </view>
   </view>
   <!-- 翻转提示 -->
-  <view class="flip-hint" wx:if="{{!loading && !error && !empty && currentCard && !isFlipped}}">
+  <view class="flip-hint" wx:if="{{!loading && !error && !empty && !pendingComplete && currentCard && !isFlipped}}">
     <text>点击卡片查看答案</text>
   </view>
   <!-- 纠错按钮 -->
-  <view class="report-btn-wrapper" wx:if="{{!loading && !error && !empty && currentCard}}">
+  <view class="report-btn-wrapper" wx:if="{{!loading && !error && !empty && !pendingComplete && currentCard}}">
     <view class="report-btn" bindtap="openReportModal">
       <text>发现问题？帮我们改进</text>
+    </view>
+  </view>
+  <!-- 撤销条 -->
+  <view class="undo-bar" wx:if="{{undoVisible}}" catchtap="undoLastSwipe">
+    <view class="undo-bar-content">
+      <text class="undo-bar-text">已标记为「{{undoRatingText}}」</text>
+      <view class="undo-btn">
+        <text>撤销</text>
+      </view>
     </view>
   </view>
   <!-- 纠错弹窗 -->

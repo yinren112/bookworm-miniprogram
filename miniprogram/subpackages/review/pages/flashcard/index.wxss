@@ -76,6 +76,7 @@ page {
 /* Make card background slightly off-white for better contrast */
 .card-face {
   min-height: 560rpx;
+  max-height: 66vh;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -98,7 +99,9 @@ page {
 
 .card-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .card-hint {
@@ -245,34 +248,52 @@ page {
 
 /* Card Transition Animation (on card-stack, not card-container which WXS controls) */
 @keyframes cardEnter {
-  0% { opacity: 0; transform: translateY(30rpx); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% { opacity: 0; transform: translateY(18rpx) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .card-stack.card-entering {
-  animation: cardEnter 250ms var(--ease-out-expo) both;
+  animation: cardEnter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cardSwipeExitLeft {
+  0% { opacity: 1; transform: translateX(0) rotate(0deg) scale(1); }
+  100% { opacity: 0.06; transform: translateX(-88rpx) rotate(-8deg) scale(0.98); }
+}
+
+@keyframes cardSwipeExitRight {
+  0% { opacity: 1; transform: translateX(0) rotate(0deg) scale(1); }
+  100% { opacity: 0.06; transform: translateX(88rpx) rotate(8deg) scale(0.98); }
+}
+
+.card-stack.card-swipe-exit-left {
+  animation: cardSwipeExitLeft 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.card-stack.card-swipe-exit-right {
+  animation: cardSwipeExitRight 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card-stack.card-entering {
     animation: none;
   }
+
+  .card-stack.card-swipe-exit-left,
+  .card-stack.card-swipe-exit-right {
+    animation: none;
+  }
 }
 
-/* Swipe Hint Overlay */
+/* Swipe Tutorial Overlay */
 .swipe-hint-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.55);
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
   z-index: 999;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-10);
   animation: hintFadeIn 0.3s var(--ease-out-expo) both;
 }
 
@@ -281,58 +302,154 @@ page {
   100% { opacity: 1; }
 }
 
-.swipe-hint-content {
+.swipe-tutorial {
+  width: 620rpx;
+  background: var(--color-bg-card);
+  border-radius: 48rpx;
+  padding: 48rpx 40rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 80rpx;
+  gap: var(--space-6);
+  text-align: center;
 }
 
-.swipe-hint-arrow {
+.tutorial-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
+}
+
+.tutorial-sub {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
+  line-height: 1.5;
+}
+
+.tutorial-levels {
+  width: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.tutorial-row {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }
 
-.swipe-hint-left {
-  animation: hintSwayLeft 1.2s ease-in-out infinite;
+.tutorial-direction {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-light);
 }
 
-.swipe-hint-right {
-  animation: hintSwayRight 1.2s ease-in-out infinite;
+.tutorial-items {
+  display: flex;
+  gap: var(--space-3);
 }
 
-@keyframes hintSwayLeft {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(-20rpx); }
+.tutorial-item {
+  flex: 1;
+  padding: 20rpx 16rpx;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  align-items: center;
 }
 
-@keyframes hintSwayRight {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(20rpx); }
+.tutorial-item.forgot {
+  background: var(--color-bg-danger);
+  border: 2rpx solid var(--color-juicy-red);
+}
+.tutorial-item.fuzzy {
+  background: var(--color-bg-warn);
+  border: 2rpx solid var(--color-juicy-yellow);
+}
+.tutorial-item.knew {
+  background: var(--color-bg-success);
+  border: 2rpx solid var(--color-juicy-green);
+}
+.tutorial-item.perfect {
+  background: var(--color-bg-info);
+  border: 2rpx solid var(--color-juicy-blue);
 }
 
-.swipe-hint-emoji {
-  font-size: 64rpx;
+.tutorial-label {
+  font-size: 20rpx;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-light);
 }
 
-.swipe-hint-text {
+.tutorial-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-main);
+}
+
+/* Undo Bar */
+.undo-bar {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 32rpx);
+  left: var(--space-6);
+  right: var(--space-6);
+  z-index: 100;
+  animation: undoSlideUp 0.25s var(--ease-out-expo) both;
+}
+
+.undo-bar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 36rpx;
+  border-radius: var(--radius-card);
+  background: var(--color-text-main);
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.18);
+}
+
+.undo-bar-text {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-inverse);
+}
+
+.undo-btn {
+  padding: 14rpx 32rpx;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.2);
+}
+
+.undo-btn text {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-heavy);
+  color: var(--color-text-inverse);
+}
+
+@keyframes undoSlideUp {
+  0% { opacity: 0; transform: translateY(24rpx); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Pending Complete State */
+.pending-complete {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pageFadeIn 0.3s var(--ease-out-expo) both;
+}
+
+.pending-complete-inner {
+  text-align: center;
+}
+
+.pending-complete-text {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-heavy);
-  color: #FFFFFF;
-}
-
-.swipe-hint-dismiss {
-  font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: var(--font-weight-medium);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .swipe-hint-left,
-  .swipe-hint-right {
-    animation: none;
-  }
+  color: var(--color-text-light);
 }
 
 /* Inline Swipe Tip (count-based, non-blocking) */

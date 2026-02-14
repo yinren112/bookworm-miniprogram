@@ -14,6 +14,12 @@ const feedback = require("../../../../utils/ui/feedback");
 const { createFatigueChecker } = require("../../../../utils/fatigue");
 const { QUIZ_SECONDS_PER_ITEM, QUIZ_HINT_COUNT_KEY } = require("../../../../utils/constants");
 
+function shouldShowMultiChoiceHint(question) {
+  if (!question || question.questionType !== 'MULTI_CHOICE') return false;
+  const count = wx.getStorageSync(QUIZ_HINT_COUNT_KEY);
+  return (typeof count === 'number' ? count : 0) < 3;
+}
+
 function getQuizState(page) {
   return getPageState("review.quiz", page, () => ({
     questions: [],
@@ -64,6 +70,7 @@ Page({
     lastSubmitAt: 0,
     autoAdvancing: false,
     showQuizHint: false,
+    showMultiChoiceHint: false,
   },
 
   playQuestionEnter() {
@@ -160,6 +167,7 @@ Page({
       questionTypeClass: getQuestionTypeClass(currentQuestion),
       accuracyPercent,
       lastSubmitAt: session.lastSubmitAt || 0,
+      showMultiChoiceHint: shouldShowMultiChoiceHint(currentQuestion),
     });
 
     this.updateProgress(currentIndex);
@@ -225,6 +233,7 @@ Page({
         questionTypeClass: getQuestionTypeClass(state.questions[0]),
         accuracyPercent: 0,
         lastSubmitAt: 0,
+        showMultiChoiceHint: shouldShowMultiChoiceHint(state.questions[0]),
       }, () => {
         this.playQuestionEnter();
       });
@@ -350,7 +359,9 @@ Page({
         result.correctAnswer,
         correctIndices,
       );
-      const explanation = typeof result?.explanation === 'string' ? sanitizeMpHtmlContent(result.explanation) : '';
+      const explanation = typeof result?.explanation === 'string'
+        ? sanitizeMpHtmlContent(result.explanation, { convertNewlinesToBr: true })
+        : '';
 
       const newCorrectCount =
         this.data.correctCount + (result.isCorrect ? 1 : 0);
@@ -379,7 +390,7 @@ Page({
           explanation,
         },
         correctIndices,
-        correctAnswerText: sanitizeMpHtmlContent(correctAnswerText),
+        correctAnswerText: sanitizeMpHtmlContent(correctAnswerText, { convertNewlinesToBr: true }),
         optionStates,
         answeredCount,
         correctCount: newCorrectCount,
@@ -478,6 +489,7 @@ Page({
       fillAnswer: "",
       showResult: false,
       showQuizHint: false,
+      showMultiChoiceHint: shouldShowMultiChoiceHint(nextQ),
       lastResult: null,
       correctIndices: [],
       correctAnswerText: "",
@@ -676,10 +688,18 @@ function normalizeOptionIndices(input) {
 
 function sanitizeQuestion(q) {
   if (!q || typeof q !== 'object') return q;
-  const stem = typeof q.stem === 'string' ? sanitizeMpHtmlContent(q.stem) : '';
+  const stem = typeof q.stem === 'string'
+    ? sanitizeMpHtmlContent(q.stem, { convertNewlinesToBr: true })
+    : '';
   const options = Array.isArray(q.options)
-    ? q.options.map((opt) => (typeof opt === 'string' ? sanitizeMpHtmlContent(opt) : ''))
+    ? q.options.map((opt) => (
+      typeof opt === 'string'
+        ? sanitizeMpHtmlContent(opt, { convertNewlinesToBr: true })
+        : ''
+    ))
     : [];
-  const explanation = typeof q.explanation === 'string' ? sanitizeMpHtmlContent(q.explanation) : undefined;
+  const explanation = typeof q.explanation === 'string'
+    ? sanitizeMpHtmlContent(q.explanation, { convertNewlinesToBr: true })
+    : undefined;
   return { ...q, stem, options, ...(explanation === undefined ? {} : { explanation }) };
 }

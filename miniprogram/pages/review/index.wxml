@@ -45,16 +45,9 @@
         <text>DEVTOOLS API：{{debugApiBaseUrl}}</text>
       </view>
     </block>
-    <enter-transition wx:else class="content-wrapper" visible="{{!loading && !error}}" staggerIndex="0">
-      <view class="welcome-guide" wx:if="{{showWelcomeGuide && enrolledCourses.length === 0}}">
-        <card-flat>
-          <view class="welcome-content">
-            <text class="welcome-title">选一门课程，开始复习</text>
-            <text class="welcome-desc">点击下方浏览课程列表，注册后即可开始学习</text>
-            <juicy-button type="primary" size="sm" bind:tap="openCoursePicker">浏览课程</juicy-button>
-          </view>
-        </card-flat>
-      </view>
+    <enter-transition wx:else visible="{{!loading && !error}}" staggerIndex="0">
+      <view class="content-wrapper">
+      <!-- 内联占位（modal 已移到页面底部） -->
       <view class="study-card">
         <view class="course-header pressable" bindtap="navigateToCourse" data-course-key="{{currentCourse ? currentCourse.courseKey : ''}}" hover-class="course-header--pressed" hover-stay-time="80">
           <view class="course-info">
@@ -83,9 +76,19 @@
           <juicy-button type="outline" full wx:if="{{dashboard && dashboard.wrongCount > 0}}" bind:tap="startWrongReview">
             错题强化 ({{dashboard.wrongCount}})
           </juicy-button>
-          <juicy-button type="secondary" full wx:if="{{resumeSession}}" bind:tap="continueSession">
-            继续上次
-          </juicy-button>
+          <view class="resume-card pressable" wx:if="{{resumeSession && resumeInfo}}" bindtap="continueSession" hover-class="resume-card--pressed" hover-stay-time="80">
+            <view class="resume-card-top">
+              <text class="resume-card-label">继续上次</text>
+              <pill-tag variant="neutral" size="sm" wx:if="{{resumeInfo.timeAgoText}}">{{resumeInfo.timeAgoText}}</pill-tag>
+            </view>
+            <view class="resume-card-detail">
+              <text class="resume-card-type">{{resumeInfo.typeLabel}}</text>
+              <text class="resume-card-sep" wx:if="{{resumeInfo.courseTitle}}">·</text>
+              <text class="resume-card-course" wx:if="{{resumeInfo.courseTitle}}">{{resumeInfo.courseTitle}}</text>
+              <text class="resume-card-sep" wx:if="{{resumeInfo.progressText}}">·</text>
+              <text class="resume-card-progress" wx:if="{{resumeInfo.progressText}}">{{resumeInfo.progressText}}</text>
+            </view>
+          </view>
         </view>
       </view>
       <enter-transition visible="{{!loading && !error}}" staggerIndex="1">
@@ -141,14 +144,14 @@
         </view>
       </enter-transition>
       <enter-transition visible="{{!loading && !error}}" staggerIndex="2">
-        <view class="study-card" wx:if="{{heatmapData && heatmapData.length > 0}}">
+        <view class="study-card pressable" wx:if="{{heatmapData && heatmapData.length > 0}}" bindtap="goActivityHistory" hover-class="study-card--pressed" hover-stay-time="80">
           <view class="section-header">
             <text class="section-title">学习热力图</text>
             <pill-tag variant="neutral" size="sm">最近7天</pill-tag>
           </view>
           <view class="heatmap-row">
             <block wx:for="{{heatmapData}}" wx:key="date">
-              <view class="day-column" bindtap="onHeatmapTap" data-date="{{item.date}}" data-index="{{index}}">
+              <view class="day-column" catchtap="onHeatmapTap" data-date="{{item.date}}" data-index="{{index}}">
                 <view class="day-bar-wrapper">
                   <view class="heatmap-tooltip" wx:if="{{heatmapTooltipIndex === index}}">
                     <text>{{heatmapTooltipText}}</text>
@@ -164,8 +167,20 @@
       <view class="footer-slogan">
         <text>KEEP LEARNING, KEEP GROWING.</text>
       </view>
+      </view>
     </enter-transition>
   </scroll-view>
+  <!-- 全屏欢迎引导 -->
+  <view class="welcome-overlay {{showWelcomeGuide && enrolledCourses.length === 0 ? 'visible' : ''}}" catchtap="openCoursePicker">
+    <view class="welcome-modal" catchtap="noop">
+      <view class="welcome-icon-row">
+        <text class="welcome-icon-text">📖</text>
+      </view>
+      <text class="welcome-title">欢迎来到复习助手</text>
+      <text class="welcome-desc">科学间隔重复，高效记忆知识点。\n选一门课程，立刻开始。</text>
+      <juicy-button type="primary" full bind:tap="openCoursePicker">浏览课程</juicy-button>
+    </view>
+  </view>
   <view class="course-picker-overlay {{showCoursePicker ? 'visible' : ''}}" catchtap="closeCoursePicker">
     <view class="course-picker-modal" catchtap="noop">
       <view class="modal-header">

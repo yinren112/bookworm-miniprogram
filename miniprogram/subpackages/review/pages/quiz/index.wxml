@@ -43,9 +43,12 @@
     </view>
 
     <view class="question-stem">
-      <mp-html content="{{currentQuestion.stem}}" markdown="{{true}}" />
+      <mp-html content="{{currentQuestion.stem}}" markdown="{{false}}" />
     </view>
 
+    <view class="multi-choice-hint" wx:if="{{showMultiChoiceHint && !showResult}}">
+      <text>多选题：选择所有正确选项后点击「提交」</text>
+    </view>
     <view class="options-section" wx:if="{{currentQuestion.questionType !== 'FILL_BLANK'}}">
       <card-flat
         wx:for="{{currentQuestion.options}}"
@@ -57,7 +60,7 @@
       >
         <view class="option-inner">
           <view class="option-marker">{{optionLabels[index]}}</view>
-          <view class="option-content"><mp-html content="{{item}}" markdown="{{true}}" /></view>
+          <view class="option-content"><mp-html content="{{item}}" markdown="{{false}}" /></view>
           <view class="option-state" wx:if="{{showResult && optionStates[index].isCorrect}}">✓</view>
           <view class="option-state" wx:elif="{{showResult && optionStates[index].isWrong}}">✗</view>
         </view>
@@ -99,11 +102,11 @@
       <text class="result-title {{lastResult.isCorrect ? 'is-correct' : 'is-wrong'}}">{{lastResult.isCorrect ? '答对了' : '答错了'}}</text>
       <view wx:if="{{lastResult.explanation}}">
         <text class="explanation-label">解析</text>
-        <mp-html content="{{lastResult.explanation}}" markdown="{{true}}" />
+        <mp-html content="{{lastResult.explanation}}" markdown="{{false}}" />
       </view>
       <view wx:if="{{!lastResult.isCorrect}}">
         <text class="answer-label">正确答案</text>
-        <mp-html content="{{correctAnswerText}}" markdown="{{true}}" />
+        <mp-html content="{{correctAnswerText}}" markdown="{{false}}" />
       </view>
     </view>
 

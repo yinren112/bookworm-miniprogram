@@ -47,6 +47,7 @@ Page({
     isDevtools: false,
     debugApiBaseUrl: '',
     showWelcomeGuide: false,
+    resumeInfo: null,
     isPageActive: false, // For Tab Switch Animation
     heatmapTooltipIndex: -1,
     heatmapTooltipText: '',
@@ -169,12 +170,14 @@ Page({
       }
 
       const resumeSession = getResumeSession();
+      const resumeInfo = this.buildResumeInfo(resumeSession, courses);
       const welcomeSeen = wx.getStorageSync(ONBOARDING_WELCOME_KEY);
       const hasEnrolledCourse = courses.some((course) => !!course.enrolled);
       this.setData({
         dashboard,
         ...viewState,
         resumeSession,
+        resumeInfo,
         recommendedCourses,
         courses,
         showWelcomeGuide: !welcomeSeen && !hasEnrolledCourse,
@@ -253,6 +256,36 @@ Page({
       noDueTasks,
       primaryCtaText: ctaText,
     };
+  },
+
+  buildResumeInfo(session, coursesList) {
+    if (!session) return null;
+    const typeLabel = session.type === 'flashcard' ? '背卡' : '刷题';
+    const total = session.cardsLength || session.questionsLength || 0;
+    const current = session.currentIndex || 0;
+    const progressText = total > 0 ? `${current}/${total}` : '';
+
+    let courseTitle = '';
+    if (session.courseKey && coursesList) {
+      const match = coursesList.find((c) => c.courseKey === session.courseKey);
+      if (match) courseTitle = match.title;
+    }
+
+    let timeAgoText = '';
+    if (session.updatedAt) {
+      const diffMs = Date.now() - session.updatedAt;
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) {
+        timeAgoText = '刚刚';
+      } else if (diffMin < 60) {
+        timeAgoText = `${diffMin}分钟前`;
+      } else {
+        const diffHours = Math.floor(diffMin / 60);
+        timeAgoText = diffHours < 24 ? `${diffHours}小时前` : `${Math.floor(diffHours / 24)}天前`;
+      }
+    }
+
+    return { typeLabel, progressText, courseTitle, timeAgoText };
   },
 
   onRetry() {
@@ -508,6 +541,20 @@ Page({
 
     wx.navigateTo({
       url: `/subpackages/review/pages/quiz/index?${params.join('&')}`,
+    });
+  },
+
+  goActivityHistory() {
+    this.triggerHaptic('light');
+    wx.navigateTo({
+      url: '/subpackages/review/pages/activity-history/index',
+    });
+  },
+
+  onHistoryTap() {
+    this.triggerHaptic('light');
+    wx.navigateTo({
+      url: '/subpackages/review/pages/activity-history/index',
     });
   },
 

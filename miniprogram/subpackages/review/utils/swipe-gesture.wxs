@@ -60,10 +60,10 @@ function touchMove(e, ins) {
   var touch = e.touches[0];
   var dx = touch.clientX - state.startX;
   var dy = touch.clientY - state.startY;
+  var absDx = Math.abs(dx);
   
   // 方向锁定检测
   if (!state.isHorizontalLocked) {
-    var absDx = Math.abs(dx);
     var absDy = Math.abs(dy);
     
     // 如果水平位移不够明显，不处理
@@ -178,17 +178,17 @@ function touchEnd(e, ins) {
   var card = ins.selectComponent('#swipe-card');
   
   if (rating) {
-    // 触发提交：飞出动画
-    var endX = direction === 'right' ? state.screenWidth + 100 : -state.screenWidth - 100;
-    var endRotate = direction === 'right' ? 20 : -20;
-    
+    // 提交命中：容器仅回正，退出动画交给逻辑层的 card-stack class 控制。
     if (card) {
       card.setStyle({
-        transform: 'translateX(' + endX + 'px) rotate(' + endRotate + 'deg)',
-        opacity: 0,
-        transition: 'transform 0.3s ease-out, opacity 0.3s ease-out'
+        transform: 'translateX(0) rotate(0deg)',
+        opacity: 1,
+        transition: 'transform 0.12s ease-out, opacity 0.12s ease-out'
       });
     }
+
+    // 提交后立即隐藏指示器，避免新卡片残留旧状态
+    updateIndicators(ins, 'none', 'none', 0);
     
     // 通知逻辑层
     ins.callMethod('onSwipeCommit', {
