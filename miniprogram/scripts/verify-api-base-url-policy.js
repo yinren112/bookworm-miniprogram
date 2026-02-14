@@ -25,6 +25,12 @@ function run() {
     'develop-devtools-allows-http',
   );
 
+  assertEqual(
+    enforceApiBaseUrlPolicy('http://192.168.50.8:8080/api', { envVersion: 'develop', platform: 'ios' }),
+    'http://192.168.50.8:8080/api',
+    'develop-device-allows-http',
+  );
+
   expectThrow(
     () => enforceApiBaseUrlPolicy('http://api.example.com/api', { envVersion: 'trial', platform: '' }),
     'trial-rejects-http',
@@ -44,4 +50,3 @@ function run() {
 
 run();
 process.stdout.write('OK\n');
-

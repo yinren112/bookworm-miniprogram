@@ -1,5 +1,7 @@
 const logger = require('./utils/logger');
-const { enforceApiBaseUrlPolicy } = require('./utils/url');
+const { enforceApiBaseUrlPolicy, normalizeApiBaseUrl } = require('./utils/url');
+
+const DEVICE_DEV_API_BASE_URL_KEY = 'DEV_API_BASE_URL';
 
 function getSystemPlatform() {
   try {
@@ -17,6 +19,20 @@ function isDevtools() {
     // ignore
   }
   return getSystemPlatform() === 'devtools';
+}
+
+function getDeviceDevelopApiBaseUrlOverride() {
+  try {
+    if (!wx.getStorageSync) return '';
+    const raw = wx.getStorageSync(DEVICE_DEV_API_BASE_URL_KEY);
+    if (typeof raw !== 'string' || !raw.trim()) return '';
+    const normalized = normalizeApiBaseUrl(raw);
+    if (!normalized) return '';
+    return normalized;
+  } catch (e) {
+    logger.warn('[WARN] Failed to read DEV_API_BASE_URL override:', e);
+    return '';
+  }
 }
 
 /**
@@ -46,6 +62,11 @@ function getApiBaseUrl() {
     const platform = isDevtools() ? 'devtools' : getSystemPlatform();
     if (platform === 'devtools') {
       return enforceApiBaseUrlPolicy(urls.develop, { envVersion, platform });
+    }
+    const deviceOverride = getDeviceDevelopApiBaseUrlOverride();
+    if (deviceOverride) {
+      logger.warn('[WARN] Device develop build uses DEV_API_BASE_URL override');
+      return enforceApiBaseUrlPolicy(deviceOverride, { envVersion, platform: '' });
     }
     logger.warn('[WARN] Device develop build uses trial API (no in-app endpoint switching)');
     return enforceApiBaseUrlPolicy(urls.trial, { envVersion, platform: '' });

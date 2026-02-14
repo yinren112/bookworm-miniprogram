@@ -9,9 +9,6 @@
     "pages/webview/index",
     "pages/customer-service/index"
   ],
-  "requiredPrivateInfos": [
-    "getPhoneNumber"
-  ],
   "tabBar": {
     "color": "#999999",
     "selectedColor": "#46B065",

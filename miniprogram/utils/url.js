@@ -30,9 +30,9 @@ function normalizeApiBaseUrl(input) {
 function enforceApiBaseUrlPolicy(url, options = {}) {
   if (!url || typeof url !== 'string') return '';
   const envVersion = typeof options.envVersion === 'string' ? options.envVersion : '';
-  const platform = typeof options.platform === 'string' ? options.platform : '';
 
-  const allowHttp = envVersion === 'develop' && platform === 'devtools';
+  // develop 环境允许 http，便于本地真机联调（例如手机热点 + 电脑本机 IP）。
+  const allowHttp = envVersion === 'develop';
   if (allowHttp) {
     return url;
   }
