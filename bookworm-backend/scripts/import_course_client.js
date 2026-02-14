@@ -92,57 +92,132 @@ function parseCardsTsv(content, unitKey) {
         
         return {
             contentId: fields[idx.id]?.trim(),
-            front: fields[idx.front]?.trim(),
-            back: fields[idx.back]?.trim(),
+            front: normalizeEscapedWhitespace(fields[idx.front]?.trim()),
+            back: normalizeEscapedWhitespace(fields[idx.back]?.trim()),
             tags: idx.tags > -1 ? fields[idx.tags]?.trim() : undefined,
             difficulty: idx.diff > -1 ? parseInt(fields[idx.diff]) || 1 : 1
         };
     }).filter(x => x);
 }
 
-function parseQuestionsGift(content, _unitKey) {
+function parseQuestionsGift(content, unitKey) {
     const questions = [];
-    // Remove comments
-    const cleanContent = content.split(/\r?\n/).filter(l => !l.trim().startsWith("//")).join("\n");
-    // Regex: ::ID:: STEM { ANSWER }
-    const pattern = /::(\S+)::\s*([\s\S]*?)\s*\{([\s\S]*?)\}/g;
-    
-    let match;
-    while ((match = pattern.exec(cleanContent)) !== null) {
-        const [, id, stem, ansBlock] = match;
-        const q = { contentId: id.trim(), stem: stem.trim(), difficulty: 1 };
-        const upperAns = ansBlock.trim().toUpperCase();
+    const cleanContent = content
+        .split(/\r?\n/)
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n");
 
-        if (['T', 'F', 'TRUE', 'FALSE'].includes(upperAns)) {
-            q.questionType = 'TRUE_FALSE';
-            q.answer = upperAns.startsWith('T') ? 'TRUE' : 'FALSE';
-        } else if (ansBlock.trim().startsWith('=') && !ansBlock.includes('~')) {
-            q.questionType = 'FILL_BLANK';
-            q.answer = ansBlock.trim().substring(1).trim();
-        } else {
-            // Choice Question
-            const lines = ansBlock.split(/\r?\n/).map(l => l.trim()).filter(l => l);
-            const options = [];
-            const corrects = [];
-            lines.forEach(l => {
-                const cleanL = l.replace(/^\t+/, '').trim(); // Remove leading tabs
-                if (cleanL.startsWith('=')) {
-                    const txt = cleanL.substring(1).trim();
-                    options.push(txt);
-                    corrects.push(txt);
-                } else if (cleanL.startsWith('~')) {
-                    options.push(cleanL.substring(1).trim());
-                }
-            });
-            q.options = options;
-            q.questionType = corrects.length > 1 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE';
-            
-            // Backend expects JSON array for Multi, string for Single
-            q.answer = corrects.length > 1 ? JSON.stringify(corrects) : corrects[0];
+    const questionIdPattern = /::(\S+)::/g;
+    const idMatches = Array.from(cleanContent.matchAll(questionIdPattern));
+
+    const isLikelyAnswerBlock = (block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return false;
+        const upper = trimmed.toUpperCase();
+        if (upper === "TRUE" || upper === "FALSE" || upper === "T" || upper === "F") return true;
+        if (trimmed.startsWith("=")) return true;
+        const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        return lines.some((line) => line.startsWith("=") || line.startsWith("~"));
+    };
+
+    const findMatchingBrace = (text, openPos, endPos) => {
+        let depth = 0;
+        for (let i = openPos; i < endPos; i++) {
+            const ch = text[i];
+            if (ch === "{") depth++;
+            else if (ch === "}") {
+                depth--;
+                if (depth === 0) return i;
+            }
         }
+        return -1;
+    };
+
+    for (let i = 0; i < idMatches.length; i++) {
+        const match = idMatches[i];
+        const contentId = (match[1] || "").trim();
+        const bodyStart = (match.index ?? 0) + match[0].length;
+        const bodyEnd = i < idMatches.length - 1 ? (idMatches[i + 1].index ?? cleanContent.length) : cleanContent.length;
+        const body = cleanContent.slice(bodyStart, bodyEnd);
+
+        let answerStart = -1;
+        let answerEnd = -1;
+        for (let j = 0; j < body.length; j++) {
+            if (body[j] !== "{") continue;
+            const close = findMatchingBrace(body, j, body.length);
+            if (close === -1) break;
+            const candidate = body.slice(j + 1, close);
+            if (isLikelyAnswerBlock(candidate)) {
+                answerStart = j;
+                answerEnd = close;
+                break;
+            }
+        }
+
+        if (answerStart === -1 || answerEnd === -1) {
+            throw new Error(`[Unit: ${unitKey}] invalid GIFT question format near: ${body.trim().substring(0, 50)}...`);
+        }
+
+        const stem = normalizeEscapedWhitespace(body.slice(0, answerStart).trim());
+        const ansBlock = body.slice(answerStart + 1, answerEnd).trim();
+        if (!contentId || !stem) {
+            throw new Error(`[Unit: ${unitKey}] invalid question with empty contentId/stem`);
+        }
+
+        const q = { contentId, stem, difficulty: 1 };
+        const upperAns = ansBlock.toUpperCase();
+
+        if (upperAns === "TRUE" || upperAns === "T" || upperAns === "FALSE" || upperAns === "F") {
+            q.questionType = "TRUE_FALSE";
+            q.answer = upperAns.startsWith("T") ? "TRUE" : "FALSE";
+            questions.push(q);
+            continue;
+        }
+
+        if (ansBlock.startsWith("=") && !ansBlock.includes("~")) {
+            q.questionType = "FILL_BLANK";
+            q.answer = normalizeEscapedWhitespace(ansBlock.substring(1).trim());
+            questions.push(q);
+            continue;
+        }
+
+        const lines = ansBlock.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        const options = [];
+        const corrects = [];
+        for (const line of lines) {
+            if (line.startsWith("=")) {
+                const txt = normalizeEscapedWhitespace(line.substring(1).trim());
+                options.push(txt);
+                corrects.push(txt);
+            } else if (line.startsWith("~")) {
+                options.push(normalizeEscapedWhitespace(line.substring(1).trim()));
+            }
+        }
+
+        if (options.length < 2) {
+            throw new Error(`[Unit: ${unitKey}] question ${contentId} must have at least 2 options`);
+        }
+        if (corrects.length === 0) {
+            throw new Error(`[Unit: ${unitKey}] question ${contentId} has no correct answer`);
+        }
+
+        q.options = options;
+        q.questionType = corrects.length > 1 ? "MULTI_CHOICE" : "SINGLE_CHOICE";
+        q.answer = corrects.length > 1 ? corrects.join("|") : corrects[0];
         questions.push(q);
     }
+
     return questions;
+}
+
+function normalizeEscapedWhitespace(text) {
+    if (typeof text !== 'string') return '';
+    return text
+      .replace(/\\\\r\\\\n/g, '\n')
+      .replace(/\\r\\n/g, '\n')
+      // Do not damage LaTeX commands such as \\neq / \\nabla.
+      .replace(/\\\\n(?![A-Za-z])/g, '\n')
+      .replace(/\\n(?![A-Za-z])/g, '\n');
 }
 
 // ============================================

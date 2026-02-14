@@ -291,6 +291,18 @@ card-001\t问题\t答案\t标签\t3`;
       expect(result[0].answer).toBe("2.718|2.72");
     });
 
+    it("should parse question when stem contains LaTeX braces", () => {
+      const content = `::Q009:: 设 $f(x)=x^{2}$，求 $\\lim_{x\\to 0}\\frac{\\sin x}{x}$ 的值 {=1}`;
+
+      const result = parseQuestionsGift(content, "limit");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].questionType).toBe(QuestionType.FILL_BLANK);
+      expect(result[0].stem).toContain("x^{2}");
+      expect(result[0].stem).toContain("\\lim_{x\\to 0}");
+      expect(result[0].answer).toBe("1");
+    });
+
     it("should parse multiple questions", () => {
       const content = `::Q001:: 问题1 {TRUE}
 ::Q002:: 问题2 {

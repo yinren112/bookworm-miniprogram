@@ -183,8 +183,8 @@ export function parseCardsTsv(content: string, unitKey: string): CardDefinition[
 
     const fields = line.split("\t");
     const contentId = fields[contentIdIdx]?.trim();
-    const front = fields[frontIdx]?.trim();
-    const back = fields[backIdx]?.trim();
+    const front = normalizeEscapedWhitespace(fields[frontIdx]?.trim() || "");
+    const back = normalizeEscapedWhitespace(fields[backIdx]?.trim() || "");
 
     if (!contentId || !front || !back) {
       throw new Error(
@@ -250,19 +250,75 @@ export function parseQuestionsGift(content: string, unitKey: string): QuestionDe
     .filter(line => !line.trim().startsWith("//"))
     .join("\n");
 
-  // 匹配题目模式: ::ID:: 题干 { 答案区域 }
-  // 使用非贪婪匹配和多行模式
-  const questionPattern = /::(\S+)::\s*([\s\S]*?)\s*\{([\s\S]*?)\}/g;
+  // 逐题切分，避免题干中的 LaTeX 花括号干扰解析
+  const questionIdPattern = /::(\S+)::/g;
+  const idMatches = Array.from(cleanContent.matchAll(questionIdPattern));
 
-  let match;
+  const isLikelyAnswerBlock = (block: string): boolean => {
+    const trimmed = block.trim();
+    if (!trimmed) return false;
 
-  while ((match = questionPattern.exec(cleanContent)) !== null) {
-    const contentId = match[1].trim();
-    const stem = match[2].trim();
-    const answerBlock = match[3].trim();
+    const upper = trimmed.toUpperCase();
+    if (upper === "TRUE" || upper === "FALSE" || upper === "T" || upper === "F") {
+      return true;
+    }
+
+    if (trimmed.startsWith("=")) {
+      return true;
+    }
+
+    const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    return lines.some((line) => line.startsWith("=") || line.startsWith("~"));
+  };
+
+  const findMatchingBrace = (text: string, openPos: number, endPos: number): number => {
+    let depth = 0;
+    for (let i = openPos; i < endPos; i++) {
+      const ch = text[i];
+      if (ch === "{") {
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  };
+
+  for (let i = 0; i < idMatches.length; i++) {
+    const match = idMatches[i];
+    const contentId = (match[1] || "").trim();
+    const bodyStart = (match.index ?? 0) + match[0].length;
+    const bodyEnd = i < idMatches.length - 1 ? (idMatches[i + 1].index ?? cleanContent.length) : cleanContent.length;
+    const body = cleanContent.slice(bodyStart, bodyEnd);
+
+    let answerStart = -1;
+    let answerEnd = -1;
+
+    for (let j = 0; j < body.length; j++) {
+      if (body[j] !== "{") continue;
+      const close = findMatchingBrace(body, j, body.length);
+      if (close === -1) break;
+      const candidate = body.slice(j + 1, close);
+      if (isLikelyAnswerBlock(candidate)) {
+        answerStart = j;
+        answerEnd = close;
+        break;
+      }
+    }
+
+    if (answerStart === -1 || answerEnd === -1) {
+      const preview = body.trim().substring(0, 50);
+      throw new Error(`questions/${unitKey}.gift: invalid question format at "${preview}..."`);
+    }
+
+    const stem = normalizeEscapedWhitespace(body.slice(0, answerStart).trim());
+    const answerBlock = body.slice(answerStart + 1, answerEnd).trim();
 
     if (!contentId || !stem) {
-      throw new Error(`questions/${unitKey}.gift: invalid question format at "${match[0].substring(0, 50)}..."`);
+      throw new Error(`questions/${unitKey}.gift: invalid question format at "${body.trim().substring(0, 50)}..."`);
     }
 
     // 判断题目类型
@@ -294,7 +350,7 @@ export function parseQuestionsGift(content: string, unitKey: string): QuestionDe
     // 填空题: {=答案} 或 {=答案1|答案2}
     // 特征: 只有一个 = 开头的答案，没有 ~ 选项
     if (answerBlock.startsWith("=") && !answerBlock.includes("\n~") && !answerBlock.includes("~")) {
-      const fillAnswer = answerBlock.substring(1).trim();
+      const fillAnswer = normalizeEscapedWhitespace(answerBlock.substring(1).trim());
       questions.push({
         contentId,
         questionType: QuestionType.FILL_BLANK,
@@ -311,11 +367,11 @@ export function parseQuestionsGift(content: string, unitKey: string): QuestionDe
 
     for (const optionLine of optionLines) {
       if (optionLine.startsWith("=")) {
-        const optionText = optionLine.substring(1).trim();
+        const optionText = normalizeEscapedWhitespace(optionLine.substring(1).trim());
         options.push(optionText);
         correctAnswers.push(optionText);
       } else if (optionLine.startsWith("~")) {
-        const optionText = optionLine.substring(1).trim();
+        const optionText = normalizeEscapedWhitespace(optionLine.substring(1).trim());
         options.push(optionText);
       }
     }
@@ -356,7 +412,12 @@ export function parseQuestionsGift(content: string, unitKey: string): QuestionDe
 // ============================================
 
 function normalizeEscapedWhitespace(text: string): string {
-  return text.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+  return text
+    .replace(/\\\\r\\\\n/g, "\n")
+    .replace(/\\r\\n/g, "\n")
+    // Do not damage LaTeX commands like \\neq / \\nabla.
+    .replace(/\\\\n(?![A-Za-z])/g, "\n")
+    .replace(/\\n(?![A-Za-z])/g, "\n");
 }
 
 function buildCheatsheetStableKey(
