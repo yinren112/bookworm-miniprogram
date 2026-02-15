@@ -348,8 +348,31 @@ export function parseQuestionsGift(content: string, unitKey: string): QuestionDe
     }
 
     // 填空题: {=答案} 或 {=答案1|答案2}
-    // 特征: 只有一个 = 开头的答案，没有 ~ 选项
+    // 兼容：若答案块是多行且每行都以 "=" 开头，视为“全正确选项”的多选题，避免误判成填空题
     if (answerBlock.startsWith("=") && !answerBlock.includes("\n~") && !answerBlock.includes("~")) {
+      const answerLines = answerBlock
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      const allLinesAreCorrectOptions =
+        answerLines.length >= 2 && answerLines.every((line) => line.startsWith("="));
+      if (allLinesAreCorrectOptions) {
+        const options = answerLines
+          .map((line) => normalizeEscapedWhitespace(line.substring(1).trim()))
+          .filter(Boolean);
+        if (options.length >= 2) {
+          questions.push({
+            contentId,
+            questionType: QuestionType.MULTI_CHOICE,
+            stem,
+            options,
+            answer: options.join("|"),
+          });
+          continue;
+        }
+      }
+
       const fillAnswer = normalizeEscapedWhitespace(answerBlock.substring(1).trim());
       questions.push({
         contentId,
@@ -533,6 +556,7 @@ export function validateCoursePackageSchema(pkg: CoursePackage): string[] {
 
 export function validateCoursePackage(pkg: CoursePackage): string[] {
   const errors: string[] = [];
+  const placeholderMarkers = ["答案占位符"];
 
   // 1. 验证 units 定义
   const definedUnits = new Set(pkg.units.map((u) => u.unitKey));
@@ -566,6 +590,11 @@ export function validateCoursePackage(pkg: CoursePackage): string[] {
 
     for (const q of questions) {
       const prefix = `questions/${unitKey}/${q.contentId || "unknown"}`;
+      const textToCheck = `${q.stem || ""}\n${q.answer || ""}`;
+
+      if (placeholderMarkers.some((marker) => textToCheck.includes(marker))) {
+        errors.push(`${prefix}: Contains placeholder content (答案占位符), question is not usable`);
+      }
 
       // 3.3 选择题选项数量检查
       if (

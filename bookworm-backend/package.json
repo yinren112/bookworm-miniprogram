@@ -22,7 +22,11 @@
     "test:study:kpi": "dotenv -e .env.test -- node ./node_modules/vitest/vitest.mjs run --config vitest.study-kpi.config.ts --coverage",
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "lint:fix": "node ./node_modules/eslint/bin/eslint.js . --fix",
-    "generate-tokens": "node ./node_modules/ts-node/dist/bin.js scripts/generate-load-test-tokens.ts"
+    "generate-tokens": "node ./node_modules/ts-node/dist/bin.js scripts/generate-load-test-tokens.ts",
+    "audit:study-content": "node ./node_modules/ts-node/dist/bin.js src/scripts/audit-study-content.ts",
+    "fix:study-misclassified-fillblank": "node ./node_modules/ts-node/dist/bin.js src/scripts/fix-study-misclassified-fillblank.ts",
+    "fix:study-fillblank-usability": "node ./node_modules/ts-node/dist/bin.js src/scripts/fix-study-fillblank-usability.ts",
+    "fix:study-placeholder-questions": "node ./node_modules/ts-node/dist/bin.js src/scripts/fix-study-placeholder-questions.ts"
   },
   "prisma": {
     "seed": "node ./node_modules/ts-node/dist/bin.js prisma/seed.ts"

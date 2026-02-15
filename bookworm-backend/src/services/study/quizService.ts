@@ -7,6 +7,7 @@ import {
   questionSelectPublic,
   questionSelectWithAnswer,
   questionAttemptQuestionIdView,
+  questionIdAnswerView,
   wrongItemWithQuestionInclude,
   wrongItemListInclude,
 } from "../../db/views";
@@ -14,6 +15,10 @@ import { recordActivity } from "./streakService";
 import { log } from "../../lib/logger";
 import { isPrismaUniqueConstraintError } from "../../utils/typeGuards";
 import { StudyServiceError, StudyErrorCodes } from "../../errors";
+import {
+  getFillBlankComparableTokens,
+  extractLegacyChoiceOptionsFromFillBlank,
+} from "./fillBlankAnswer";
 
 type DbCtx = PrismaClient | Prisma.TransactionClient;
 
@@ -51,6 +56,62 @@ export interface SubmitAnswerResult {
   correctOptionIndices?: number[];
   explanation: string | null;
   wrongCount: number; // 累计错误次数
+}
+
+type PublicQuestionRow = Prisma.StudyQuestionGetPayload<{
+  select: typeof questionSelectPublic;
+}>;
+
+function normalizeLegacyFillBlankQuestion<T extends {
+  questionType: QuestionType;
+  answerJson: string;
+  optionsJson: unknown;
+}>(question: T): T {
+  if (question.questionType !== "FILL_BLANK") return question;
+
+  const options = extractLegacyChoiceOptionsFromFillBlank(question.answerJson);
+  if (!options || options.length < 2) return question;
+
+  return {
+    ...question,
+    questionType: "MULTI_CHOICE",
+    optionsJson: options,
+    answerJson: options.join("|"),
+  } as T;
+}
+
+async function normalizeLegacyFillBlankQuestionsForSession(
+  db: DbCtx,
+  questions: PublicQuestionRow[],
+): Promise<PublicQuestionRow[]> {
+  const fillBlankIds = questions
+    .filter((question) => question.questionType === "FILL_BLANK")
+    .map((question) => question.id);
+  if (fillBlankIds.length === 0) return questions;
+
+  const answers = await db.studyQuestion.findMany({
+    where: { id: { in: fillBlankIds } },
+    select: questionIdAnswerView,
+  });
+
+  const optionsByQuestionId = new Map<number, string[]>();
+  for (const item of answers) {
+    const options = extractLegacyChoiceOptionsFromFillBlank(item.answerJson);
+    if (!options || options.length < 2) continue;
+    optionsByQuestionId.set(item.id, options);
+  }
+
+  if (optionsByQuestionId.size === 0) return questions;
+
+  return questions.map((question) => {
+    const options = optionsByQuestionId.get(question.id);
+    if (!options) return question;
+    return {
+      ...question,
+      questionType: "MULTI_CHOICE",
+      optionsJson: options,
+    };
+  });
 }
 
 /**
@@ -136,10 +197,11 @@ export async function startQuizSession(
     // 3. 合并并打乱顺序
     questions = shuffleArray([...unansweredQuestions, ...backfillQuestions], sessionId);
   }
+  const normalizedQuestions = await normalizeLegacyFillBlankQuestionsForSession(db, questions);
 
   return {
     sessionId,
-    questions: questions.map((q) => ({
+    questions: normalizedQuestions.map((q) => ({
       id: q.id,
       contentId: q.contentId,
       questionType: q.questionType,
@@ -149,7 +211,7 @@ export async function startQuizSession(
         (q.questionType === "TRUE_FALSE" ? ["TRUE", "FALSE"] : null),
       difficulty: q.difficulty,
     })),
-    totalCount: questions.length,
+    totalCount: normalizedQuestions.length,
   };
 }
 
@@ -176,11 +238,12 @@ export async function submitQuizAnswer(
   if (!question) {
     throw new StudyServiceError(StudyErrorCodes.QUESTION_NOT_FOUND, "Question not found");
   }
+  const normalizedQuestion = normalizeLegacyFillBlankQuestion(question);
 
   const correctOptionIndices = extractCorrectOptionIndices(
-    question.questionType,
-    question.optionsJson,
-    question.answerJson,
+    normalizedQuestion.questionType,
+    normalizedQuestion.optionsJson,
+    normalizedQuestion.answerJson,
   );
 
   // 幂等性检查：查询是否已存在提交记录
@@ -189,23 +252,23 @@ export async function submitQuizAnswer(
   });
 
   if (existingAttempt) {
-    return buildIdempotentResult(db, userId, questionId, question, existingAttempt.isCorrect, correctOptionIndices);
+    return buildIdempotentResult(db, userId, questionId, normalizedQuestion, existingAttempt.isCorrect, correctOptionIndices);
   }
 
   // 判断答案是否正确
   const isCorrect = checkAnswer(
-    question.questionType,
-    question.answerJson,
+    normalizedQuestion.questionType,
+    normalizedQuestion.answerJson,
     chosenAnswer,
-    question.optionsJson,
+    normalizedQuestion.optionsJson,
   );
 
-  logDebugIfEnabled(questionId, question, chosenAnswer, isCorrect);
+  logDebugIfEnabled(questionId, normalizedQuestion, chosenAnswer, isCorrect);
 
   // 创建答题记录（处理并发冲突）
   const attemptResult = await createAttemptRecord(db, userId, questionId, sessionId, chosenAnswer, isCorrect, durationMs);
   if (attemptResult.idempotent) {
-    return buildIdempotentResult(db, userId, questionId, question, attemptResult.isCorrect, correctOptionIndices);
+    return buildIdempotentResult(db, userId, questionId, normalizedQuestion, attemptResult.isCorrect, correctOptionIndices);
   }
 
   // 更新错题本
@@ -219,9 +282,9 @@ export async function submitQuizAnswer(
   return {
     questionId,
     isCorrect,
-    correctAnswer: question.answerJson,
+    correctAnswer: normalizedQuestion.answerJson,
     correctOptionIndices,
-    explanation: question.explanationShort,
+    explanation: normalizedQuestion.explanationShort,
     wrongCount,
   };
 }
@@ -509,8 +572,17 @@ function checkAnswer(
 
     case "FILL_BLANK": {
       // 填空题：支持多个正确答案（用 | 分隔）
-      const validAnswers = normalizedCorrect.split("|").map((a) => a.trim());
-      return validAnswers.includes(normalizedChosen);
+      const chosenCandidates = getFillBlankComparableTokens(chosenAnswer);
+      if (chosenCandidates.size === 0) return false;
+
+      const validAnswers = correctAnswer.split("|").map((a) => a.trim()).filter(Boolean);
+      for (const answer of validAnswers) {
+        const validCandidates = getFillBlankComparableTokens(answer);
+        for (const candidate of validCandidates) {
+          if (chosenCandidates.has(candidate)) return true;
+        }
+      }
+      return false;
     }
 
     default:
@@ -759,4 +831,5 @@ export const __testing = {
   parseAnswerTokens,
   resolveOptionIndexByLabel,
   resolveUserChoiceIndex,
+  normalizeLegacyFillBlankQuestion,
 };

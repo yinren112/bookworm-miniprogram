@@ -822,3 +822,17 @@ Host lailinkeji
 2. 导入链路需要前后端一致：`src/services/study/importService.ts` 与 `scripts/import_course_client.js` 的 GIFT 解析策略必须同步更新，否则会出现“本地打包成功、服务端落库失败/错题”的分裂行为。
 3. 扫描版 PDF（文本层为 0）优先流程：`pdftoppm` 导出页图 -> OCR（优先 easyocr 作为兜底）-> 人工校对后再写入 `.gift`；不要直接把 OCR 原文无校对入库。
 4. 课程包验收最小闭环：`units.json` 覆盖映射完整 + 0 空文件 + 每个声明 unit 的 `questions/<unit>.gift` 存在 + 同文件 `contentId` 去重 + 全量 GIFT 可解析。
+
+### SOP-填空题误导入为多选（手机不可用）排查与修复
+1. 现象特征：`study_question.question_type='FILL_BLANK'`，但 `answer_json` 是多行答案块（如 `A\n=B\n=C` 或全 `=...`），前端会渲染文本输入框导致不可用。
+2. 快速识别：运行 `npm run audit:study-content -- --source db`，重点看 `POSSIBLE_MISCLASSIFIED_CHOICE` 告警项。
+3. 修复顺序：先 dry-run `npm run fix:study-misclassified-fillblank`，确认命中列表后执行 `npm run fix:study-misclassified-fillblank -- --apply`。
+4. 修复后验证：再次运行 `npm run audit:study-content -- --source db`，确保 `POSSIBLE_MISCLASSIFIED_CHOICE` 为 0，并抽样验证刷题页展示为多选。
+5. 预防回归：保持 `parseQuestionsGift` 规则：多行全 `=` 答案块必须解析为 `MULTI_CHOICE`，不得落库为 `FILL_BLANK`。
+
+### SOP-填空题可输入性与占位题清理
+1. 先审计：`npm run audit:study-content -- --source db`，看 `PLACEHOLDER_ANSWER`、`POWER_OR_SUBSCRIPT`、`LATEX_COMMAND` 等告警。
+2. 清理占位题：先 `npm run fix:study-placeholder-questions`（dry-run），再 `npm run fix:study-placeholder-questions -- --apply` 删除 `答案占位符` 题目并回写课程题数。
+3. 补可输入别名：先 `npm run fix:study-fillblank-usability`（dry-run），再 `npm run fix:study-fillblank-usability -- --apply`，为高门槛填空追加 ASCII 别名并删除明显损坏题。
+4. 复验：再次运行 `npm run audit:study-content -- --source db`，目标是只剩极少数必须人工确认的复杂公式题。
+5. 导入防回流：`validateCoursePackage` 已对 `答案占位符` 报错；导入前必须走 dry-run，发现占位内容先修课程包再导入。

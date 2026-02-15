@@ -221,6 +221,11 @@ export const questionIdOnlyView = {
   id: true,
 } as const satisfies Prisma.StudyQuestionSelect;
 
+export const questionIdAnswerView = {
+  id: true,
+  answerJson: true,
+} as const satisfies Prisma.StudyQuestionSelect;
+
 export const questionIdCourseIdView = {
   id: true,
   courseId: true,

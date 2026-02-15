@@ -81,4 +81,31 @@ describe("Quiz answer checking compatibility", () => {
     );
     expect(ok).toBe(true);
   });
+
+  it("accepts exp(x) as equivalent of e^x for fill blank", () => {
+    const ok = __testing.checkAnswer(
+      "FILL_BLANK",
+      "e^x",
+      "exp(x)",
+    );
+    expect(ok).toBe(true);
+  });
+
+  it("accepts LaTeX fraction as equivalent of plain fraction for fill blank", () => {
+    const ok = __testing.checkAnswer(
+      "FILL_BLANK",
+      "\\frac{1}{2}",
+      "(1)/(2)",
+    );
+    expect(ok).toBe(true);
+  });
+
+  it("accepts expression with math delimiters for fill blank", () => {
+    const ok = __testing.checkAnswer(
+      "FILL_BLANK",
+      "$e^{-1/3}$",
+      "exp(-1/3)",
+    );
+    expect(ok).toBe(true);
+  });
 });

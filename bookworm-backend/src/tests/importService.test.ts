@@ -291,6 +291,21 @@ card-001\t问题\t答案\t标签\t3`;
       expect(result[0].answer).toBe("2.718|2.72");
     });
 
+    it("should parse multiline all-correct block as multi choice", () => {
+      const content = `::Q008A:: 下列说法正确的是（ ） {
+=选项A
+=选项B
+=选项C
+}`;
+
+      const result = parseQuestionsGift(content, "limit");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].questionType).toBe(QuestionType.MULTI_CHOICE);
+      expect(result[0].options).toEqual(["选项A", "选项B", "选项C"]);
+      expect(result[0].answer).toBe("选项A|选项B|选项C");
+    });
+
     it("should parse question when stem contains LaTeX braces", () => {
       const content = `::Q009:: 设 $f(x)=x^{2}$，求 $\\lim_{x\\to 0}\\frac{\\sin x}{x}$ 的值 {=1}`;
 
@@ -634,5 +649,20 @@ describe("validateCoursePackage", () => {
     const errors = validateCoursePackageSchema(pkg);
 
     expect(errors.some((e) => e.includes("schema:questions/u1/0/stem"))).toBe(true);
+  });
+
+  it("should detect placeholder content in question", () => {
+    const pkg = createValidPackage();
+    pkg.questions.set("u1", [
+      {
+        contentId: "Q001",
+        questionType: QuestionType.FILL_BLANK,
+        stem: "题目含占位",
+        answer: "答案占位符",
+      },
+    ]);
+
+    const errors = validateCoursePackage(pkg);
+    expect(errors.some((e) => e.includes("Contains placeholder content"))).toBe(true);
   });
 });

@@ -65,5 +65,18 @@ describe("quizService helper functions", () => {
       expect(idx.sort()).toEqual([0, 2]);
     });
   });
-});
 
+  describe("normalizeLegacyFillBlankQuestion", () => {
+    it("converts legacy fill-blank all-correct block into multi choice", () => {
+      const normalized = __testing.normalizeLegacyFillBlankQuestion({
+        questionType: "FILL_BLANK",
+        answerJson: "A\n=B\n=C",
+        optionsJson: null,
+      } as any);
+
+      expect(normalized.questionType).toBe("MULTI_CHOICE");
+      expect(normalized.optionsJson).toEqual(["A", "B", "C"]);
+      expect(normalized.answerJson).toBe("A|B|C");
+    });
+  });
+});
