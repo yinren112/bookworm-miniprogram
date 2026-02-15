@@ -1,0 +1,71 @@
+[
+  {
+    "title": "计算机基础 5 分钟速记",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "version": 1,
+    "content": "# 五大部件\n\n- 控制器\n- 运算器\n- 存储器\n- 输入设备\n- 输出设备\n\n# 一句话\n\n硬件是身体，软件是灵魂。"
+  },
+  {
+    "title": "硬件与存储高频考点",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "unitKey": "exam_2023_2024_1",
+    "version": 1,
+    "content": "# 高频结论\n\n- 核心部件：CPU\n- 速度：内存 > SSD > 机械硬盘 > 光盘\n- 1KB = 1024B\n- 汉字编码（基础课口径）：16位"
+  },
+  {
+    "title": "网络与安全冲刺",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "unitKey": "exam_2023_2024_1",
+    "version": 1,
+    "content": "# 网络\n\n- 功能：资源共享、数据通信、分布式处理\n- 拓扑：星型、总线型、环型、树型\n\n# 安全\n\n- 强密码\n- 系统补丁\n- 防火墙\n- 杀毒软件\n- 备份"
+  },
+  {
+    "title": "Office 三件套函数与快捷键",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "version": 1,
+    "content": "# Word\n\n- 查找：Ctrl + F\n- 另存为：文件 -> 另存为\n\n# Excel\n\n- SUM / AVERAGE / MAX\n- 保存：Ctrl + S\n\n# PowerPoint\n\n- 放映结束：Esc"
+  },
+  {
+    "title": "系统软件 vs 应用软件",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "unitKey": "exam_2022_2023_1",
+    "version": 1,
+    "content": "# 系统软件\n\n- 操作系统\n- 编译程序\n- 数据库管理系统\n\n# 应用软件\n\n- Office\n- 浏览器\n- 即时通讯工具"
+  },
+  {
+    "title": "Windows 文件管理考前速看",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "unitKey": "exam_2022_2023_1_alt",
+    "version": 1,
+    "content": "# 高频操作\n\n- 移动：剪切 + 粘贴\n- 复制：复制 + 粘贴\n- 选不连续文件：Ctrl + 单击\n- 程序卡死：Ctrl + Alt + Del"
+  },
+  {
+    "title": "Excel 经典版本必背点",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "unitKey": "exam_2022_2023_1_alt",
+    "version": 1,
+    "content": "# 经典版本（2003）\n\n- 扩展名：.xls\n- 默认工作表：3个\n- 最大列数：256\n- 填充柄：右下角\n- 绝对引用符号：$"
+  },
+  {
+    "title": "判断题避坑表",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "unitKey": "exam_2022_2023_1_alt",
+    "version": 1,
+    "content": "# 常见“错”项\n\n- 任务栏永远不能移动（错）\n- 回收站不占空间（错）\n- 页码只能从第一页开始（错）\n\n# 常见“对”项\n\n- 分类汇总可多选\n- 工作簿可重命名\n- 幻灯片是演示文稿基本单位"
+  },
+  {
+    "title": "冲刺答题顺序建议",
+    "assetType": "note",
+    "contentFormat": "markdown",
+    "version": 1,
+    "content": "# 120分钟建议\n\n1. 选择题与判断题先做完\n2. 再做填空题\n3. 最后做简答与论述\n\n客观题先拿满，主观题再争上限。"
+  }
+]
